@@ -1,17 +1,33 @@
 import psycopg2
 import requests
 from datetime import datetime, date
+import os
 
 # --- Настройки базы данных ---
-PG_HOST = "aws-0-eu-central-1.pooler.supabase.com"
-PG_DB = "postgres"
-PG_USER = "postgres.torlfffeghukusovmxsv"
-PG_PASSWORD = "qogheb-jynsi4-mispiH"
-PG_PORT = 6543
+PG_HOST = os.environ.get('SUPABASE_HOST')
+PG_DB = os.environ.get('SUPABASE_DB')
+PG_USER = os.environ.get('SUPABASE_USER')
+PG_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
+PG_PORT = os.environ.get('SUPABASE_PORT')
 
 # --- Настройки Telegram ---
-TELEGRAM_TOKEN = "8056760905:AAHtjq1DbUkoNGz1Xx3jEkUI8vLwWxvfbzE"
-CHAT_ID = "-1001866680518"
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
+# Проверка наличия всех необходимых переменных окружения
+required_env_vars = {
+    'SUPABASE_HOST': PG_HOST,
+    'SUPABASE_DB': PG_DB,
+    'SUPABASE_USER': PG_USER,
+    'SUPABASE_PASSWORD': PG_PASSWORD,
+    'SUPABASE_PORT': PG_PORT,
+    'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN,
+    'TELEGRAM_CHAT_ID': CHAT_ID
+}
+
+missing_vars = [var for var, value in required_env_vars.items() if not value]
+if missing_vars:
+    raise ValueError(f"Отсутствуют следующие переменные окружения: {', '.join(missing_vars)}")
 
 def count_tasks_by_type(start_date, end_date):
     conn = psycopg2.connect(

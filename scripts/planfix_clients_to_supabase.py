@@ -3,20 +3,37 @@ import xml.etree.ElementTree as ET
 import psycopg2
 import json
 from datetime import datetime
+import os
 
 # --- Настройки Planfix ---
 API_URL = "https://api.planfix.com/xml/"
-API_KEY = "393bbe17b391c335356c67ebf586c020"
-TOKEN = "964fdc4d11e21792288d39dfab239c1b"
-ACCOUNT = "alumineu"
+API_KEY = os.environ.get('PLANFIX_API_KEY')
+TOKEN = os.environ.get('PLANFIX_TOKEN')
+ACCOUNT = os.environ.get('PLANFIX_ACCOUNT')
 TEMPLATE_ID = 20  # id нужного шаблона компании
 
 # --- Настройки базы данных ---
-PG_HOST = "aws-0-eu-central-1.pooler.supabase.com"
-PG_DB = "postgres"
-PG_USER = "postgres.torlfffeghukusovmxsv"
-PG_PASSWORD = "qogheb-jynsi4-mispiH"
-PG_PORT = 6543
+PG_HOST = os.environ.get('SUPABASE_HOST')
+PG_DB = os.environ.get('SUPABASE_DB')
+PG_USER = os.environ.get('SUPABASE_USER')
+PG_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
+PG_PORT = os.environ.get('SUPABASE_PORT')
+
+# Проверка наличия всех необходимых переменных окружения
+required_env_vars = {
+    'PLANFIX_API_KEY': API_KEY,
+    'PLANFIX_TOKEN': TOKEN,
+    'PLANFIX_ACCOUNT': ACCOUNT,
+    'SUPABASE_HOST': PG_HOST,
+    'SUPABASE_DB': PG_DB,
+    'SUPABASE_USER': PG_USER,
+    'SUPABASE_PASSWORD': PG_PASSWORD,
+    'SUPABASE_PORT': PG_PORT
+}
+
+missing_vars = [var for var, value in required_env_vars.items() if not value]
+if missing_vars:
+    raise ValueError(f"Отсутствуют следующие переменные окружения: {', '.join(missing_vars)}")
 
 # Сопоставление custom field name -> column name
 custom_map = {
