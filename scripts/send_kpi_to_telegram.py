@@ -1,64 +1,68 @@
 import psycopg2
 import requests
-from datetime import datetime, date
+from datetime import datetime, date, timedelta # Added timedelta
 import os
+import logging # Added logging
+from scripts.config import MANAGERS_KPI 
 
-# --- Настройки базы данных ---
+# --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')
 PG_DB = os.environ.get('SUPABASE_DB')
 PG_USER = os.environ.get('SUPABASE_USER')
 PG_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
 PG_PORT = os.environ.get('SUPABASE_PORT')
 
-# --- Настройки Telegram ---
+# --- Telegram Settings ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-# Проверка наличия всех необходимых переменных окружения
-required_env_vars = {
-    'SUPABASE_HOST': PG_HOST,
-    'SUPABASE_DB': PG_DB,
-    'SUPABASE_USER': PG_USER,
-    'SUPABASE_PASSWORD': PG_PASSWORD,
-    'SUPABASE_PORT': PG_PORT,
-    'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN,
-    'TELEGRAM_CHAT_ID': CHAT_ID
-}
+# Get a logger instance for this module
+logger = logging.getLogger(__name__)
 
-missing_vars = [var for var, value in required_env_vars.items() if not value]
-if missing_vars:
-    raise ValueError(f"Отсутствуют следующие переменные окружения: {', '.join(missing_vars)}")
+# Prepare manager lists for SQL queries
+PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
+PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
 
-def count_tasks_by_type(start_date, end_date):
-    conn = psycopg2.connect(
-        host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT
-    )
-    cur = conn.cursor()
-    
-    print(f"\nDebug - Task query parameters:")
-    print(f"Start date: {start_date}")
-    print(f"End date: {end_date}")
-    
-    # Debug query to check task data format and PRZ tasks specifically
-    cur.execute("""
-        SELECT 
-            owner_name,
-            title,
-            result,
-            closed_at,
-            TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date
-        FROM planfix_tasks
-        WHERE owner_name IN ('Kozik Andrzej', 'Stukalo Nazarii')
-        AND closed_at IS NOT NULL
-        AND TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
-        LIMIT 10;
-    """)
-    print("\nDebug - Sample PRZ task data:")
-    for row in cur.fetchall():
-        print(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}")
-    
-    # Main query for tasks
-    cur.execute("""
+def _check_env_vars():
+    """Checks for required environment variables and logs errors if any are missing."""
+    required_env_vars = {
+        'SUPABASE_HOST': PG_HOST, 'SUPABASE_DB': PG_DB, 'SUPABASE_USER': PG_USER,
+        'SUPABASE_PASSWORD': PG_PASSWORD, 'SUPABASE_PORT': PG_PORT,
+        'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN, 'TELEGRAM_CHAT_ID': CHAT_ID
+    }
+    missing_vars = [var for var, value in required_env_vars.items() if not value]
+    if missing_vars:
+        error_msg = f"Missing environment variables: {', '.join(missing_vars)}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    if not MANAGERS_KPI:
+        error_msg = "MANAGERS_KPI list in config.py is empty. Cannot generate KPI report."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+def _execute_kpi_query(query: str, params: tuple, description: str) -> list:
+    """Helper function to connect, execute query, and close connection."""
+    conn = None
+    try:
+        conn = psycopg2.connect(host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT)
+        cur = conn.cursor()
+        logger.info(f"Executing KPI query for: {description} with params: {params}")
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        logger.info(f"Query for {description} returned {len(rows)} rows.")
+        return rows
+    except psycopg2.Error as e:
+        logger.error(f"Database error during KPI query for {description}: {e}")
+        # Optionally re-raise or return empty list depending on desired error handling
+        raise # Re-raise to stop script if DB query fails
+    finally:
+        if conn:
+            conn.close()
+
+
+def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
+    if not PLANFIX_USER_NAMES: return []
+    query = f"""
         WITH task_counts AS (
         SELECT
             owner_name AS manager,
@@ -82,7 +86,7 @@ def count_tasks_by_type(start_date, end_date):
             closed_at IS NOT NULL
                 AND closed_at >= %s::timestamp
                 AND closed_at < %s::timestamp
-                AND owner_name IN ('Kozik Andrzej', 'Stukalo Nazarii')
+                AND owner_name IN %s
             AND title IS NOT NULL
             AND POSITION('/' IN title) > 0
         GROUP BY
@@ -96,56 +100,18 @@ def count_tasks_by_type(start_date, end_date):
         WHERE task_type IS NOT NULL
         ORDER BY manager, 
             CASE task_type
-                WHEN 'WDM' THEN 1
-                WHEN 'PRZ' THEN 2
-                WHEN 'ZKL' THEN 3
-                WHEN 'SPT' THEN 4
-                WHEN 'MAT' THEN 5
-                WHEN 'NOW' THEN 6
-                WHEN 'MSP' THEN 7
-                WHEN 'TPY' THEN 8
-                WHEN 'WRK' THEN 9
-                WHEN 'OPI' THEN 10
+                WHEN 'WDM' THEN 1 WHEN 'PRZ' THEN 2 WHEN 'ZKL' THEN 3 WHEN 'SPT' THEN 4
+                WHEN 'MAT' THEN 5 WHEN 'NOW' THEN 6 WHEN 'MSP' THEN 7 WHEN 'TPY' THEN 8
+                WHEN 'WRK' THEN 9 WHEN 'OPI' THEN 10 ELSE 11
             END;
-    """, (start_date, end_date))
-    rows = cur.fetchall()
-    print("\nDebug - Task results:")
-    for row in rows:
-        print(f"Manager: {row[0]}, Type: {row[1]}, Count: {row[2]}")
-    cur.close()
-    conn.close()
-    return rows
+    """
+    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
 
-def count_offers(start_date, end_date):
-    conn = psycopg2.connect(
-        host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT
-    )
-    cur = conn.cursor()
-    
-    print(f"\nDebug - Offer query parameters:")
-    print(f"Start date: {start_date}")
-    print(f"End date: {end_date}")
-    
-    # Debug query to check offer data format
-    cur.execute("""
-        SELECT 
-            menedzher,
-            data_wyslania_oferty,
-            TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') as parsed_date
-        FROM planfix_orders
-        WHERE menedzher IN ('945243', '945245')
-        AND data_wyslania_oferty IS NOT NULL
-        AND data_wyslania_oferty != ''
-        LIMIT 5;
-    """)
-    print("\nDebug - Sample offer data:")
-    for row in cur.fetchall():
-        print(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
-    
-    # Main query for offers
-    cur.execute("""
+def count_offers(start_date_str: str, end_date_str: str) -> list:
+    if not PLANFIX_USER_IDS: return []
+    query = f"""
         SELECT
-            menedzher AS manager,
+            menedzher AS manager_id,
             COUNT(*) AS offer_count
         FROM
             planfix_orders
@@ -154,344 +120,222 @@ def count_offers(start_date, end_date):
             AND data_wyslania_oferty != ''
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') < %s::timestamp
-            AND menedzher IN ('945243', '945245')
+            AND menedzher IN %s
         GROUP BY
             menedzher;
-    """, (start_date, end_date))
-    rows = cur.fetchall()
-    print("\nDebug - Offer results:")
-    for row in rows:
-        print(f"Manager: {row[0]}, Count: {row[1]}")
-    cur.close()
-    conn.close()
-    return rows
+    """
+    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
 
-def count_orders(start_date, end_date):
-    conn = psycopg2.connect(
-        host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT
-    )
-    cur = conn.cursor()
-    
-    print(f"\nDebug - Order query parameters:")
-    print(f"Start date: {start_date}")
-    print(f"End date: {end_date}")
-    
-    # Debug query to check order data format
-    cur.execute("""
-        SELECT 
-            menedzher,
-            data_potwierdzenia_zamowienia,
-            TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') as parsed_date
-        FROM planfix_orders
-        WHERE menedzher IN ('945243', '945245')
-        AND data_potwierdzenia_zamowienia IS NOT NULL
-        AND data_potwierdzenia_zamowienia != ''
-        LIMIT 5;
-    """)
-    print("\nDebug - Sample order data:")
-    for row in cur.fetchall():
-        print(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
-    
-    cur.execute("""
+def count_orders(start_date_str: str, end_date_str: str) -> list:
+    if not PLANFIX_USER_IDS: return []
+    query = f"""
         WITH order_metrics AS (
-            -- Count confirmed orders (ZAM)
             SELECT
-                menedzher AS manager,
-                COUNT(*) AS order_count,
-                0 AS total_amount
-            FROM
-                planfix_orders
-            WHERE
-                data_potwierdzenia_zamowienia IS NOT NULL
-                AND data_potwierdzenia_zamowienia != ''
+                menedzher AS manager_id, COUNT(*) AS order_count, 0 AS total_amount
+            FROM planfix_orders
+            WHERE data_potwierdzenia_zamowienia IS NOT NULL AND data_potwierdzenia_zamowienia != ''
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') < %s::timestamp
-                AND menedzher IN ('945243', '945245')
-            GROUP BY
-                menedzher
+                AND menedzher IN %s
+            GROUP BY menedzher
             UNION ALL
-            -- Calculate revenue (PRC) for realized orders
             SELECT
-                menedzher AS manager,
-                0 AS order_count,
+                menedzher AS manager_id, 0 AS order_count,
                 COALESCE(SUM(NULLIF(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) AS total_amount
-            FROM
-                planfix_orders
-            WHERE
-                data_realizacji IS NOT NULL
-                AND data_realizacji != ''
+            FROM planfix_orders
+            WHERE data_realizacji IS NOT NULL AND data_realizacji != ''
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
-                AND menedzher IN ('945243', '945245')
-            GROUP BY
-                menedzher
+                AND menedzher IN %s
+            GROUP BY menedzher
         )
-        SELECT 
-            manager,
-            SUM(order_count) AS order_count,
-            SUM(total_amount) AS total_amount
+        SELECT manager_id, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount
         FROM order_metrics
-        GROUP BY manager;
-    """, (start_date, end_date, start_date, end_date))
-    rows = cur.fetchall()
-    print("\nDebug - Order results:")
-    for row in rows:
-        print(f"Manager: {row[0]}, Count: {row[1]}, Amount: {row[2]}")
-    cur.close()
-    conn.close()
-    return rows
+        GROUP BY manager_id;
+    """
+    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
 
-def count_client_statuses(start_date, end_date):
-    conn = psycopg2.connect(
-        host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT
-    )
-    cur = conn.cursor()
-    
-    print(f"\nDebug - Client status query parameters:")
-    print(f"Start date: {start_date}")
-    print(f"End date: {end_date}")
-    
-    # Debug query to check client data format
-    cur.execute("""
-        SELECT 
-            menedzer,
-            data_dodania_do_nowi,
-            data_dodania_do_w_trakcie,
-            data_dodania_do_perspektywiczni,
-            TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') as parsed_date_nowi,
-            TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') as parsed_date_w_trakcie,
-            TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') as parsed_date_perspektywiczni
-        FROM planfix_clients
-        WHERE menedzer IN ('Kozik Andrzej', 'Stukalo Nazarii')
-        AND (data_dodania_do_nowi IS NOT NULL 
-             OR data_dodania_do_w_trakcie IS NOT NULL 
-             OR data_dodania_do_perspektywiczni IS NOT NULL)
-        LIMIT 5;
-    """)
-    print("\nDebug - Sample client data:")
-    for row in cur.fetchall():
-        print(f"Manager: {row[0]}, NWI: {row[1]}, WTR: {row[2]}, PSK: {row[3]}")
-        print(f"Parsed dates - NWI: {row[4]}, WTR: {row[5]}, PSK: {row[6]}")
-    
-    cur.execute("""
+def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
+    if not PLANFIX_USER_NAMES: return []
+    # Using date part of start/end date strings for client status as they are DD-MM-YYYY
+    # The query casts to ::date anyway, so sending full timestamp string is fine.
+    query = f"""
         WITH client_statuses AS (
-            SELECT
-                menedzer AS manager,
-                'NWI' as status,
-                COUNT(*) as count
-            FROM
-                planfix_clients
-            WHERE
-                data_dodania_do_nowi IS NOT NULL
+            SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
+            FROM planfix_clients
+            WHERE data_dodania_do_nowi IS NOT NULL AND data_dodania_do_nowi != ''
                 AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN ('Kozik Andrzej', 'Stukalo Nazarii')
-            GROUP BY
-                menedzer
+                AND menedzer IN %s
+            GROUP BY menedzer
             UNION ALL
-            SELECT
-                menedzer AS manager,
-                'WTR' as status,
-                COUNT(*) as count
-            FROM
-                planfix_clients
-            WHERE
-                data_dodania_do_w_trakcie IS NOT NULL
+            SELECT menedzer AS manager, 'WTR' as status, COUNT(*) as count
+            FROM planfix_clients
+            WHERE data_dodania_do_w_trakcie IS NOT NULL AND data_dodania_do_w_trakcie != ''
                 AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN ('Kozik Andrzej', 'Stukalo Nazarii')
-            GROUP BY
-                menedzer
+                AND menedzer IN %s
+            GROUP BY menedzer
             UNION ALL
-            SELECT
-                menedzer AS manager,
-                'PSK' as status,
-                COUNT(*) as count
-            FROM
-                planfix_clients
-            WHERE
-                data_dodania_do_perspektywiczni IS NOT NULL
+            SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
+            FROM planfix_clients
+            WHERE data_dodania_do_perspektywiczni IS NOT NULL AND data_dodania_do_perspektywiczni != ''
                 AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN ('Kozik Andrzej', 'Stukalo Nazarii')
-            GROUP BY
-                menedzer
+                AND menedzer IN %s
+            GROUP BY menedzer
         )
-        SELECT 
-            manager,
-            status,
-            count
-        FROM client_statuses
-        ORDER BY manager, status;
-    """, (start_date, end_date, start_date, end_date, start_date, end_date))
-    rows = cur.fetchall()
-    print("\nDebug - Client status results:")
-    for row in rows:
-        print(f"Manager: {row[0]}, Status: {row[1]}, Count: {row[2]}")
-    cur.close()
-    conn.close()
-    return rows
+        SELECT manager, status, count FROM client_statuses ORDER BY manager, status;
+    """
+    return _execute_kpi_query(query, (
+        start_date_str.split(' ')[0], end_date_str.split(' ')[0], PLANFIX_USER_NAMES,
+        start_date_str.split(' ')[0], end_date_str.split(' ')[0], PLANFIX_USER_NAMES,
+        start_date_str.split(' ')[0], end_date_str.split(' ')[0], PLANFIX_USER_NAMES
+    ), "client statuses")
+
 
 def send_to_telegram(task_results, offer_results, order_results, client_results, report_type):
-    # Initialize data structure for each manager
-    managers = {
-        '945243': 'Kozik Andrzej',
-        '945245': 'Stukalo Nazarii'
+    logger.info(f"Preparing {report_type} KPI report for Telegram.")
+    data = {
+        mgr_info['planfix_user_id']: {
+            'WDM': 0, 'ZKL': 0, 'PRZ': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0, 'MSP': 0, 
+            'TPY': 0, 'WRK': 0, 'OPI': 0, 'OFW': 0, 'TTL': 0, 'ZAM': 0, 
+            'PRC': 0.0, 'NWI': 0, 'WTR': 0, 'PSK': 0,
+            'name': mgr_info['planfix_user_name'], 'alias': mgr_info['telegram_alias']
+        } for mgr_info in MANAGERS_KPI
     }
-    data = {manager_id: {
-        'WDM': 0, 'ZKL': 0, 'PRZ': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0,
-        'MSP': 0, 'TPY': 0, 'WRK': 0, 'OPI': 0, 'OFW': 0,
-        'TTL': 0, 'ZAM': 0, 'PRC': 0,
-        'NWI': 0, 'WTR': 0, 'PSK': 0
-    } for manager_id in managers.keys()}
+    name_to_id_map = {m['planfix_user_name']: m['planfix_user_id'] for m in MANAGERS_KPI}
+
+    for manager_name, task_type, count in task_results:
+        manager_id = name_to_id_map.get(manager_name)
+        if manager_id and task_type in data[manager_id]:
+            data[manager_id][task_type] = count
+            data[manager_id]['TTL'] += count
     
-    # Process task results
-    for manager, task_type, count in task_results:
-        if manager in ['Kozik Andrzej', 'Stukalo Nazarii']:
-            manager_id = '945243' if manager == 'Kozik Andrzej' else '945245'
-            if task_type in data[manager_id]:
-                data[manager_id][task_type] = count
-                data[manager_id]['TTL'] += count
-    
-    # Process offer results
     for manager_id, count in offer_results:
-        if manager_id in data:
-            data[manager_id]['OFW'] = count
+        if manager_id in data: data[manager_id]['OFW'] = count
     
-    # Process order results
     for manager_id, count, amount in order_results:
         if manager_id in data:
             data[manager_id]['ZAM'] = count
-            data[manager_id]['PRC'] = amount
+            data[manager_id]['PRC'] = float(amount) if amount is not None else 0.0
     
-    # Process client status results
-    for manager, status, count in client_results:
-        if manager in ['Kozik Andrzej', 'Stukalo Nazarii']:
-            manager_id = '945243' if manager == 'Kozik Andrzej' else '945245'
-            if status in data[manager_id]:
-                data[manager_id][status] = count
+    for manager_name, status, count in client_results:
+        manager_id = name_to_id_map.get(manager_name)
+        if manager_id and status in data[manager_id]: data[manager_id][status] = count
     
-    # Get current date for report title
-    current_date = datetime.now()
-    if report_type == 'daily':
-        report_title = f"RAPORT {current_date.strftime('%d.%m.%Y')}"
-    else:  # monthly
-        report_title = f"RAPORT {current_date.strftime('%m.%Y')}"
+    current_dt = datetime.now()
+    report_title_date = current_dt.strftime('%d.%m.%Y') if report_type == 'daily' else current_dt.strftime('%m.%Y')
+    report_title = f"RAPORT {report_title_date}"
     
-    # Format the table
-    text = "```\n"  # Start monospace formatting
-    text += f"{report_title}\n"
-    text += "════════════════════════\n"
-    text += "KPI | Kozik   | Stukalo\n"
-    text += "────────────────────────\n"
-    
-    # Add task metrics in specific order, skipping if both managers have 0
+    text = "```\n" + f"{report_title}\n"
+    aliases = [mgr_data['alias'].ljust(7) for mgr_data in data.values()] # ljust for alignment
+    header_line = "KPI | " + " | ".join(aliases) + "\n"
+    separator_line = "═" * (len(header_line) -1) + "\n" # -1 for newline char
+    light_separator_line = "─" * (len(header_line) -1) + "\n"
+
+    text += separator_line + header_line + light_separator_line
+
     text += "zadania\n"
     task_order = ['WDM', 'PRZ', 'SPT', 'MAT', 'ZKL', 'TPY', 'MSP', 'NOW', 'WRK', 'OPI']
-    has_any_tasks = False
+    has_any_tasks_overall = False
     for task_type in task_order:
-        kozik_value = data['945243'][task_type]
-        stukalo_value = data['945245'][task_type]
-        if kozik_value != 0 or stukalo_value != 0:
-            if not has_any_tasks:
-                has_any_tasks = True
-            text += f"{task_type} | {int(kozik_value):7d} | {int(stukalo_value):8d}\n"
+        values = [data[mgr_id][task_type] for mgr_id in data]
+        if any(v != 0 for v in values):
+            has_any_tasks_overall = True
+            line_values = " | ".join([f"{int(data[mgr_id][task_type]):7d}" for mgr_id in data])
+            text += f"{task_type.ljust(3)} | {line_values}\n"
+    if has_any_tasks_overall:
+        text += light_separator_line
+        ttl_values = " | ".join([f"{int(data[mgr_id]['TTL']):7d}" for mgr_id in data])
+        text += f"TTL | {ttl_values}\n"
     
-    if has_any_tasks:
-        text += "────────────────────────\n"
-        text += f"TTL | {int(data['945243']['TTL']):7d} | {int(data['945245']['TTL']):8d}\n"
-    
-    # Add client status metrics if any are non-zero
-    text += "────────────────────────\n"
-    text += "klienci\n"
+    text += light_separator_line + "klienci\n"
     status_order = ['NWI', 'WTR', 'PSK']
-    has_any_statuses = False
     for status in status_order:
-        kozik_value = data['945243'][status]
-        stukalo_value = data['945245'][status]
-        if kozik_value != 0 or stukalo_value != 0:
-            if not has_any_statuses:
-                has_any_statuses = True
-            text += f"{status} | {int(kozik_value):7d} | {int(stukalo_value):8d}\n"
-    
-    # Add order metrics if any are non-zero
-    text += "────────────────────────\n"
-    text += "zamówienia\n"
-    has_any_orders = False
-    
-    # Add OFW first
-    if data['945243']['OFW'] != 0 or data['945245']['OFW'] != 0:
-        has_any_orders = True
-        text += f"OFW | {int(data['945243']['OFW']):7d} | {int(data['945245']['OFW']):8d}\n"
-    
-    # Then add ZAM
-    if data['945243']['ZAM'] != 0 or data['945245']['ZAM'] != 0:
-        if not has_any_orders:
-            text += "────────────────────────\n"
-        has_any_orders = True
-        text += f"ZAM | {int(data['945243']['ZAM']):7d} | {int(data['945245']['ZAM']):8d}\n"
-    
-    # Finally add PRC
-    if data['945243']['PRC'] != 0 or data['945245']['PRC'] != 0:
-        if not has_any_orders:
-            text += "────────────────────────\n"
-        has_any_orders = True
-        text += f"PRC | {float(data['945243']['PRC']):7.0f} | {float(data['945245']['PRC']):8.0f}\n"
-    
-    text += "════════════════════════\n"
-    text += "```"  # End monospace formatting
+        values = [data[mgr_id][status] for mgr_id in data]
+        if any(v != 0 for v in values):
+            line_values = " | ".join([f"{int(data[mgr_id][status]):7d}" for mgr_id in data])
+            text += f"{status.ljust(3)} | {line_values}\n"
+            
+    text += light_separator_line + "zamówienia\n"
+    order_kpis = ['OFW', 'ZAM', 'PRC']
+    for kpi in order_kpis:
+        values = [data[mgr_id][kpi] for mgr_id in data]
+        if any(v != 0 for v in values):
+            if kpi == 'PRC':
+                line_values = " | ".join([f"{data[mgr_id][kpi]:7.0f}" for mgr_id in data])
+            else:
+                line_values = " | ".join([f"{int(data[mgr_id][kpi]):7d}" for mgr_id in data])
+            text += f"{kpi.ljust(3)} | {line_values}\n"
+            
+    text += separator_line + "```"
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": text,
-        "parse_mode": "Markdown"
-    }
-    response = requests.post(url, data=payload)
-    response.raise_for_status()
+    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+    try:
+        response = requests.post(url, data=payload)
+        response.raise_for_status()
+        logger.info(f"Successfully sent {report_type} KPI report to Telegram chat ID {CHAT_ID}.")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send KPI report to Telegram: {e}")
+        if e.response is not None:
+            logger.error(f"Telegram API response: {e.response.text}")
 
-def get_date_range(report_type):
-    # Use current date instead of 2025
+
+def get_date_range(report_type: str) -> tuple[str, str]:
     today = date.today()
-    
     if report_type == 'daily':
-        start_date = today
-        end_date = today.replace(day=today.day + 1)
+        start_date_obj = datetime(today.year, today.month, today.day)
+        end_date_obj = start_date_obj + timedelta(days=1)
     else:  # monthly
-        start_date = today.replace(day=1)
-        if today.month == 12:
-            end_date = today.replace(year=today.year + 1, month=1, day=1)
-        else:
-            end_date = today.replace(month=today.month + 1, day=1)
-    
-    print(f"\nDebug - Date range for {report_type} report:")
-    print(f"Start date: {start_date}")
-    print(f"End date: {end_date}")
-    
-    # Convert dates to the format used in the database
-    start_date_str = start_date.strftime('%Y-%m-%d')
-    end_date_str = end_date.strftime('%Y-%m-%d')
-    
-    print(f"Formatted start date: {start_date_str}")
-    print(f"Formatted end date: {end_date_str}")
-    
+        # Report for the previous month
+        first_day_current_month = today.replace(day=1)
+        end_date_obj = first_day_current_month # End of previous month (exclusive)
+        start_date_obj = (first_day_current_month - timedelta(days=1)).replace(day=1) # Beginning of previous month
+        
+    start_date_str = start_date_obj.strftime('%Y-%m-%d %H:%M:%S')
+    end_date_str = end_date_obj.strftime('%Y-%m-%d %H:%M:%S')
+    logger.info(f"Generated date range for {report_type} report: {start_date_str} to {end_date_str}")
     return start_date_str, end_date_str
 
+
 if __name__ == "__main__":
-    # Send daily report
-    start_date, end_date = get_date_range('daily')
-    task_results = count_tasks_by_type(start_date, end_date)
-    offer_results = count_offers(start_date, end_date)
-    order_results = count_orders(start_date, end_date)
-    client_results = count_client_statuses(start_date, end_date)
-    send_to_telegram(task_results, offer_results, order_results, client_results, 'daily')
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+    logger.info("Starting KPI Telegram report script.")
     
-    # Send monthly report
-    start_date, end_date = get_date_range('monthly')
-    task_results = count_tasks_by_type(start_date, end_date)
-    offer_results = count_offers(start_date, end_date)
-    order_results = count_orders(start_date, end_date)
-    client_results = count_client_statuses(start_date, end_date)
-    send_to_telegram(task_results, offer_results, order_results, client_results, 'monthly')
-    
-    print("Отчеты отправлены в Telegram.")
+    try:
+        _check_env_vars() # Check environment variables and manager config
+
+        # Send daily report
+        logger.info("Generating daily KPI report.")
+        start_daily, end_daily = get_date_range('daily')
+        tasks_daily = count_tasks_by_type(start_daily, end_daily)
+        offers_daily = count_offers(start_daily, end_daily)
+        orders_daily = count_orders(start_daily, end_daily)
+        clients_daily = count_client_statuses(start_daily, end_daily)
+        send_to_telegram(tasks_daily, offers_daily, orders_daily, clients_daily, 'daily')
+        
+        # Send monthly report only on the 1st day of the month
+        if date.today().day == 1:
+            logger.info("Generating monthly KPI report (it's the 1st of the month).")
+            start_monthly, end_monthly = get_date_range('monthly')
+            tasks_monthly = count_tasks_by_type(start_monthly, end_monthly)
+            offers_monthly = count_offers(start_monthly, end_monthly)
+            orders_monthly = count_orders(start_monthly, end_monthly)
+            clients_monthly = count_client_statuses(start_monthly, end_monthly)
+            send_to_telegram(tasks_monthly, offers_monthly, orders_monthly, clients_monthly, 'monthly')
+        else:
+            logger.info("Skipping monthly report (not the 1st day of the month).")
+            
+        logger.info("KPI Telegram report script finished successfully.")
+
+    except ValueError as e: # Catch config errors from _check_env_vars
+        logger.critical(f"Configuration error: {e}. KPI script cannot proceed.")
+    except Exception as e: # Catch any other unexpected errors
+        logger.critical(f"An unexpected error occurred in the KPI script: {e}")
+        # logger.exception("Details of unexpected error in KPI script:") # For more detailed debugging
