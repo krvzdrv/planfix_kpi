@@ -1,12 +1,13 @@
 import os
-import xml.etree.ElementTree as ET
+import sys
+import logging
 from datetime import datetime
-import time # For potential rate limiting
-import requests # For exception handling
-import logging # Added logging
-import psycopg2 # Added for exception handling
+import xml.etree.ElementTree as ET
+import psycopg2
+import requests
 
-# Assuming planfix_utils is in the same directory or PYTHONPATH is set up
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import scripts.planfix_utils as planfix_utils
 
 # Script-specific constants
@@ -19,70 +20,97 @@ TASKS_PK_COLUMN = "planfix_id" # Primary key in Supabase table
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
 
+def get_planfix_tasks(page):
+    headers = {
+        'Content-Type': 'application/xml',
+        'Accept': 'application/xml'
+    }
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        f'<request method="task.getList">'
+        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
+        f'<pageCurrent>{page}</pageCurrent>'
+        f'<pageSize>100</pageSize>'
+        '<filters>'
+        '  <filter>'
+        '    <type>51</type>'
+        '    <operator>equal</operator>'
+        f'    <value>{TASK_TEMPLATE_ID}</value>'
+        '  </filter>'
+        '</filters>'
+        '<fields>'
+        '  <field>id</field>'
+        '  <field>title</field>'
+        '  <field>description</field>'
+        '  <field>status</field>'
+        '  <field>statusName</field>'
+        '  <field>project</field>'
+        '  <field>assigner</field>'
+        '  <field>owner</field>'
+        '  <field>dateCreate</field>'
+        '  <field>dateStart</field>'
+        '  <field>dateEnd</field>'
+        '  <field>dateComplete</field>'
+        '  <field>lastUpdateDate</field>'
+        '</fields>'
+        '</request>'
+    )
+    response = requests.post(
+        planfix_utils.PLANFIX_API_URL,
+        data=body.encode('utf-8'),
+        headers=headers,
+        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
+    )
+    response.raise_for_status()
+    return response.text
 
-def get_planfix_tasks_xml_page(page: int) -> str:
-    """
-    Retrieves a page of task data from Planfix as XML.
-    Uses TASK_TEMPLATE_ID.
-    """
-    request_body_xml = f"""
-    <task.getList>
-        <general>{TASK_TEMPLATE_ID}</general> 
-        <pageCurrent>{page}</pageCurrent>
-        <pageSize>50</pageSize> 
-    </task.getList>
-    """
-    return planfix_utils.make_planfix_request(request_body_xml)
-
-def parse_task_data_from_xml(xml_text: str) -> list[dict]:
-    """
-    Parses XML text and returns a list of task dictionaries.
-    Each dictionary includes 'updated_at' and 'is_deleted'.
-    Uses planfix_utils.parse_planfix_date_string and planfix_utils.get_planfix_status_name.
-    """
-    tasks_data_list = []
-    try:
-        root = ET.fromstring(xml_text)
-        task_elements = root.findall(".//task")
-
-        for task_element in task_elements:
-            task_data = {}
-            task_data['planfix_id'] = task_element.findtext("id")
-            task_data['title'] = task_element.findtext("title")
-            task_data['description'] = task_element.findtext("description")
-            
-            status_id = task_element.findtext("status/id")
-            if status_id:
-                task_data['status_name'] = planfix_utils.get_planfix_status_name(status_id) # Already logs
-            else:
-                task_data['status_name'] = None 
-            
-            task_data['project_id'] = task_element.findtext("project/id") 
-            task_data['assigner_id'] = task_element.findtext("assigner/id")
-            task_data['owner_id'] = task_element.findtext("owner/id") 
-            
-            task_data['date_created'] = planfix_utils.parse_planfix_date_string(task_element.findtext("dateCreate")) 
-            task_data['start_date'] = planfix_utils.parse_planfix_date_string(task_element.findtext("dateStart"))
-            task_data['due_date'] = planfix_utils.parse_planfix_date_string(task_element.findtext("dateEnd")) 
-            task_data['date_completed'] = planfix_utils.parse_planfix_date_string(task_element.findtext("dateComplete"))
-            task_data['last_update_date'] = planfix_utils.parse_planfix_date_string(task_element.findtext("lastUpdateDate"))
-            
-            task_data['updated_at'] = datetime.now()
-            task_data['is_deleted'] = False
-            
-            if task_data.get(TASKS_PK_COLUMN): 
-                tasks_data_list.append(task_data)
-            else:
-                logger.warning(f"Task element skipped due to missing primary key '{TASKS_PK_COLUMN}'. Element: {ET.tostring(task_element, encoding='unicode')[:200]}...")
-        return tasks_data_list
-
-    except ET.ParseError as e:
-        logger.error(f"Error parsing XML for tasks: {e}. XML snippet: {xml_text[:200]}...")
+def parse_tasks(xml_text):
+    root = ET.fromstring(xml_text)
+    if root.attrib.get("status") == "error":
+        code = root.findtext("code")
+        message = root.findtext("message")
+        logger.error(f"Ошибка Planfix API: code={code}, message={message}")
         return []
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during task parsing: {e}")
-        # logger.exception("Details of unexpected error during task parsing:")
-        return tasks_data_list 
+    tasks = []
+    for task in root.findall('.//task'):
+        def get_text(tag):
+            el = task.find(tag)
+            return el.text if el is not None else None
+
+        tasks.append({
+            "planfix_id": int(get_text('id')) if get_text('id') else None,
+            "title": get_text('title'),
+            "description": get_text('description'),
+            "status": get_text('statusName') or get_text('status'),
+            "project_id": int(get_text('project/id')) if get_text('project/id') else None,
+            "project_title": get_text('project/title'),
+            "assigner_id": int(get_text('assigner/id')) if get_text('assigner/id') else None,
+            "assigner_name": get_text('assigner/name'),
+            "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
+            "owner_name": get_text('owner/name'),
+            "date_created": planfix_utils.parse_planfix_date_string(get_text('dateCreate')),
+            "start_date": planfix_utils.parse_planfix_date_string(get_text('dateStart')),
+            "due_date": planfix_utils.parse_planfix_date_string(get_text('dateEnd')),
+            "date_completed": planfix_utils.parse_planfix_date_string(get_text('dateComplete')),
+            "last_update_date": planfix_utils.parse_planfix_date_string(get_text('lastUpdateDate')),
+            "updated_at": datetime.now(),
+            "is_deleted": False
+        })
+    return tasks
+
+def upsert_tasks(tasks, supabase_conn):
+    if not tasks:
+        return
+    first_item_keys = tasks[0].keys()
+    all_column_names = list(first_item_keys)
+    planfix_utils.upsert_data_to_supabase(
+        supabase_conn,
+        TASKS_TABLE_NAME,
+        TASKS_PK_COLUMN,
+        all_column_names,
+        tasks
+    )
+    logger.info(f"Upserted {len(tasks)} tasks.")
 
 def main():
     """
@@ -97,7 +125,7 @@ def main():
 
     required_env_vars = {
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_USER_TOKEN': planfix_utils.PLANFIX_USER_TOKEN,
+        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
         'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING
     }
@@ -110,95 +138,37 @@ def main():
     supabase_conn = None
     try:
         supabase_conn = planfix_utils.get_supabase_connection()
-        
-        current_page = 0
-        all_processed_task_ids = [] 
-
+        all_tasks = []
+        all_ids = []
+        page = 1
         while True:
-            logger.info(f"Fetching page {current_page} of tasks...")
-            try:
-                xml_data = get_planfix_tasks_xml_page(current_page)
-                page_tasks_data = parse_task_data_from_xml(xml_data)
-
-                if not page_tasks_data:
-                    if "<task>" not in xml_data and current_page > 0 :
-                         logger.info("No more tasks found. Exiting loop.")
-                         break
-                    elif "<task>" not in xml_data and current_page == 0:
-                         logger.info("No tasks found on the first page.")
-                         break
-                    elif not page_tasks_data and "<error>" in xml_data :
-                        logger.error("Planfix API returned an error while fetching tasks. Stopping.")
-                        break
-                    logger.info("No task data found on this page, assuming end of data or parse error logged previously.")
-                    break
-                
-                if page_tasks_data:
-                    for task_dict in page_tasks_data:
-                        pk_value = task_dict.get(TASKS_PK_COLUMN)
-                        if pk_value is not None:
-                             try: 
-                                all_processed_task_ids.append(int(pk_value))
-                             except ValueError:
-                                logger.warning(f"Task ID '{pk_value}' is not an integer. Skipping for deletion marking list.")
-                    
-                    first_item_keys = page_tasks_data[0].keys()
-                    all_column_names = list(first_item_keys)
-
-                    if TASKS_PK_COLUMN not in all_column_names:
-                        logger.critical(f"Primary key '{TASKS_PK_COLUMN}' not in data keys. Skipping upsert for this page.")
-                    else:
-                        planfix_utils.upsert_data_to_supabase(
-                            supabase_conn,
-                            TASKS_TABLE_NAME,
-                            TASKS_PK_COLUMN,
-                            all_column_names,
-                            page_tasks_data
-                        )
-                        logger.info(f"Upserted {len(page_tasks_data)} tasks from page {current_page}.")
-                else:
-                    logger.info(f"No data to upsert for page {current_page}. This might be due to parsing errors for all items on the page or end of data.")
-
-                current_page += 1
-                # time.sleep(0.5) 
-
-            except requests.exceptions.RequestException as e: 
-                logger.error(f"API request failed when fetching tasks on page {current_page}: {e}")
-                break 
-            except Exception as e: 
-                logger.error(f"An unexpected error occurred processing page {current_page} of tasks: {e}")
-                # logger.exception("Details of unexpected error:")
+            logger.info(f"Fetching page {page} of tasks...")
+            xml = get_planfix_tasks(page)
+            if page == 1:
+                logger.debug("----- XML-ответ первой страницы -----")
+                logger.debug(xml[:2000])
+                logger.debug("----- Конец XML-ответа -----")
+            tasks = parse_tasks(xml)
+            if not tasks:
                 break
-
-
-        if supabase_conn:
-            if not all_processed_task_ids and current_page == 0 :
-                logger.info("No tasks were found in Planfix. Marking all existing tasks in Supabase as deleted.")
-                planfix_utils.mark_items_as_deleted_in_supabase(
-                    supabase_conn, TASKS_TABLE_NAME, TASKS_PK_COLUMN, [] 
-                )
-            elif all_processed_task_ids:
-                logger.info(f"Total processed task IDs for deletion check: {len(all_processed_task_ids)}")
-                planfix_utils.mark_items_as_deleted_in_supabase(
-                    supabase_conn, TASKS_TABLE_NAME, TASKS_PK_COLUMN, all_processed_task_ids 
-                )
-                logger.info(f"Marked tasks not in the current batch as deleted.") # Already logged in util
-            else:
-                 logger.warning("No new task IDs were processed successfully. Skipping deletion marking to avoid data loss due to potential errors (e.g. API or parsing issues partway through).")
-
-
-    except psycopg2.Error as e: 
+            upsert_tasks(tasks, supabase_conn)
+            all_tasks.extend(tasks)
+            all_ids.extend([t[TASKS_PK_COLUMN] for t in tasks if t[TASKS_PK_COLUMN] is not None])
+            logger.info(f"Загружено задач на странице {page}: {len(tasks)}")
+            if len(tasks) < 100:
+                break
+            page += 1
+        logger.info(f"Всего загружено задач: {len(all_tasks)}")
+        # Можно добавить пометку удалённых, если нужно
+    except psycopg2.Error as e:
         logger.critical(f"Supabase connection error: {e}")
-    except ValueError as e: # From check_required_env_vars
-        logger.critical(f"Configuration error (likely missing env vars, logged earlier): {e}")
-    except Exception as e: 
-        logger.critical(f"An unexpected critical error occurred in main tasks sync: {e}")
-        # logger.exception("Details of critical unexpected error:")
+    except Exception as e:
+        logger.critical(f"An unexpected critical error occurred in main task sync: {e}")
     finally:
         if supabase_conn:
             supabase_conn.close()
             logger.info("Supabase connection closed.")
-        logger.info("Tasks synchronization finished.")
+        logger.info("Task synchronization finished.")
 
 if __name__ == "__main__":
     main()

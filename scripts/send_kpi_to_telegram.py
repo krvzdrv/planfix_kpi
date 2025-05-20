@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, date, timedelta # Added timedelta
 import os
 import logging # Added logging
-from scripts.config import MANAGERS_KPI 
+from config import MANAGERS_KPI 
 
 # --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')
@@ -69,8 +69,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' 
-                         AND result = 'Klient jest zainteresowany' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Wysłać materiały' THEN 'MAT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
@@ -89,6 +88,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND owner_name IN %s
             AND title IS NOT NULL
             AND POSITION('/' IN title) > 0
+            AND is_deleted = false
         GROUP BY
             owner_name, task_type
         )
@@ -137,6 +137,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') < %s::timestamp
                 AND menedzher IN %s
+                AND is_deleted = false
             GROUP BY menedzher
             UNION ALL
             SELECT
@@ -147,6 +148,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
                 AND menedzher IN %s
+                AND is_deleted = false
             GROUP BY menedzher
         )
         SELECT manager_id, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount
@@ -157,8 +159,6 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
 
 def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_NAMES: return []
-    # Using date part of start/end date strings for client status as they are DD-MM-YYYY
-    # The query casts to ::date anyway, so sending full timestamp string is fine.
     query = f"""
         WITH client_statuses AS (
             SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
@@ -167,6 +167,7 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
                 AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
                 AND menedzer IN %s
+                AND is_deleted = false
             GROUP BY menedzer
             UNION ALL
             SELECT menedzer AS manager, 'WTR' as status, COUNT(*) as count
@@ -175,6 +176,7 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
                 AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s::date
                 AND menedzer IN %s
+                AND is_deleted = false
             GROUP BY menedzer
             UNION ALL
             SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
@@ -183,6 +185,7 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
                 AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
                 AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
                 AND menedzer IN %s
+                AND is_deleted = false
             GROUP BY menedzer
         )
         SELECT manager, status, count FROM client_statuses ORDER BY manager, status;
@@ -289,10 +292,12 @@ def get_date_range(report_type: str) -> tuple[str, str]:
         start_date_obj = datetime(today.year, today.month, today.day)
         end_date_obj = start_date_obj + timedelta(days=1)
     else:  # monthly
-        # Report for the previous month
-        first_day_current_month = today.replace(day=1)
-        end_date_obj = first_day_current_month # End of previous month (exclusive)
-        start_date_obj = (first_day_current_month - timedelta(days=1)).replace(day=1) # Beginning of previous month
+        # Report for the current month
+        start_date_obj = today.replace(day=1)
+        if today.month == 12:
+            end_date_obj = datetime(today.year + 1, 1, 1)
+        else:
+            end_date_obj = datetime(today.year, today.month + 1, 1)
         
     start_date_str = start_date_obj.strftime('%Y-%m-%d %H:%M:%S')
     end_date_str = end_date_obj.strftime('%Y-%m-%d %H:%M:%S')
@@ -320,17 +325,14 @@ if __name__ == "__main__":
         clients_daily = count_client_statuses(start_daily, end_daily)
         send_to_telegram(tasks_daily, offers_daily, orders_daily, clients_daily, 'daily')
         
-        # Send monthly report only on the 1st day of the month
-        if date.today().day == 1:
-            logger.info("Generating monthly KPI report (it's the 1st of the month).")
-            start_monthly, end_monthly = get_date_range('monthly')
-            tasks_monthly = count_tasks_by_type(start_monthly, end_monthly)
-            offers_monthly = count_offers(start_monthly, end_monthly)
-            orders_monthly = count_orders(start_monthly, end_monthly)
-            clients_monthly = count_client_statuses(start_monthly, end_monthly)
-            send_to_telegram(tasks_monthly, offers_monthly, orders_monthly, clients_monthly, 'monthly')
-        else:
-            logger.info("Skipping monthly report (not the 1st day of the month).")
+        # Send monthly report always
+        logger.info("Generating monthly KPI report.")
+        start_monthly, end_monthly = get_date_range('monthly')
+        tasks_monthly = count_tasks_by_type(start_monthly, end_monthly)
+        offers_monthly = count_offers(start_monthly, end_monthly)
+        orders_monthly = count_orders(start_monthly, end_monthly)
+        clients_monthly = count_client_statuses(start_monthly, end_monthly)
+        send_to_telegram(tasks_monthly, offers_monthly, orders_monthly, clients_monthly, 'monthly')
             
         logger.info("KPI Telegram report script finished successfully.")
 

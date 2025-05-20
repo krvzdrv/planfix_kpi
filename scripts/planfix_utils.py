@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Environment Variable Loading
 PLANFIX_API_KEY = os.environ.get('PLANFIX_API_KEY')
-PLANFIX_USER_TOKEN = os.environ.get('PLANFIX_USER_TOKEN')
+PLANFIX_TOKEN = os.environ.get('PLANFIX_TOKEN')
 PLANFIX_ACCOUNT = os.environ.get('PLANFIX_ACCOUNT')
 SUPABASE_CONNECTION_STRING = os.environ.get('SUPABASE_CONNECTION_STRING')
 
@@ -41,7 +41,7 @@ def make_planfix_request(request_body_xml: str) -> str:
     auth_xml = f"""
     <auth>
         <key>{PLANFIX_API_KEY}</key>
-        <user_token>{PLANFIX_USER_TOKEN}</user_token>
+        <user_token>{PLANFIX_TOKEN}</user_token>
     </auth>
     """
     

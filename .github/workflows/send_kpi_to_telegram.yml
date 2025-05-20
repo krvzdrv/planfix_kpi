@@ -14,18 +14,18 @@ jobs:
     env:
       TZ: Europe/Warsaw
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        id: setup-python # ID добавлен для ссылки на версию Python
-        uses: actions/setup-python@v4
+        id: setup-python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: ~/.cache/pip # Путь к кэшу pip
+          path: ~/.cache/pip
           key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-
@@ -37,39 +37,69 @@ jobs:
           pip install -r requirements.txt
 
       - name: Update clients in Supabase
-        run: python scripts/planfix_clients_to_supabase.py
+        id: update-clients
+        run: |
+          if ! python scripts/planfix_clients_to_supabase.py; then
+            echo "::error::Failed to update clients"
+            exit 1
+          fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 
       - name: Update orders in Supabase
-        run: python scripts/planfix_orders_to_supabase.py
+        id: update-orders
+        if: steps.update-clients.outcome == 'success'
+        run: |
+          if ! python scripts/planfix_orders_to_supabase.py; then
+            echo "::error::Failed to update orders"
+            exit 1
+          fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 
       - name: Update tasks in Supabase
-        run: python scripts/planfix_tasks_to_supabase.py
+        id: update-tasks
+        if: steps.update-orders.outcome == 'success'
+        run: |
+          if ! python scripts/planfix_tasks_to_supabase.py; then
+            echo "::error::Failed to update tasks"
+            exit 1
+          fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 
       - name: Send KPI to Telegram
-        run: python scripts/send_kpi_to_telegram.py
+        id: send-kpi
+        if: steps.update-tasks.outcome == 'success'
+        run: |
+          if ! python scripts/send_kpi_to_telegram.py; then
+            echo "::error::Failed to send KPI to Telegram"
+            exit 1
+          fi
         env:
-          # Переменные окружения для этого шага остаются прежними, так как скрипт send_kpi_to_telegram.py
-          # использует индивидуальные подключения к Supabase, а не SUPABASE_CONNECTION_STRING
-          # и не использует PLANFIX_USER_TOKEN напрямую.
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
           SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${{ secrets.TELEGRAM_CHAT_ID }}\",\"text\":\"❌ KPI workflow failed at step: ${{ job.status }}\",\"parse_mode\":\"Markdown\"}"
+        env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
