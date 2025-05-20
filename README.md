@@ -1,4 +1,4 @@
-# Planfix Sync
+# Planfix KPI
 
 Скрипты для синхронизации данных между Planfix CRM и Supabase, с последующей отправкой KPI отчетов в Telegram.
 
