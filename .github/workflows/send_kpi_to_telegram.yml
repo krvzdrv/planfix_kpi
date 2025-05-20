@@ -15,54 +15,61 @@ jobs:
       TZ: Europe/Warsaw
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
+        id: setup-python # ID добавлен для ссылки на версию Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip # Путь к кэшу pip
+          key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-
+            ${{ runner.os }}-python-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Update clients in Supabase
         run: python scripts/planfix_clients_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
-          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
-          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
-          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
-          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+
       - name: Update orders in Supabase
         run: python scripts/planfix_orders_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
-          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
-          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
-          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
-          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+
       - name: Update tasks in Supabase
         run: python scripts/planfix_tasks_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
-          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
-          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
-          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
-          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+
       - name: Send KPI to Telegram
         run: python scripts/send_kpi_to_telegram.py
         env:
+          # Переменные окружения для этого шага остаются прежними, так как скрипт send_kpi_to_telegram.py
+          # использует индивидуальные подключения к Supabase, а не SUPABASE_CONNECTION_STRING
+          # и не использует PLANFIX_USER_TOKEN напрямую.
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
           SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }} 
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
