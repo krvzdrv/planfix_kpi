@@ -40,32 +40,30 @@ jobs:
         run: python scripts/planfix_clients_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Используется новый ключ переменной, но старый секрет
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Новая переменная
 
       - name: Update orders in Supabase
         run: python scripts/planfix_orders_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Используется новый ключ переменной, но старый секрет
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Новая переменная
 
       - name: Update tasks in Supabase
         run: python scripts/planfix_tasks_to_supabase.py
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Изменено с PLANFIX_TOKEN
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_TOKEN }} # Используется новый ключ переменной, но старый секрет
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Заменены индивидуальные переменные Supabase
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }} # Новая переменная
 
       - name: Send KPI to Telegram
         run: python scripts/send_kpi_to_telegram.py
         env:
-          # Переменные окружения для этого шага остаются прежними, так как скрипт send_kpi_to_telegram.py
-          # использует индивидуальные подключения к Supabase, а не SUPABASE_CONNECTION_STRING
-          # и не использует PLANFIX_USER_TOKEN напрямую.
+          # Эти переменные остаются без изменений, так как send_kpi_to_telegram.py использует их напрямую
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
           SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
