@@ -45,7 +45,7 @@ jobs:
           fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 
@@ -59,7 +59,7 @@ jobs:
           fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 
@@ -73,7 +73,7 @@ jobs:
           fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
-          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
 

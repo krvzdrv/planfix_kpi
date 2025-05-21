@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Environment Variable Loading
 PLANFIX_API_KEY = os.environ.get('PLANFIX_API_KEY')
-PLANFIX_TOKEN = os.environ.get('PLANFIX_TOKEN')
+PLANFIX_TOKEN = os.environ.get('PLANFIX_USER_TOKEN')
 PLANFIX_ACCOUNT = os.environ.get('PLANFIX_ACCOUNT')
 SUPABASE_CONNECTION_STRING = os.environ.get('SUPABASE_CONNECTION_STRING')
 
@@ -61,16 +61,24 @@ def make_planfix_request(request_body_xml: str) -> str:
         </request>
         """
         logger.info(f"Making Planfix API request to method: {root_tag_name}")
-        # logger.debug(f"Planfix request payload: {final_xml_payload}") # Potentially too verbose for INFO
         
         response = requests.post(PLANFIX_API_URL, data=final_xml_payload.encode('utf-8'), headers=headers)
-        response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
+        response.raise_for_status()
+        
+        # Check for Planfix API errors in response
+        root = ET.fromstring(response.text)
+        error = root.find('.//error')
+        if error is not None:
+            error_code = error.find('code').text if error.find('code') is not None else 'Unknown'
+            error_message = error.find('message').text if error.find('message') is not None else 'Unknown error'
+            logger.error(f"Planfix API error: Code {error_code}, Message: {error_message}")
+            raise ValueError(f"Planfix API error: {error_message}")
+            
         logger.info(f"Planfix API request to {root_tag_name} successful.")
-        # logger.debug(f"Planfix response: {response.text}") # Potentially too verbose
         return response.text
         
     except ET.ParseError as e:
-        logger.error(f"XML ParseError for request_body_xml: {e}. Request body: {request_body_xml[:200]}...") # Log snippet
+        logger.error(f"XML ParseError for request_body_xml: {e}. Request body: {request_body_xml[:200]}...")
         raise
     except requests.exceptions.RequestException as e:
         logger.error(f"Planfix API request failed: {e}")
