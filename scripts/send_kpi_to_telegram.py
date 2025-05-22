@@ -202,7 +202,6 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
-                AND wynik = 'Wykonane'
                 AND SPLIT_PART(title, '/', 1) IN (
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
