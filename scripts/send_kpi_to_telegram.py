@@ -98,22 +98,25 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
         SELECT 
             owner_name,
             title,
+            nastepne_zadanie,
             wynik,
             data_zakonczenia_zadania,
             TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
-            is_deleted
+            is_deleted,
+            template_id
         FROM planfix_tasks
         WHERE owner_name IN %s
         AND data_zakonczenia_zadania IS NOT NULL
         AND data_zakonczenia_zadania >= %s::timestamp
         AND data_zakonczenia_zadania < %s::timestamp
         AND is_deleted = false
-        LIMIT 10;
+        ORDER BY data_zakonczenia_zadania DESC
+        LIMIT 20;
     """
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Wynik: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Next Task: {row[2]}, Wynik: {row[3]}, Date: {row[4]}, Formatted: {row[5]}, Deleted: {row[6]}, Template: {row[7]}")
     
     # Основной KPI-запрос
     query = f"""
@@ -121,16 +124,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             SELECT
                 owner_name AS manager,
                 CASE 
-                    WHEN title = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN title = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN title = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN title = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN title = 'Wysłać materiały' THEN 'MAT'
-                    WHEN title = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN title = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN title = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN title = 'Zebrać opinie' THEN 'OPI'
-                    WHEN title = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN nastepne_zadanie = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN nastepne_zadanie = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN nastepne_zadanie = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN nastepne_zadanie = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN nastepne_zadanie = 'Wysłać materiały' THEN 'MAT'
+                    WHEN nastepne_zadanie = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN nastepne_zadanie = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN nastepne_zadanie = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN nastepne_zadanie = 'Zebrać opinie' THEN 'OPI'
+                    WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
                 wynik,
@@ -142,7 +145,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
-                AND title IN (
+                AND template_id = 2465239
+                AND nastepne_zadanie IN (
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
                     'Zadzwonić do klienta',
@@ -157,16 +161,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             GROUP BY
                 owner_name, 
                 CASE 
-                    WHEN title = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN title = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN title = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN title = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN title = 'Wysłać materiały' THEN 'MAT'
-                    WHEN title = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN title = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN title = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN title = 'Zebrać opinie' THEN 'OPI'
-                    WHEN title = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN nastepne_zadanie = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN nastepne_zadanie = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN nastepne_zadanie = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN nastepne_zadanie = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN nastepne_zadanie = 'Wysłać materiały' THEN 'MAT'
+                    WHEN nastepne_zadanie = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN nastepne_zadanie = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN nastepne_zadanie = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN nastepne_zadanie = 'Zebrać opinie' THEN 'OPI'
+                    WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END,
                 wynik
