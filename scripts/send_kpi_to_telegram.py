@@ -87,17 +87,20 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             title,
             result,
             closed_at,
-            TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date
+            TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
+            is_deleted
         FROM planfix_tasks
         WHERE owner_name IN %s
         AND closed_at IS NOT NULL
-        AND TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
+        AND closed_at >= %s::timestamp
+        AND closed_at < %s::timestamp
+        AND is_deleted = false
         LIMIT 10;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug tasks")
-    logger.info("\nDebug - Sample PRZ task data:")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
+    logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}")
     
     query = f"""
         WITH task_counts AS (
@@ -120,9 +123,9 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             planfix_tasks
         WHERE
             closed_at IS NOT NULL
-                AND closed_at >= %s::timestamp
-                AND closed_at < %s::timestamp
-                AND owner_name IN %s
+            AND closed_at >= %s::timestamp
+            AND closed_at < %s::timestamp
+            AND owner_name IN %s
             AND title IS NOT NULL
             AND POSITION('/' IN title) > 0
             AND is_deleted = false
@@ -142,7 +145,9 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 WHEN 'WRK' THEN 9 WHEN 'OPI' THEN 10 ELSE 11
             END;
     """
-    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    logger.info(f"Task results: {results}")
+    return results
 
 def count_offers(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_IDS: return []
