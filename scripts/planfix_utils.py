@@ -13,6 +13,11 @@ PLANFIX_API_KEY = os.environ.get('PLANFIX_API_KEY')
 PLANFIX_TOKEN = os.environ.get('PLANFIX_USER_TOKEN')
 PLANFIX_ACCOUNT = os.environ.get('PLANFIX_ACCOUNT')
 SUPABASE_CONNECTION_STRING = os.environ.get('SUPABASE_CONNECTION_STRING')
+SUPABASE_HOST = os.environ.get('SUPABASE_HOST')
+SUPABASE_DB = os.environ.get('SUPABASE_DB')
+SUPABASE_USER = os.environ.get('SUPABASE_USER')
+SUPABASE_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
+SUPABASE_PORT = os.environ.get('SUPABASE_PORT')
 
 PLANFIX_API_URL = "https://api.planfix.com/xml/"
 
@@ -153,14 +158,34 @@ def get_planfix_status_name(status_id: str) -> str | None:
 def get_supabase_connection() -> psycopg2.extensions.connection:
     """
     Establishes and returns a Supabase connection.
-    Logs an error and raises ValueError if connection string is missing.
+    Logs an error and raises ValueError if connection parameters are missing.
     """
-    if not SUPABASE_CONNECTION_STRING:
-        logger.error("SUPABASE_CONNECTION_STRING environment variable is not set.")
-        raise ValueError("SUPABASE_CONNECTION_STRING environment variable is not set.")
     try:
         logger.info("Attempting to connect to Supabase...")
-        conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
+        if SUPABASE_CONNECTION_STRING:
+            conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
+        else:
+            # Check if all required parameters are present
+            required_params = {
+                'SUPABASE_HOST': SUPABASE_HOST,
+                'SUPABASE_DB': SUPABASE_DB,
+                'SUPABASE_USER': SUPABASE_USER,
+                'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
+                'SUPABASE_PORT': SUPABASE_PORT
+            }
+            missing_params = [name for name, value in required_params.items() if not value]
+            if missing_params:
+                error_message = f"Missing required Supabase connection parameters: {', '.join(missing_params)}"
+                logger.error(error_message)
+                raise ValueError(error_message)
+            
+            conn = psycopg2.connect(
+                host=SUPABASE_HOST,
+                dbname=SUPABASE_DB,
+                user=SUPABASE_USER,
+                password=SUPABASE_PASSWORD,
+                port=SUPABASE_PORT
+            )
         logger.info("Successfully connected to Supabase.")
         return conn
     except psycopg2.Error as e:
