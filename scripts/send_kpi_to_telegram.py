@@ -75,94 +75,55 @@ def _execute_kpi_query(query: str, params: tuple, description: str) -> list:
 
 def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_NAMES: return []
-    
     logger.info(f"\nDebug - Task query parameters:")
     logger.info(f"Start date: {start_date_str}")
     logger.info(f"End date: {end_date_str}")
-    
-    # Debug query to check task data format and PRZ tasks specifically
+    # Debug query to check task data format
     debug_query = """
         SELECT 
             owner_name,
             title,
-            task_type,
-            task_result,
-            date_completed,
-            TO_CHAR(date_completed, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
+            wynik,
+            data_zakonczenia_zadania,
+            TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
             is_deleted
         FROM planfix_tasks
         WHERE owner_name IN %s
-        AND date_completed IS NOT NULL
-        AND date_completed >= %s::timestamp
-        AND date_completed < %s::timestamp
+        AND data_zakonczenia_zadania IS NOT NULL
+        AND data_zakonczenia_zadania >= %s::timestamp
+        AND data_zakonczenia_zadania < %s::timestamp
         AND is_deleted = false
         LIMIT 10;
     """
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Type: {row[2]}, Result: {row[3]}, Date: {row[4]}, Formatted: {row[5]}, Deleted: {row[6]}")
-    
-    # Additional debug query to check all tasks for these managers
-    all_tasks_query = """
-        SELECT 
-            owner_name,
-            title,
-            task_type,
-            task_result,
-            date_completed,
-            is_deleted
-        FROM planfix_tasks
-        WHERE owner_name IN %s
-        AND date_completed IS NOT NULL
-        LIMIT 5;
-    """
-    all_tasks = _execute_kpi_query(all_tasks_query, (PLANFIX_USER_NAMES,), "all tasks")
-    logger.info("\nDebug - Sample of all tasks for managers:")
-    for row in all_tasks:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Type: {row[2]}, Result: {row[3]}, Date: {row[4]}, Deleted: {row[5]}")
-    
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Wynik: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}")
+    # Основной KPI-запрос
     query = f"""
         WITH task_counts AS (
             SELECT
                 owner_name AS manager,
-                task_type,
+                TRIM(SPLIT_PART(title, '/', 1)) AS task_type,
+                wynik,
                 COUNT(*) AS task_count
             FROM planfix_tasks
             WHERE
-                date_completed IS NOT NULL
-                AND date_completed >= %s::timestamp
-                AND date_completed < %s::timestamp
+                data_zakonczenia_zadania IS NOT NULL
+                AND data_zakonczenia_zadania >= %s::timestamp
+                AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
-                AND task_type IS NOT NULL
                 AND is_deleted = false
             GROUP BY
-                owner_name, task_type
+                owner_name, TRIM(SPLIT_PART(title, '/', 1)), wynik
         )
         SELECT 
             manager,
-            CASE 
-                WHEN task_type = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                WHEN task_type = 'Zadzwonić do klienta' THEN 'ZKL'
-                WHEN task_type = 'Przeprowadzić pierwszą rozmowę telefoniczną' 
-                     AND task_result = 'Klient jest zainteresowany' THEN 'PRZ'
-                WHEN task_type = 'Przeprowadzić spotkanie' THEN 'SPT'
-                WHEN task_type = 'Wysłać materiały' THEN 'MAT'
-                WHEN task_type = 'Opowiedzieć o nowościach' THEN 'NOW'
-                WHEN task_type = 'Zapisać na media społecznościowe' THEN 'MSP'
-                WHEN task_type = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                WHEN task_type = 'Przywrócić klienta' THEN 'WRK'
-                WHEN task_type = 'Zebrać opinie' THEN 'OPI'
-            END AS task_type,
+            task_type,
+            wynik,
             task_count
         FROM task_counts
-        WHERE task_type IS NOT NULL
-        ORDER BY manager, 
-            CASE task_type
-                WHEN 'WDM' THEN 1 WHEN 'PRZ' THEN 2 WHEN 'ZKL' THEN 3 WHEN 'SPT' THEN 4
-                WHEN 'MAT' THEN 5 WHEN 'NOW' THEN 6 WHEN 'MSP' THEN 7 WHEN 'TPY' THEN 8
-                WHEN 'WRK' THEN 9 WHEN 'OPI' THEN 10 ELSE 11
-            END;
+        ORDER BY manager, task_type, wynik;
     """
     results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
