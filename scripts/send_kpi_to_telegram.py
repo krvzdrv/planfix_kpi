@@ -78,6 +78,21 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     logger.info(f"\nDebug - Task query parameters:")
     logger.info(f"Start date: {start_date_str}")
     logger.info(f"End date: {end_date_str}")
+    
+    # Словарь соответствия полных названий и сокращений
+    task_type_mapping = {
+        'Nawiązać pierwszy kontakt': 'WDM',
+        'Przeprowadzić pierwszą rozmowę telefoniczną': 'PRZ',
+        'Zadzwonić do klienta': 'ZKL',
+        'Przeprowadzić spotkanie': 'SPT',
+        'Wysłać materiały': 'MAT',
+        'Odpowiedzieć na pytanie techniczne': 'TPY',
+        'Zapisać na media społecznościowe': 'MSP',
+        'Opowiedzieć o nowościach': 'NOW',
+        'Zebrać opinie': 'OPI',
+        'Przywrócić klienta': 'WRK'
+    }
+    
     # Debug query to check task data format
     debug_query = """
         SELECT 
@@ -99,12 +114,25 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
         logger.info(f"Manager: {row[0]}, Title: {row[1]}, Wynik: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}")
+    
     # Основной KPI-запрос
     query = f"""
         WITH task_counts AS (
             SELECT
                 owner_name AS manager,
-                TRIM(SPLIT_PART(title, '/', 1)) AS task_type,
+                CASE 
+                    WHEN title = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN title = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN title = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN title = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN title = 'Wysłać materiały' THEN 'MAT'
+                    WHEN title = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN title = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN title = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN title = 'Zebrać opinie' THEN 'OPI'
+                    WHEN title = 'Przywrócić klienta' THEN 'WRK'
+                    ELSE NULL
+                END AS task_type,
                 wynik,
                 COUNT(*) AS task_count
             FROM planfix_tasks
@@ -114,8 +142,34 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
+                AND title IN (
+                    'Nawiązać pierwszy kontakt',
+                    'Przeprowadzić pierwszą rozmowę telefoniczną',
+                    'Zadzwonić do klienta',
+                    'Przeprowadzić spotkanie',
+                    'Wysłać materiały',
+                    'Odpowiedzieć na pytanie techniczne',
+                    'Zapisać na media społecznościowe',
+                    'Opowiedzieć o nowościach',
+                    'Zebrać opinie',
+                    'Przywrócić klienta'
+                )
             GROUP BY
-                owner_name, TRIM(SPLIT_PART(title, '/', 1)), wynik
+                owner_name, 
+                CASE 
+                    WHEN title = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN title = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN title = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN title = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN title = 'Wysłać materiały' THEN 'MAT'
+                    WHEN title = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN title = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN title = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN title = 'Zebrać opinie' THEN 'OPI'
+                    WHEN title = 'Przywrócić klienta' THEN 'WRK'
+                    ELSE NULL
+                END,
+                wynik
         )
         SELECT 
             manager,
@@ -123,6 +177,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             wynik,
             task_count
         FROM task_counts
+        WHERE task_type IS NOT NULL
         ORDER BY manager, task_type, wynik;
     """
     results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
