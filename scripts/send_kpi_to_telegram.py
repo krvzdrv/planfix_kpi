@@ -182,16 +182,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             SELECT
                 owner_name AS manager,
                 CASE 
-                    WHEN SPLIT_PART(title, '/', 1) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
                 COUNT(*) AS task_count
@@ -202,7 +202,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
-                AND SPLIT_PART(title, '/', 1) IN (
+                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
                     'Zadzwonić do klienta',
@@ -217,16 +217,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             GROUP BY
                 owner_name, 
                 CASE 
-                    WHEN SPLIT_PART(title, '/', 1) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN SPLIT_PART(title, '/', 1) = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END
         )
