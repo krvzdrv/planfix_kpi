@@ -50,7 +50,7 @@ pip install -r requirements.txt
 
 ### Planfix
 - `PLANFIX_API_KEY` - API ключ Planfix
-- `PLANFIX_USER_TOKEN` - токен пользователя Planfix (ранее PLANFIX_TOKEN)
+- `PLANFIX_TOKEN` - токен пользователя Planfix
 - `PLANFIX_ACCOUNT` - аккаунт Planfix
 
 ### Supabase
