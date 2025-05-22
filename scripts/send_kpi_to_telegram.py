@@ -176,92 +176,72 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     for row in debug_total_results:
         logger.info(f"Manager: {row[0]}, Task Type: {row[1]}, Total: {row[2]}, Completed: {row[3]}, Unfinished: {row[4]}")
     
-    # Основной KPI-запрос
-    query = f"""
+    # Get tasks by type for each manager
+    tasks_by_type_query = """
         WITH task_counts AS (
-            SELECT
-                owner_name AS manager,
+            SELECT 
+                t.manager,
                 CASE 
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                    ELSE NULL
-                END AS task_type,
-                COUNT(*) AS task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
-                AND is_deleted = false
-                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
-                    'Nawiązać pierwszy kontakt',
-                    'Przeprowadzić pierwszą rozmowę telefoniczną',
-                    'Zadzwonić do klienta',
-                    'Przeprowadzić spotkanie',
-                    'Wysłać materiały',
-                    'Odpowiedzieć na pytanie techniczne',
-                    'Zapisać na media społecznościowe',
-                    'Opowiedzieć o nowościach',
-                    'Zebrać opinie',
-                    'Przywrócić klienta'
-                )
-            GROUP BY
-                owner_name, 
-                CASE 
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                    ELSE NULL
-                END
+                    WHEN t.title LIKE '%Wysłać dokumenty%' THEN 'WDM'
+                    WHEN t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%' THEN 'PRZ'
+                    WHEN t.title LIKE '%Zebrać kluczowe informacje%' THEN 'ZKL'
+                    WHEN t.title LIKE '%Przeprowadzić spotkanie%' THEN 'SPT'
+                    WHEN t.title LIKE '%Wysłać materiały%' THEN 'MAT'
+                    WHEN t.title LIKE '%Przeprowadzić rozmowę telefoniczną%' THEN 'TPY'
+                    WHEN t.title LIKE '%Przeprowadzić spotkanie%' THEN 'MSP'
+                    WHEN t.title LIKE '%Opowiedzieć o nowościach%' THEN 'NOW'
+                    WHEN t.title LIKE '%Odpowiedzieć na pytanie techniczne%' THEN 'OPI'
+                    WHEN t.title LIKE '%Zebrać opinie%' THEN 'WRK'
+                    ELSE 'OTHER'
+                END as task_type,
+                COUNT(*) as count
+            FROM planfix_tasks t
+            WHERE t.date BETWEEN %s AND %s
+            AND t.manager = ANY(%s)
+            AND t.deleted = false
+            GROUP BY t.manager, task_type
         ),
         combined_counts AS (
             SELECT 
-                manager,
-                task_type,
-                task_count
-            FROM task_counts
-            WHERE task_type IS NOT NULL
-            UNION ALL
-            SELECT 
-                manager,
+                t.manager,
                 'PRZ' as task_type,
-                COUNT(*) as task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
-                AND is_deleted = false
-                AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
-            GROUP BY manager
+                COUNT(*) as count
+            FROM planfix_tasks t
+            WHERE t.date BETWEEN %s AND %s
+            AND t.manager = ANY(%s)
+            AND t.deleted = false
+            AND t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%'
+            GROUP BY t.manager
         )
         SELECT 
-            manager,
-            task_type,
-            SUM(task_count) as task_count
-        FROM combined_counts
-        GROUP BY manager, task_type
-        ORDER BY manager, 
-            CASE task_type
+            tc.manager,
+            tc.task_type,
+            tc.count,
+            CASE 
+                WHEN tc.task_type = 'PRZ' AND EXISTS (
+                    SELECT 1 FROM planfix_tasks t 
+                    WHERE t.manager = tc.manager 
+                    AND t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%'
+                    AND t.wynik = 'Klient jest zainteresowany'
+                    AND t.date BETWEEN %s AND %s
+                ) THEN 1
+                ELSE 0
+            END as kzi_count
+        FROM task_counts tc
+        UNION ALL
+        SELECT 
+            cc.manager,
+            cc.task_type,
+            cc.count,
+            0 as kzi_count
+        FROM combined_counts cc
+        ORDER BY 
+            CASE tc.manager
+                WHEN 'Kozik Andrzej' THEN 1
+                WHEN 'Stukalo Nazarii' THEN 2
+                ELSE 3
+            END,
+            CASE tc.task_type
                 WHEN 'WDM' THEN 1
                 WHEN 'PRZ' THEN 2
                 WHEN 'KZI' THEN 3
@@ -273,9 +253,10 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 WHEN 'NOW' THEN 9
                 WHEN 'OPI' THEN 10
                 WHEN 'WRK' THEN 11
+                ELSE 12
             END;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(tasks_by_type_query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
     return results
 
@@ -420,126 +401,76 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
     ), "client statuses")
 
 
-def send_to_telegram(task_results, offer_results, order_results, client_results, report_type):
-    logger.info(f"Preparing {report_type} KPI report for Telegram.")
-    logger.info(f"Task results received: {task_results}")
-    
-    data = {
-        mgr_info['planfix_user_id']: {
-            'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0, 'MSP': 0, 
-            'TPY': 0, 'WRK': 0, 'OPI': 0, 'OFW': 0, 'TTL': 0, 'ZAM': 0, 
-            'PRC': 0.0, 'NWI': 0, 'WTR': 0, 'PSK': 0,
-            'name': mgr_info['planfix_user_name'], 'alias': mgr_info['telegram_alias']
-        } for mgr_info in MANAGERS_KPI
-    }
-    name_to_id_map = {m['planfix_user_name']: m['planfix_user_id'] for m in MANAGERS_KPI}
-    logger.info(f"Manager name to ID mapping: {name_to_id_map}")
-
-    for manager_name, task_type, count in task_results:
-        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Count: {count}")
-        manager_id = name_to_id_map.get(manager_name)
-        logger.info(f"Found manager ID: {manager_id}")
-        if manager_id and task_type in data[manager_id]:
-            data[manager_id][task_type] = count
-            data[manager_id]['TTL'] += count
-            logger.info(f"Updated data for manager {manager_id}: {task_type}={count}")
-        else:
-            logger.warning(f"Could not process task result - Manager ID not found or invalid task type: {manager_name} -> {manager_id}, {task_type}")
-    
-    for manager_id, count in offer_results:
-        if manager_id in data: 
-            data[manager_id]['OFW'] = count
-            logger.info(f"Updated offers for manager {manager_id}: {count}")
-    
-    for manager_id, count, amount in order_results:
-        if manager_id in data:
-            data[manager_id]['ZAM'] = count
-            data[manager_id]['PRC'] = float(amount) if amount is not None else 0.0
-            logger.info(f"Updated orders for manager {manager_id}: count={count}, amount={amount}")
-    
-    for manager_name, status, count in client_results:
-        manager_id = name_to_id_map.get(manager_name)
-        if manager_id and status in data[manager_id]: 
-            data[manager_id][status] = count
-            logger.info(f"Updated client status for manager {manager_id}: {status}={count}")
-    
-    current_dt = datetime.now()
-    report_title_date = current_dt.strftime('%d.%m.%Y') if report_type == 'daily' else current_dt.strftime('%m.%Y')
-    report_title = f"RAPORT {report_title_date}"
-    
-    # Escape special Markdown characters in manager aliases
-    aliases = [mgr_data['alias'].replace('_', '\\_').replace('*', '\\*').replace('`', '\\`').ljust(7) for mgr_data in data.values()]
-    
-    text = "```\n" + f"{report_title}\n"
-    header_line = "KPI | " + " | ".join(aliases) + "\n"
-    separator_line = "═" * (len(header_line) -1) + "\n" # -1 for newline char
-    light_separator_line = "─" * (len(header_line) -1) + "\n"
-
-    text += separator_line + header_line + light_separator_line
-
-    text += "zadania\n"
-    task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'WRK', 'OPI']
-    has_any_tasks_overall = False
-    for task_type in task_order:
-        values = [data[mgr_id][task_type] for mgr_id in data]
-        if any(v != 0 for v in values):
-            has_any_tasks_overall = True
-            line_values = " | ".join([f"{int(data[mgr_id][task_type]):7d}" for mgr_id in data])
-            text += f"{task_type.ljust(3)} | {line_values}\n"
-    if has_any_tasks_overall:
-        text += light_separator_line
-        ttl_values = " | ".join([f"{int(data[mgr_id]['TTL']):7d}" for mgr_id in data])
-        text += f"TTL | {ttl_values}\n"
-    
-    text += light_separator_line + "klienci\n"
-    status_order = ['NWI', 'WTR', 'PSK']
-    for status in status_order:
-        values = [data[mgr_id][status] for mgr_id in data]
-        if any(v != 0 for v in values):
-            line_values = " | ".join([f"{int(data[mgr_id][status]):7d}" for mgr_id in data])
-            text += f"{status.ljust(3)} | {line_values}\n"
-            
-    text += light_separator_line + "zamówienia\n"
-    order_kpis = ['OFW', 'ZAM', 'PRC']
-    for kpi in order_kpis:
-        values = [data[mgr_id][kpi] for mgr_id in data]
-        if any(v != 0 for v in values):
-            if kpi == 'PRC':
-                line_values = " | ".join([f"{data[mgr_id][kpi]:7.0f}" for mgr_id in data])
-            else:
-                line_values = " | ".join([f"{int(data[mgr_id][kpi]):7d}" for mgr_id in data])
-            text += f"{kpi.ljust(3)} | {line_values}\n"
-            
-    text += separator_line + "```"
-    
-    logger.info(f"Prepared report text:\n{text}")
-    
-    if not TELEGRAM_TOKEN or not CHAT_ID:
-        error_msg = "Missing Telegram configuration: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-    
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    
+def send_to_telegram():
+    """Send KPI report to Telegram."""
     try:
-        logger.info(f"Sending message to Telegram chat {CHAT_ID}")
-        response = requests.post(url, json=payload, timeout=30)  # Added timeout
-        response.raise_for_status()
+        # Initialize data structure for each manager
+        data = {
+            'Kozik Andrzej': {
+                'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0
+            },
+            'Stukalo Nazarii': {
+                'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0
+            }
+        }
         
-        if response.status_code == 200:
-            logger.info(f"Successfully sent {report_type} KPI report to Telegram chat ID {CHAT_ID}.")
-        else:
-            logger.error(f"Unexpected response from Telegram API: {response.status_code} - {response.text}")
-            raise requests.exceptions.RequestException(f"Unexpected response: {response.status_code}")
+        # Get task results
+        task_results = get_kpi_data()
+        if not task_results:
+            logger.error("No task results received")
+            return
             
-    except requests.exceptions.Timeout:
-        logger.error("Timeout while sending message to Telegram")
-        raise
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send KPI report to Telegram: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            logger.error(f"Telegram API response: {e.response.text}")
+        # Process task results
+        for row in task_results:
+            manager = row[0]
+            task_type = row[1]
+            count = row[2]
+            kzi_count = row[3]
+            
+            if manager in data and task_type in data[manager]:
+                data[manager][task_type] = count
+                if task_type == 'PRZ' and kzi_count > 0:
+                    data[manager]['KZI'] = kzi_count
+        
+        # Format message
+        message = "📊 *KPI Report*\n\n"
+        
+        # Define task order
+        task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+        
+        # Add data for each manager
+        for manager, manager_data in data.items():
+            message += f"*{manager}*\n"
+            for task_type in task_order:
+                count = manager_data[task_type]
+                message += f"{task_type}: {count}\n"
+            message += "\n"
+        
+        # Send to Telegram
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+        
+        if not bot_token or not chat_id:
+            logger.error("Missing Telegram configuration")
+            return
+            
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            'chat_id': chat_id,
+            'text': message,
+            'parse_mode': 'Markdown'
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code != 200:
+            logger.error(f"Failed to send message to Telegram: {response.text}")
+        else:
+            logger.info("Message sent successfully to Telegram")
+            
+    except Exception as e:
+        logger.error(f"Error sending to Telegram: {str(e)}")
         raise
 
 
