@@ -231,13 +231,35 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END
+        ),
+        combined_counts AS (
+            SELECT 
+                manager,
+                task_type,
+                task_count
+            FROM task_counts
+            WHERE task_type IS NOT NULL
+            UNION ALL
+            SELECT 
+                manager,
+                'PRZ' as task_type,
+                COUNT(*) as task_count
+            FROM planfix_tasks
+            WHERE
+                data_zakonczenia_zadania IS NOT NULL
+                AND data_zakonczenia_zadania >= %s::timestamp
+                AND data_zakonczenia_zadania < %s::timestamp
+                AND owner_name IN %s
+                AND is_deleted = false
+                AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
+            GROUP BY manager
         )
         SELECT 
             manager,
             task_type,
-            task_count
-        FROM task_counts
-        WHERE task_type IS NOT NULL
+            SUM(task_count) as task_count
+        FROM combined_counts
+        GROUP BY manager, task_type
         ORDER BY manager, 
             CASE task_type
                 WHEN 'WDM' THEN 1
@@ -253,7 +275,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 WHEN 'WRK' THEN 11
             END;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
     return results
 
