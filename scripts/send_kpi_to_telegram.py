@@ -85,76 +85,75 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
         SELECT 
             owner_name,
             title,
-            result,
-            closed_at,
-            TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
-            is_deleted,
-            SPLIT_PART(title, '/', 1) as task_type_raw,
-            TRIM(SPLIT_PART(title, '/', 1)) as task_type_trimmed
+            task_type,
+            task_result,
+            date_completed,
+            TO_CHAR(date_completed, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
+            is_deleted
         FROM planfix_tasks
         WHERE owner_name IN %s
-        AND closed_at IS NOT NULL
-        AND closed_at >= %s::timestamp
-        AND closed_at < %s::timestamp
+        AND date_completed IS NOT NULL
+        AND date_completed >= %s::timestamp
+        AND date_completed < %s::timestamp
         AND is_deleted = false
         LIMIT 10;
     """
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}, Raw Type: {row[6]}, Trimmed Type: {row[7]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Type: {row[2]}, Result: {row[3]}, Date: {row[4]}, Formatted: {row[5]}, Deleted: {row[6]}")
     
     # Additional debug query to check all tasks for these managers
     all_tasks_query = """
         SELECT 
             owner_name,
             title,
-            closed_at,
+            task_type,
+            task_result,
+            date_completed,
             is_deleted
         FROM planfix_tasks
         WHERE owner_name IN %s
-        AND closed_at IS NOT NULL
+        AND date_completed IS NOT NULL
         LIMIT 5;
     """
     all_tasks = _execute_kpi_query(all_tasks_query, (PLANFIX_USER_NAMES,), "all tasks")
     logger.info("\nDebug - Sample of all tasks for managers:")
     for row in all_tasks:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Date: {row[2]}, Deleted: {row[3]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Type: {row[2]}, Result: {row[3]}, Date: {row[4]}, Deleted: {row[5]}")
     
     query = f"""
         WITH task_counts AS (
-        SELECT
-            owner_name AS manager,
-                CASE 
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' 
-                         AND result = 'Klient jest zainteresowany' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zebrać opinie' THEN 'OPI'
-                END AS task_type,
-            COUNT(*) AS task_count
-        FROM
-            planfix_tasks
-        WHERE
-            closed_at IS NOT NULL
-            AND closed_at >= %s::timestamp
-            AND closed_at < %s::timestamp
-            AND owner_name IN %s
-            AND title IS NOT NULL
-            AND POSITION('/' IN title) > 0
-            AND is_deleted = false
-        GROUP BY
-            owner_name, task_type
+            SELECT
+                owner_name AS manager,
+                task_type,
+                COUNT(*) AS task_count
+            FROM planfix_tasks
+            WHERE
+                date_completed IS NOT NULL
+                AND date_completed >= %s::timestamp
+                AND date_completed < %s::timestamp
+                AND owner_name IN %s
+                AND task_type IS NOT NULL
+                AND is_deleted = false
+            GROUP BY
+                owner_name, task_type
         )
         SELECT 
             manager,
-            task_type,
+            CASE 
+                WHEN task_type = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                WHEN task_type = 'Zadzwonić do klienta' THEN 'ZKL'
+                WHEN task_type = 'Przeprowadzić pierwszą rozmowę telefoniczną' 
+                     AND task_result = 'Klient jest zainteresowany' THEN 'PRZ'
+                WHEN task_type = 'Przeprowadzić spotkanie' THEN 'SPT'
+                WHEN task_type = 'Wysłać materiały' THEN 'MAT'
+                WHEN task_type = 'Opowiedzieć o nowościach' THEN 'NOW'
+                WHEN task_type = 'Zapisać na media społecznościowe' THEN 'MSP'
+                WHEN task_type = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                WHEN task_type = 'Przywrócić klienta' THEN 'WRK'
+                WHEN task_type = 'Zebrać opinie' THEN 'OPI'
+            END AS task_type,
             task_count
         FROM task_counts
         WHERE task_type IS NOT NULL
