@@ -10,6 +10,19 @@ import planfix_utils
 # Load environment variables from .env file
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/send_kpi_to_telegram.log'),
+        logging.StreamHandler()
+    ]
+)
+
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+
 # --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')
 PG_DB = os.environ.get('SUPABASE_DB')
@@ -186,7 +199,6 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
-                wynik,
                 COUNT(*) AS task_count
             FROM planfix_tasks
             WHERE
@@ -221,17 +233,15 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN nastepne_zadanie = 'Zebrać opinie' THEN 'OPI'
                     WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
-                END,
-                wynik
+                END
         )
         SELECT 
             manager,
             task_type,
-            wynik,
             task_count
         FROM task_counts
         WHERE task_type IS NOT NULL
-        ORDER BY manager, task_type, wynik;
+        ORDER BY manager, task_type;
     """
     results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
@@ -393,8 +403,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     name_to_id_map = {m['planfix_user_name']: m['planfix_user_id'] for m in MANAGERS_KPI}
     logger.info(f"Manager name to ID mapping: {name_to_id_map}")
 
-    for manager_name, task_type, wynik, count in task_results:
-        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Wynik: {wynik}, Count: {count}")
+    for manager_name, task_type, count in task_results:
+        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Count: {count}")
         manager_id = name_to_id_map.get(manager_name)
         logger.info(f"Found manager ID: {manager_id}")
         if manager_id and task_type in data[manager_id]:
@@ -502,11 +512,6 @@ def get_date_range(report_type: str) -> tuple[str, str]:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
-    )
     logger.info("Starting KPI Telegram report script.")
     
     try:
