@@ -99,11 +99,20 @@ def parse_tasks(xml_text):
         def get_text(tag):
             el = task.find(tag)
             return el.text if el is not None else None
+        
+        title = get_text('title')
+        task_type = None
+        if title and '/' in title:
+            task_type = title.split('/')[0].strip()
+            
         tasks.append({
             "planfix_id": int(get_text('id')) if get_text('id') else None,
-            "title": get_text('title'),
+            "title": title,
             "description": get_text('description'),
             "status": get_text('statusName') or get_text('status'),
+            "task_type": task_type,
+            "task_result": get_text('statusName') or get_text('status'),
+            "task_status": get_text('statusName') or get_text('status'),
             "assigner_id": int(get_text('assigner/id')) if get_text('assigner/id') else None,
             "assigner_name": get_text('assigner/name'),
             "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
