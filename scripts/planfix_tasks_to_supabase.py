@@ -83,7 +83,8 @@ def parse_date(date_str):
         return None
     for fmt in ("%d-%m-%Y %H:%M", "%d-%m-%Y"):
         try:
-            return datetime.strptime(date_str, fmt)
+            dt = datetime.strptime(date_str, fmt)
+            return dt.isoformat()  # Convert to ISO format for Supabase
         except ValueError:
             continue
     return None
@@ -134,7 +135,7 @@ def parse_tasks(xml_text):
                     if field_name in custom_fields:
                         # Для дат парсим value как дату, если это дата
                         if field_name in ["Data utworzenia zadania", "Data zakończenia zadania"]:
-                            custom_result[custom_fields[field_name]] = value.text if value is not None else None
+                            custom_result[custom_fields[field_name]] = parse_date(value.text) if value is not None else None
                         else:
                             custom_result[custom_fields[field_name]] = value.text if value is not None else text.text if text is not None else None
                     custom_data[field_name] = {
