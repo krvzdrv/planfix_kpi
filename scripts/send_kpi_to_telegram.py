@@ -512,6 +512,11 @@ def get_date_range(report_type: str) -> tuple[str, str]:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
     logger.info("Starting KPI Telegram report script.")
     
     try:
