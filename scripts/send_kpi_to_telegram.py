@@ -118,6 +118,26 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     for row in debug_results:
         logger.info(f"Manager: {row[0]}, Title: {row[1]}, Next Task: {row[2]}, Wynik: {row[3]}, Date: {row[4]}, Formatted: {row[5]}, Deleted: {row[6]}, Template: {row[7]}")
     
+    # Debug query to check all tasks for the current month
+    debug_all_tasks_query = """
+        SELECT 
+            owner_name,
+            nastepne_zadanie,
+            data_zakonczenia_zadania,
+            TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
+            is_deleted,
+            template_id
+        FROM planfix_tasks
+        WHERE data_zakonczenia_zadania IS NOT NULL
+        AND data_zakonczenia_zadania >= %s::timestamp
+        AND data_zakonczenia_zadania < %s::timestamp
+        ORDER BY data_zakonczenia_zadania DESC;
+    """
+    debug_all_results = _execute_kpi_query(debug_all_tasks_query, (start_date_str, end_date_str), "debug all tasks")
+    logger.info("\nDebug - All tasks in date range:")
+    for row in debug_all_results:
+        logger.info(f"Manager: {row[0]}, Next Task: {row[1]}, Date: {row[2]}, Formatted: {row[3]}, Deleted: {row[4]}, Template: {row[5]}")
+    
     # Основной KPI-запрос
     query = f"""
         WITH task_counts AS (
@@ -145,7 +165,6 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
-                AND template_id = 2465239
                 AND nastepne_zadanie IN (
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
