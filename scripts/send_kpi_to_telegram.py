@@ -15,13 +15,9 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/send_kpi_to_telegram.log'),
         logging.StreamHandler()
     ]
 )
-
-# Create logs directory if it doesn't exist
-os.makedirs('logs', exist_ok=True)
 
 # --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')
