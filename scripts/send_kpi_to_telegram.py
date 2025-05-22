@@ -285,8 +285,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     name_to_id_map = {m['planfix_user_name']: m['planfix_user_id'] for m in MANAGERS_KPI}
     logger.info(f"Manager name to ID mapping: {name_to_id_map}")
 
-    for manager_name, task_type, count in task_results:
-        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Count: {count}")
+    for manager_name, task_type, wynik, count in task_results:
+        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Wynik: {wynik}, Count: {count}")
         manager_id = name_to_id_map.get(manager_name)
         logger.info(f"Found manager ID: {manager_id}")
         if manager_id and task_type in data[manager_id]:
