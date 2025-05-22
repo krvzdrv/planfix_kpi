@@ -332,11 +332,15 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         data = {
             'Kozik Andrzej': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
+                'NWI': 0, 'WTR': 0, 'PSK': 0,
+                'OFW': 0, 'ZAM': 0, 'PRC': 0
             },
             'Stukalo Nazarii': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
+                'NWI': 0, 'WTR': 0, 'PSK': 0,
+                'OFW': 0, 'ZAM': 0, 'PRC': 0
             }
         }
         
@@ -348,20 +352,68 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             
             if manager in data and task_type in data[manager]:
                 data[manager][task_type] = count
-        
+
+        # Process client results
+        for row in client_results:
+            manager = row[0]
+            status = row[1]
+            count = row[2]
+            
+            if manager in data and status in data[manager]:
+                data[manager][status] = count
+
+        # Process order results
+        for row in order_results:
+            manager_id = row[0]
+            count = row[1]
+            amount = row[2]
+            
+            # Find manager name by ID
+            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            if manager in data:
+                data[manager]['OFW'] = count
+                data[manager]['ZAM'] = count
+                data[manager]['PRC'] = amount
+
         # Format message
-        message = f"📊 *KPI Report ({report_type})*\n\n"
+        today = date.today()
+        message = f"RAPORT {today.strftime('%m.%Y')}\n"
+        message += "═══════════════════════\n"
+        message += "KPI | Kozik   | Stukalo\n"
+        message += "───────────────────────\n"
         
-        # Define task order
-        task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+        # Add tasks section
+        message += "zadania\n"
+        task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
+        for task_type in task_order:
+            kozik_count = data['Kozik Andrzej'][task_type]
+            stukalo_count = data['Stukalo Nazarii'][task_type]
+            message += f"{task_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
         
-        # Add data for each manager
-        for manager, manager_data in data.items():
-            message += f"*{manager}*\n"
-            for task_type in task_order:
-                count = manager_data[task_type]
-                message += f"{task_type}: {count}\n"
-            message += "\n"
+        # Add task totals
+        kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
+        stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
+        message += "───────────────────────\n"
+        message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+        message += "───────────────────────\n"
+        
+        # Add clients section
+        message += "klienci\n"
+        client_order = ['NWI', 'WTR', 'PSK']
+        for status in client_order:
+            kozik_count = data['Kozik Andrzej'][status]
+            stukalo_count = data['Stukalo Nazarii'][status]
+            message += f"{status} | {kozik_count:6d} | {stukalo_count:6d}\n"
+        message += "───────────────────────\n"
+        
+        # Add orders section
+        message += "zamówienia\n"
+        order_order = ['OFW', 'ZAM', 'PRC']
+        for order_type in order_order:
+            kozik_count = data['Kozik Andrzej'][order_type]
+            stukalo_count = data['Stukalo Nazarii'][order_type]
+            message += f"{order_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+        message += "═══════════════════════\n"
         
         # Send to Telegram
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
