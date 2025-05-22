@@ -127,8 +127,16 @@ jobs:
           echo "SUPABASE_PORT: ${SUPABASE_PORT:+set}"
           echo "TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:+set}"
           echo "TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:+set}"
-          if ! python scripts/send_kpi_to_telegram.py; then
-            echo "Failed to send KPI report"
+          
+          # Check if all required variables are set
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::error::Missing required Telegram configuration"
+            exit 1
+          fi
+          
+          # Run the script with debug output
+          if ! python -u scripts/send_kpi_to_telegram.py; then
+            echo "::error::Failed to send KPI report"
             exit 1
           fi
 

@@ -467,8 +467,10 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     report_title_date = current_dt.strftime('%d.%m.%Y') if report_type == 'daily' else current_dt.strftime('%m.%Y')
     report_title = f"RAPORT {report_title_date}"
     
+    # Escape special Markdown characters in manager aliases
+    aliases = [mgr_data['alias'].replace('_', '\\_').replace('*', '\\*').replace('`', '\\`').ljust(7) for mgr_data in data.values()]
+    
     text = "```\n" + f"{report_title}\n"
-    aliases = [mgr_data['alias'].ljust(7) for mgr_data in data.values()] # ljust for alignment
     header_line = "KPI | " + " | ".join(aliases) + "\n"
     separator_line = "═" * (len(header_line) -1) + "\n" # -1 for newline char
     light_separator_line = "─" * (len(header_line) -1) + "\n"
@@ -512,16 +514,33 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     
     logger.info(f"Prepared report text:\n{text}")
     
+    if not TELEGRAM_TOKEN or not CHAT_ID:
+        error_msg = "Missing Telegram configuration: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+    
     try:
-        response = requests.post(url, data=payload)
+        logger.info(f"Sending message to Telegram chat {CHAT_ID}")
+        response = requests.post(url, json=payload, timeout=30)  # Added timeout
         response.raise_for_status()
-        logger.info(f"Successfully sent {report_type} KPI report to Telegram chat ID {CHAT_ID}.")
+        
+        if response.status_code == 200:
+            logger.info(f"Successfully sent {report_type} KPI report to Telegram chat ID {CHAT_ID}.")
+        else:
+            logger.error(f"Unexpected response from Telegram API: {response.status_code} - {response.text}")
+            raise requests.exceptions.RequestException(f"Unexpected response: {response.status_code}")
+            
+    except requests.exceptions.Timeout:
+        logger.error("Timeout while sending message to Telegram")
+        raise
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to send KPI report to Telegram: {e}")
-        if e.response is not None:
+        if hasattr(e, 'response') and e.response is not None:
             logger.error(f"Telegram API response: {e.response.text}")
+        raise
 
 
 def get_date_range(report_type: str) -> tuple[str, str]:
