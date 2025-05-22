@@ -32,7 +32,7 @@ def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
+        'PLANFIX_USER_TOKEN': planfix_utils.PLANFIX_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
         'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
         'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,

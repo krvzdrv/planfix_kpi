@@ -101,13 +101,6 @@ jobs:
       - name: Send KPI to Telegram
         id: send-kpi
         if: steps.update-tasks.outcome == 'success'
-        run: |
-          echo "Starting KPI report generation..."
-          python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_', 'TELEGRAM_'))})"
-          if ! python scripts/send_kpi_to_telegram.py; then
-            echo "::error::Failed to send KPI to Telegram"
-            exit 1
-          fi
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
@@ -120,6 +113,24 @@ jobs:
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          echo "Starting KPI report generation..."
+          echo "Environment variables:"
+          echo "PLANFIX_API_KEY: ${PLANFIX_API_KEY:+set}"
+          echo "PLANFIX_USER_TOKEN: ${PLANFIX_USER_TOKEN:+set}"
+          echo "PLANFIX_ACCOUNT: ${PLANFIX_ACCOUNT:+set}"
+          echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
+          echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
+          echo "SUPABASE_DB: ${SUPABASE_DB:+set}"
+          echo "SUPABASE_USER: ${SUPABASE_USER:+set}"
+          echo "SUPABASE_PASSWORD: ${SUPABASE_PASSWORD:+set}"
+          echo "SUPABASE_PORT: ${SUPABASE_PORT:+set}"
+          echo "TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:+set}"
+          echo "TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:+set}"
+          if ! python scripts/send_kpi_to_telegram.py; then
+            echo "Failed to send KPI report"
+            exit 1
+          fi
 
       - name: Notify on failure
         if: failure()
