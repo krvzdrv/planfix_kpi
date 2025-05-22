@@ -182,16 +182,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             SELECT
                 owner_name AS manager,
                 CASE 
-                    WHEN nastepne_zadanie = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN nastepne_zadanie = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN nastepne_zadanie = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN nastepne_zadanie = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN nastepne_zadanie = 'Wysłać materiały' THEN 'MAT'
-                    WHEN nastepne_zadanie = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN nastepne_zadanie = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN nastepne_zadanie = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN nastepne_zadanie = 'Zebrać opinie' THEN 'OPI'
-                    WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
                 COUNT(*) AS task_count
@@ -202,7 +202,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
-                AND nastepne_zadanie IN (
+                AND wynik = 'Wykonane'
+                AND SPLIT_PART(title, '/', 1) IN (
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
                     'Zadzwonić do klienta',
@@ -217,16 +218,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             GROUP BY
                 owner_name, 
                 CASE 
-                    WHEN nastepne_zadanie = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN nastepne_zadanie = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN nastepne_zadanie = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN nastepne_zadanie = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN nastepne_zadanie = 'Wysłać materiały' THEN 'MAT'
-                    WHEN nastepne_zadanie = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN nastepne_zadanie = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN nastepne_zadanie = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN nastepne_zadanie = 'Zebrać opinie' THEN 'OPI'
-                    WHEN nastepne_zadanie = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN SPLIT_PART(title, '/', 1) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END
         )
