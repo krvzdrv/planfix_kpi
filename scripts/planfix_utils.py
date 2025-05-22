@@ -4,13 +4,17 @@ import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Environment Variable Loading
 PLANFIX_API_KEY = os.environ.get('PLANFIX_API_KEY')
-PLANFIX_TOKEN = os.environ.get('PLANFIX_USER_TOKEN')
+PLANFIX_TOKEN = os.environ.get('PLANFIX_TOKEN')
 PLANFIX_ACCOUNT = os.environ.get('PLANFIX_ACCOUNT')
 SUPABASE_CONNECTION_STRING = os.environ.get('SUPABASE_CONNECTION_STRING')
 SUPABASE_HOST = os.environ.get('SUPABASE_HOST')
