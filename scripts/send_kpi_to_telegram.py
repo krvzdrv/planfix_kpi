@@ -3,7 +3,11 @@ import requests
 from datetime import datetime, date, timedelta # Added timedelta
 import os
 import logging # Added logging
+from dotenv import load_dotenv
 from config import MANAGERS_KPI 
+
+# Load environment variables from .env file
+load_dotenv()
 
 # --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')
@@ -68,23 +72,23 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             owner_name AS manager,
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić до клиента' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowоściaх' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zapisać на media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Odpowiedzieć на pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przywrócić клиента' THEN 'WRK'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zebrać opinie' THEN 'OPI'
                 END AS task_type,
             COUNT(*) AS task_count
         FROM
             planfix_tasks
         WHERE
-            closed_at IS NOT NULL
-                AND closed_at >= %s::timestamp
-                AND closed_at < %s::timestamp
+            COALESCE(closed_at, date_completed) IS NOT NULL
+                AND COALESCE(closed_at, date_completed) >= %s::timestamp
+                AND COALESCE(closed_at, date_completed) < %s::timestamp
                 AND owner_name IN %s
             AND title IS NOT NULL
             AND POSITION('/' IN title) > 0

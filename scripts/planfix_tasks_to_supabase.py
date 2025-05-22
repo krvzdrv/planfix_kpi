@@ -5,6 +5,10 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 import psycopg2
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -108,6 +112,7 @@ def parse_tasks(xml_text):
             "start_date": parse_date(get_text('dateStart')),
             "due_date": parse_date(get_text('dateEnd')),
             "date_completed": parse_date(get_text('dateComplete')),
+            "closed_at": parse_date(get_text('dateComplete')),
             "last_update_date": parse_date(get_text('lastUpdateDate')),
             "updated_at": datetime.now(),
             "is_deleted": False
