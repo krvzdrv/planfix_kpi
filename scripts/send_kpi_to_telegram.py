@@ -138,15 +138,16 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     for row in debug_all_results:
         logger.info(f"Manager: {row[0]}, Next Task: {row[1]}, Date: {row[2]}, Formatted: {row[3]}, Deleted: {row[4]}, Template: {row[5]}")
     
-    # Debug query to count all tasks by type and manager (all time)
+    # Debug query to count all tasks by type and manager (all time, including unfinished)
     debug_total_tasks_query = """
         SELECT 
             owner_name,
             nastepne_zadanie,
-            COUNT(*) as task_count
+            COUNT(*) as task_count,
+            COUNT(CASE WHEN data_zakonczenia_zadania IS NOT NULL THEN 1 END) as completed_count,
+            COUNT(CASE WHEN data_zakonczenia_zadania IS NULL THEN 1 END) as unfinished_count
         FROM planfix_tasks
-        WHERE data_zakonczenia_zadania IS NOT NULL
-        AND is_deleted = false
+        WHERE is_deleted = false
         AND nastepne_zadanie IN (
             'Nawiązać pierwszy kontakt',
             'Przeprowadzić pierwszą rozmowę telefoniczną',
@@ -163,9 +164,9 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
         ORDER BY owner_name, nastepne_zadanie;
     """
     debug_total_results = _execute_kpi_query(debug_total_tasks_query, (), "debug total tasks")
-    logger.info("\nDebug - Total tasks by type and manager (all time):")
+    logger.info("\nDebug - Total tasks by type and manager (all time, including unfinished):")
     for row in debug_total_results:
-        logger.info(f"Manager: {row[0]}, Task Type: {row[1]}, Count: {row[2]}")
+        logger.info(f"Manager: {row[0]}, Task Type: {row[1]}, Total: {row[2]}, Completed: {row[3]}, Unfinished: {row[4]}")
     
     # Основной KPI-запрос
     query = f"""
