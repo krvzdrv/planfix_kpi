@@ -112,7 +112,6 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             owner_name,
             title,
             nastepne_zadanie,
-            
             data_zakonczenia_zadania,
             TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
             is_deleted,
@@ -129,7 +128,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Next Task: {row[2]}, Wynik: {row[3]}, Date: {row[4]}, Formatted: {row[5]}, Deleted: {row[6]}, Template: {row[7]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Next Task: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}, Template: {row[6]}")
     
     # Debug query to check all tasks for the current month
     debug_all_tasks_query = """
