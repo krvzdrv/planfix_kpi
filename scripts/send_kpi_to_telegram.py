@@ -236,6 +236,8 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
 
 def send_to_telegram(task_results, offer_results, order_results, client_results, report_type):
     logger.info(f"Preparing {report_type} KPI report for Telegram.")
+    logger.info(f"Task results received: {task_results}")
+    
     data = {
         mgr_info['planfix_user_id']: {
             'WDM': 0, 'ZKL': 0, 'PRZ': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0, 'MSP': 0, 
@@ -245,12 +247,18 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         } for mgr_info in MANAGERS_KPI
     }
     name_to_id_map = {m['planfix_user_name']: m['planfix_user_id'] for m in MANAGERS_KPI}
+    logger.info(f"Manager name to ID mapping: {name_to_id_map}")
 
     for manager_name, task_type, count in task_results:
+        logger.info(f"Processing task result - Manager: {manager_name}, Type: {task_type}, Count: {count}")
         manager_id = name_to_id_map.get(manager_name)
+        logger.info(f"Found manager ID: {manager_id}")
         if manager_id and task_type in data[manager_id]:
             data[manager_id][task_type] = count
             data[manager_id]['TTL'] += count
+            logger.info(f"Updated data for manager {manager_id}: {task_type}={count}")
+        else:
+            logger.warning(f"Could not process task result - Manager ID not found or invalid task type: {manager_name} -> {manager_id}, {task_type}")
     
     for manager_id, count in offer_results:
         if manager_id in data: data[manager_id]['OFW'] = count
