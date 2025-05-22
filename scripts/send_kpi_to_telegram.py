@@ -183,6 +183,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 owner_name AS manager,
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
@@ -218,6 +219,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 owner_name, 
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
@@ -236,7 +238,20 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             task_count
         FROM task_counts
         WHERE task_type IS NOT NULL
-        ORDER BY manager, task_type;
+        ORDER BY manager, 
+            CASE task_type
+                WHEN 'WDM' THEN 1
+                WHEN 'PRZ' THEN 2
+                WHEN 'KZI' THEN 3
+                WHEN 'ZKL' THEN 4
+                WHEN 'SPT' THEN 5
+                WHEN 'MAT' THEN 6
+                WHEN 'TPY' THEN 7
+                WHEN 'MSP' THEN 8
+                WHEN 'NOW' THEN 9
+                WHEN 'OPI' THEN 10
+                WHEN 'WRK' THEN 11
+            END;
     """
     results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
@@ -389,7 +404,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     
     data = {
         mgr_info['planfix_user_id']: {
-            'WDM': 0, 'ZKL': 0, 'PRZ': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0, 'MSP': 0, 
+            'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 'MAT': 0, 'NOW': 0, 'MSP': 0, 
             'TPY': 0, 'WRK': 0, 'OPI': 0, 'OFW': 0, 'TTL': 0, 'ZAM': 0, 
             'PRC': 0.0, 'NWI': 0, 'WTR': 0, 'PSK': 0,
             'name': mgr_info['planfix_user_name'], 'alias': mgr_info['telegram_alias']
@@ -439,7 +454,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
     text += separator_line + header_line + light_separator_line
 
     text += "zadania\n"
-    task_order = ['WDM', 'PRZ', 'SPT', 'MAT', 'ZKL', 'TPY', 'MSP', 'NOW', 'WRK', 'OPI']
+    task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'WRK', 'OPI']
     has_any_tasks_overall = False
     for task_type in task_order:
         values = [data[mgr_id][task_type] for mgr_id in data]
