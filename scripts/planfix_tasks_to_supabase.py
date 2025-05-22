@@ -28,41 +28,47 @@ TASKS_PK_COLUMN = "planfix_id" # Primary key in Supabase table
 logger = logging.getLogger(__name__)
 
 def get_planfix_tasks(page):
-    """
-    Get tasks from Planfix with pagination.
-    
-    Args:
-        page (int): Page number
-        
-    Returns:
-        str: XML response from Planfix
-    """
-    params = {
-        'pageCurrent': page,
-        'pageSize': 100,
-        'filter': [
-            {
-                'type': '51',
-                'operator': 'equal',
-                'value': str(TASK_TEMPLATE_ID)
-            }
-        ],
-        'field': [
-            'id',
-            'title',
-            'description',
-            'status',
-            'statusName',
-            'assigner',
-            'owner',
-            'dateCreate',
-            'dateStart',
-            'dateEnd',
-            'dateComplete',
-            'lastUpdateDate'
-        ]
+    headers = {
+        'Content-Type': 'application/xml',
+        'Accept': 'application/xml'
     }
-    return make_planfix_request('task.getList', params)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<request method="task.getList">'
+        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
+        f'<pageCurrent>{page}</pageCurrent>'
+        f'<pageSize>100</pageSize>'
+        '<filters>'
+        '  <filter>'
+        '    <type>51</type>'
+        '    <operator>equal</operator>'
+        f'    <value>{TASK_TEMPLATE_ID}</value>'
+        '  </filter>'
+        '</filters>'
+        '<fields>'
+        '  <field>id</field>'
+        '  <field>title</field>'
+        '  <field>description</field>'
+        '  <field>status</field>'
+        '  <field>statusName</field>'
+        '  <field>assigner</field>'
+        '  <field>owner</field>'
+        '  <field>dateCreate</field>'
+        '  <field>dateStart</field>'
+        '  <field>dateEnd</field>'
+        '  <field>dateComplete</field>'
+        '  <field>lastUpdateDate</field>'
+        '</fields>'
+        '</request>'
+    )
+    response = requests.post(
+        os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
+        data=body.encode('utf-8'),
+        headers=headers,
+        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_USER_TOKEN"))
+    )
+    response.raise_for_status()
+    return response.text
 
 def parse_date(date_str):
     if not date_str:

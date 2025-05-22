@@ -28,11 +28,30 @@ def check_required_env_vars(env_vars_dict: dict) -> None:
         logger.error(error_message)
         raise ValueError(error_message)
 
-def make_planfix_request(request_body_xml: str) -> str:
+def dict_to_xml(data, root_tag=None):
+    """
+    Рекурсивно преобразует dict/list/str в XML-строку.
+    Если root_tag задан — оборачивает результат в этот тег.
+    """
+    xml = ''
+    if isinstance(data, dict):
+        for key, value in data.items():
+            xml += dict_to_xml(value, key)
+    elif isinstance(data, list):
+        for item in data:
+            xml += dict_to_xml(item, root_tag)
+    else:
+        # data — строка или число
+        xml += f'<{root_tag}>{data}</{root_tag}>' if root_tag else str(data)
+    if root_tag and not isinstance(data, (str, int, float)):
+        return xml
+    return xml
+
+def make_planfix_request(method_name: str, params: dict) -> str:
     """
     Sends a POST request to Planfix API.
-    request_body_xml is the XML specific to the method call, e.g. <contact.getList>...</contact.getList>
-    The method name will be extracted from the root tag of request_body_xml.
+    method_name: имя метода API (например, 'task.getList').
+    params: словарь с параметрами запроса.
     """
     headers = {
         'Content-Type': 'application/xml',
@@ -50,17 +69,19 @@ def make_planfix_request(request_body_xml: str) -> str:
         raise ValueError("PLANFIX_ACCOUNT environment variable is not set.")
 
     try:
-        # Extract method name from the root tag of request_body_xml
-        root_tag_name = ET.fromstring(request_body_xml).tag 
+        # Формируем XML-тело запроса на основе method_name и params
+        request_body_xml = f"<{method_name}>"
+        request_body_xml += dict_to_xml(params)
+        request_body_xml += f"</{method_name}>"
         
         final_xml_payload = f"""<?xml version="1.0" encoding="UTF-8"?>
-        <request method="{root_tag_name}">
+        <request method="{method_name}">
             <account>{PLANFIX_ACCOUNT}</account>
             {auth_xml}
             {request_body_xml}
         </request>
         """
-        logger.info(f"Making Planfix API request to method: {root_tag_name}")
+        logger.info(f"Making Planfix API request to method: {method_name}")
         
         response = requests.post(PLANFIX_API_URL, data=final_xml_payload.encode('utf-8'), headers=headers)
         response.raise_for_status()
@@ -74,7 +95,7 @@ def make_planfix_request(request_body_xml: str) -> str:
             logger.error(f"Planfix API error: Code {error_code}, Message: {error_message}")
             raise ValueError(f"Planfix API error: {error_message}")
             
-        logger.info(f"Planfix API request to {root_tag_name} successful.")
+        logger.info(f"Planfix API request to {method_name} successful.")
         return response.text
         
     except ET.ParseError as e:
@@ -93,16 +114,14 @@ def get_planfix_status_name(status_id: str) -> str | None:
         logger.warning("get_planfix_status_name called with empty status_id.")
         return None
 
-    request_body_xml = f"""
-    <status.get>
-        <status>
-            <id>{status_id}</id>
-        </status>
-    </status.get>
-    """
+    params = {
+        'status': {
+            'id': status_id
+        }
+    }
     try:
         logger.info(f"Fetching status name for ID: {status_id}")
-        response_xml = make_planfix_request(request_body_xml)
+        response_xml = make_planfix_request('status.get', params)
         root = ET.fromstring(response_xml)
         status_name_element = root.find(".//status/name")
         
