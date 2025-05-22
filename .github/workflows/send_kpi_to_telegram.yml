@@ -39,6 +39,8 @@ jobs:
       - name: Update clients in Supabase
         id: update-clients
         run: |
+          echo "Starting clients update..."
+          python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_clients_to_supabase.py; then
             echo "::error::Failed to update clients"
             exit 1
@@ -58,6 +60,8 @@ jobs:
         id: update-orders
         if: steps.update-clients.outcome == 'success'
         run: |
+          echo "Starting orders update..."
+          python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_orders_to_supabase.py; then
             echo "::error::Failed to update orders"
             exit 1
@@ -77,6 +81,8 @@ jobs:
         id: update-tasks
         if: steps.update-orders.outcome == 'success'
         run: |
+          echo "Starting tasks update..."
+          python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_tasks_to_supabase.py; then
             echo "::error::Failed to update tasks"
             exit 1
@@ -96,6 +102,8 @@ jobs:
         id: send-kpi
         if: steps.update-tasks.outcome == 'success'
         run: |
+          echo "Starting KPI report generation..."
+          python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_', 'TELEGRAM_'))})"
           if ! python scripts/send_kpi_to_telegram.py; then
             echo "::error::Failed to send KPI to Telegram"
             exit 1
