@@ -102,146 +102,70 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
         'Przywrócić klienta': 'WRK'
     }
     
-    # Debug query to check task data format
-    debug_query = """
-        SELECT 
-            owner_name,
-            title,
-            nastepne_zadanie,
-            data_zakonczenia_zadania,
-            TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
-            is_deleted,
-            template_id
-        FROM planfix_tasks
-        WHERE owner_name IN %s
-        AND data_zakonczenia_zadania IS NOT NULL
-        AND data_zakonczenia_zadania >= %s::timestamp
-        AND data_zakonczenia_zadania < %s::timestamp
-        AND is_deleted = false
-        ORDER BY data_zakonczenia_zadania DESC
-        LIMIT 20;
-    """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
-    logger.info("\nDebug - Sample task data:")
-    for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Next Task: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}, Template: {row[6]}")
-    
-    # Debug query to check all tasks for the current month
-    debug_all_tasks_query = """
-        SELECT 
-            owner_name,
-            nastepne_zadanie,
-            data_zakonczenia_zadania,
-            TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
-            is_deleted,
-            template_id
-        FROM planfix_tasks
-        WHERE data_zakonczenia_zadania IS NOT NULL
-        AND data_zakonczenia_zadania >= %s::timestamp
-        AND data_zakonczenia_zadania < %s::timestamp
-        ORDER BY data_zakonczenia_zadania DESC;
-    """
-    debug_all_results = _execute_kpi_query(debug_all_tasks_query, (start_date_str, end_date_str), "debug all tasks")
-    logger.info("\nDebug - All tasks in date range:")
-    for row in debug_all_results:
-        logger.info(f"Manager: {row[0]}, Next Task: {row[1]}, Date: {row[2]}, Formatted: {row[3]}, Deleted: {row[4]}, Template: {row[5]}")
-    
-    # Debug query to count all tasks by type and manager (all time, including unfinished)
-    debug_total_tasks_query = """
-        SELECT 
-            owner_name,
-            nastepne_zadanie,
-            COUNT(*) as task_count,
-            COUNT(CASE WHEN data_zakonczenia_zadania IS NOT NULL THEN 1 END) as completed_count,
-            COUNT(CASE WHEN data_zakonczenia_zadania IS NULL THEN 1 END) as unfinished_count
-        FROM planfix_tasks
-        WHERE is_deleted = false
-        AND nastepne_zadanie IN (
-            'Nawiązać pierwszy kontakt',
-            'Przeprowadzić pierwszą rozmowę telefoniczną',
-            'Zadzwonić do klienta',
-            'Przeprowadzić spotkanie',
-            'Wysłać materiały',
-            'Odpowiedzieć na pytanie techniczne',
-            'Zapisać na media społecznościowe',
-            'Opowiedzieć o nowościach',
-            'Zebrać opinie',
-            'Przywrócić klienta'
-        )
-        GROUP BY owner_name, nastepne_zadanie
-        ORDER BY owner_name, nastepne_zadanie;
-    """
-    debug_total_results = _execute_kpi_query(debug_total_tasks_query, (), "debug total tasks")
-    logger.info("\nDebug - Total tasks by type and manager (all time, including unfinished):")
-    for row in debug_total_results:
-        logger.info(f"Manager: {row[0]}, Task Type: {row[1]}, Total: {row[2]}, Completed: {row[3]}, Unfinished: {row[4]}")
-    
-    # Get tasks by type for each manager
-    tasks_by_type_query = """
+    # Основной KPI-запрос
+    query = f"""
         WITH task_counts AS (
-            SELECT 
-                t.manager,
+            SELECT
+                owner_name AS manager,
                 CASE 
-                    WHEN t.title LIKE '%Wysłać dokumenty%' THEN 'WDM'
-                    WHEN t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%' THEN 'PRZ'
-                    WHEN t.title LIKE '%Zebrać kluczowe informacje%' THEN 'ZKL'
-                    WHEN t.title LIKE '%Przeprowadzić spotkanie%' THEN 'SPT'
-                    WHEN t.title LIKE '%Wysłać materiały%' THEN 'MAT'
-                    WHEN t.title LIKE '%Przeprowadzić rozmowę telefoniczną%' THEN 'TPY'
-                    WHEN t.title LIKE '%Przeprowadzić spotkanie%' THEN 'MSP'
-                    WHEN t.title LIKE '%Opowiedzieć o nowościach%' THEN 'NOW'
-                    WHEN t.title LIKE '%Odpowiedzieć na pytanie techniczne%' THEN 'OPI'
-                    WHEN t.title LIKE '%Zebrać opinie%' THEN 'WRK'
-                    ELSE 'OTHER'
-                END as task_type,
-                COUNT(*) as count
-            FROM planfix_tasks t
-            WHERE t.date BETWEEN %s AND %s
-            AND t.manager = ANY(%s)
-            AND t.deleted = false
-            GROUP BY t.manager, task_type
-        ),
-        combined_counts AS (
-            SELECT 
-                t.manager,
-                'PRZ' as task_type,
-                COUNT(*) as count
-            FROM planfix_tasks t
-            WHERE t.date BETWEEN %s AND %s
-            AND t.manager = ANY(%s)
-            AND t.deleted = false
-            AND t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%'
-            GROUP BY t.manager
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                    ELSE NULL
+                END AS task_type,
+                COUNT(*) AS task_count
+            FROM planfix_tasks
+            WHERE
+                data_zakonczenia_zadania IS NOT NULL
+                AND data_zakonczenia_zadania >= %s::timestamp
+                AND data_zakonczenia_zadania < %s::timestamp
+                AND owner_name IN %s
+                AND is_deleted = false
+                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
+                    'Nawiązać pierwszy kontakt',
+                    'Przeprowadzić pierwszą rozmowę telefoniczną',
+                    'Zadzwonić do klienta',
+                    'Przeprowadzić spotkanie',
+                    'Wysłać materiały',
+                    'Odpowiedzieć na pytanie techniczne',
+                    'Zapisać na media społecznościowe',
+                    'Opowiedzieć o nowościach',
+                    'Zebrać opinie',
+                    'Przywrócić klienta'
+                )
+            GROUP BY
+                owner_name, 
+                CASE 
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'KZI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                    ELSE NULL
+                END
         )
         SELECT 
-            tc.manager,
-            tc.task_type,
-            tc.count,
-            CASE 
-                WHEN tc.task_type = 'PRZ' AND EXISTS (
-                    SELECT 1 FROM planfix_tasks t 
-                    WHERE t.manager = tc.manager 
-                    AND t.title LIKE '%Przeprowadzić pierwszą rozmowę telefoniczną%'
-                    AND t.wynik = 'Klient jest zainteresowany'
-                    AND t.date BETWEEN %s AND %s
-                ) THEN 1
-                ELSE 0
-            END as kzi_count
-        FROM task_counts tc
-        UNION ALL
-        SELECT 
-            cc.manager,
-            cc.task_type,
-            cc.count,
-            0 as kzi_count
-        FROM combined_counts cc
-        ORDER BY 
-            CASE tc.manager
-                WHEN 'Kozik Andrzej' THEN 1
-                WHEN 'Stukalo Nazarii' THEN 2
-                ELSE 3
-            END,
-            CASE tc.task_type
+            manager,
+            task_type,
+            task_count
+        FROM task_counts
+        WHERE task_type IS NOT NULL
+        ORDER BY manager, 
+            CASE task_type
                 WHEN 'WDM' THEN 1
                 WHEN 'PRZ' THEN 2
                 WHEN 'KZI' THEN 3
@@ -256,7 +180,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 ELSE 12
             END;
     """
-    results = _execute_kpi_query(tasks_by_type_query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
     return results
 
@@ -401,7 +325,7 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
     ), "client statuses")
 
 
-def send_to_telegram():
+def send_to_telegram(task_results, offer_results, order_results, client_results, report_type):
     """Send KPI report to Telegram."""
     try:
         # Initialize data structure for each manager
@@ -416,26 +340,17 @@ def send_to_telegram():
             }
         }
         
-        # Get task results
-        task_results = get_kpi_data()
-        if not task_results:
-            logger.error("No task results received")
-            return
-            
         # Process task results
         for row in task_results:
             manager = row[0]
             task_type = row[1]
             count = row[2]
-            kzi_count = row[3]
             
             if manager in data and task_type in data[manager]:
                 data[manager][task_type] = count
-                if task_type == 'PRZ' and kzi_count > 0:
-                    data[manager]['KZI'] = kzi_count
         
         # Format message
-        message = "📊 *KPI Report*\n\n"
+        message = f"📊 *KPI Report ({report_type})*\n\n"
         
         # Define task order
         task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
