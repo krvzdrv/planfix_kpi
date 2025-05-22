@@ -88,7 +88,9 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             result,
             closed_at,
             TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
-            is_deleted
+            is_deleted,
+            SPLIT_PART(title, '/', 1) as task_type_raw,
+            TRIM(SPLIT_PART(title, '/', 1)) as task_type_trimmed
         FROM planfix_tasks
         WHERE owner_name IN %s
         AND closed_at IS NOT NULL
@@ -100,7 +102,24 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES, start_date_str, end_date_str), "debug tasks")
     logger.info("\nDebug - Sample task data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}")
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}, Deleted: {row[5]}, Raw Type: {row[6]}, Trimmed Type: {row[7]}")
+    
+    # Additional debug query to check all tasks for these managers
+    all_tasks_query = """
+        SELECT 
+            owner_name,
+            title,
+            closed_at,
+            is_deleted
+        FROM planfix_tasks
+        WHERE owner_name IN %s
+        AND closed_at IS NOT NULL
+        LIMIT 5;
+    """
+    all_tasks = _execute_kpi_query(all_tasks_query, (PLANFIX_USER_NAMES,), "all tasks")
+    logger.info("\nDebug - Sample of all tasks for managers:")
+    for row in all_tasks:
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Date: {row[2]}, Deleted: {row[3]}")
     
     query = f"""
         WITH task_counts AS (
@@ -109,7 +128,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' 
+                         AND result = 'Klient jest zainteresowany' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Wysłać materiały' THEN 'MAT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
@@ -151,6 +171,28 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
 
 def count_offers(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_IDS: return []
+    
+    logger.info(f"\nDebug - Offer query parameters:")
+    logger.info(f"Start date: {start_date_str}")
+    logger.info(f"End date: {end_date_str}")
+    
+    # Debug query to check offer data format
+    debug_query = """
+        SELECT 
+            menedzher,
+            data_wyslania_oferty,
+            TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') as parsed_date
+        FROM planfix_orders
+        WHERE menedzher IN %s
+        AND data_wyslania_oferty IS NOT NULL
+        AND data_wyslania_oferty != ''
+        LIMIT 5;
+    """
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug offers")
+    logger.info("\nDebug - Sample offer data:")
+    for row in debug_results:
+        logger.info(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
+    
     query = f"""
         SELECT
             menedzher AS manager_id,
@@ -166,10 +208,37 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         GROUP BY
             menedzher;
     """
-    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
+    logger.info(f"Offer results: {results}")
+    return results
 
 def count_orders(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_IDS: return []
+    
+    logger.info(f"\nDebug - Order query parameters:")
+    logger.info(f"Start date: {start_date_str}")
+    logger.info(f"End date: {end_date_str}")
+    
+    # Debug query to check order data format
+    debug_query = """
+        SELECT 
+            menedzher,
+            data_potwierdzenia_zamowienia,
+            data_realizacji,
+            wartosc_netto_pln,
+            TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') as parsed_confirmation_date,
+            TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') as parsed_realization_date
+        FROM planfix_orders
+        WHERE menedzher IN %s
+        AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
+        LIMIT 5;
+    """
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
+    logger.info("\nDebug - Sample order data:")
+    for row in debug_results:
+        logger.info(f"Manager: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}")
+        logger.info(f"Parsed dates - Confirmation: {row[4]}, Realization: {row[5]}")
+    
     query = f"""
         WITH order_metrics AS (
             SELECT
@@ -197,7 +266,9 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         FROM order_metrics
         GROUP BY manager_id;
     """
-    return _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
+    logger.info(f"Order results: {results}")
+    return results
 
 def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_NAMES: return []
@@ -266,16 +337,21 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             logger.warning(f"Could not process task result - Manager ID not found or invalid task type: {manager_name} -> {manager_id}, {task_type}")
     
     for manager_id, count in offer_results:
-        if manager_id in data: data[manager_id]['OFW'] = count
+        if manager_id in data: 
+            data[manager_id]['OFW'] = count
+            logger.info(f"Updated offers for manager {manager_id}: {count}")
     
     for manager_id, count, amount in order_results:
         if manager_id in data:
             data[manager_id]['ZAM'] = count
             data[manager_id]['PRC'] = float(amount) if amount is not None else 0.0
+            logger.info(f"Updated orders for manager {manager_id}: count={count}, amount={amount}")
     
     for manager_name, status, count in client_results:
         manager_id = name_to_id_map.get(manager_name)
-        if manager_id and status in data[manager_id]: data[manager_id][status] = count
+        if manager_id and status in data[manager_id]: 
+            data[manager_id][status] = count
+            logger.info(f"Updated client status for manager {manager_id}: {status}={count}")
     
     current_dt = datetime.now()
     report_title_date = current_dt.strftime('%d.%m.%Y') if report_type == 'daily' else current_dt.strftime('%m.%Y')
@@ -323,6 +399,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             text += f"{kpi.ljust(3)} | {line_values}\n"
             
     text += separator_line + "```"
+    
+    logger.info(f"Prepared report text:\n{text}")
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
