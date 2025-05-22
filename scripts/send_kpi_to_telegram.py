@@ -112,7 +112,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             owner_name,
             title,
             nastepne_zadanie,
-            wynik,
+            
             data_zakonczenia_zadania,
             TO_CHAR(data_zakonczenia_zadania, 'YYYY-MM-DD HH24:MI:SS') as formatted_date,
             is_deleted,
