@@ -75,29 +75,53 @@ def _execute_kpi_query(query: str, params: tuple, description: str) -> list:
 
 def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_NAMES: return []
+    
+    logger.info(f"\nDebug - Task query parameters:")
+    logger.info(f"Start date: {start_date_str}")
+    logger.info(f"End date: {end_date_str}")
+    
+    # Debug query to check task data format and PRZ tasks specifically
+    debug_query = """
+        SELECT 
+            owner_name,
+            title,
+            result,
+            closed_at,
+            TO_CHAR(closed_at, 'YYYY-MM-DD HH24:MI:SS') as formatted_date
+        FROM planfix_tasks
+        WHERE owner_name IN %s
+        AND closed_at IS NOT NULL
+        AND TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
+        LIMIT 10;
+    """
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug tasks")
+    logger.info("\nDebug - Sample PRZ task data:")
+    for row in debug_results:
+        logger.info(f"Manager: {row[0]}, Title: {row[1]}, Result: {row[2]}, Date: {row[3]}, Formatted: {row[4]}")
+    
     query = f"""
         WITH task_counts AS (
         SELECT
             owner_name AS manager,
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić до клиента' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowоściaх' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zapisać на media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Odpowiedzieć на pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przywrócić клиента' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                    WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     WHEN TRIM(SPLIT_PART(title, '/', 1)) = 'Zebrać opinie' THEN 'OPI'
                 END AS task_type,
             COUNT(*) AS task_count
         FROM
             planfix_tasks
         WHERE
-            COALESCE(closed_at, date_completed) IS NOT NULL
-                AND COALESCE(closed_at, date_completed) >= %s::timestamp
-                AND COALESCE(closed_at, date_completed) < %s::timestamp
+            closed_at IS NOT NULL
+                AND closed_at >= %s::timestamp
+                AND closed_at < %s::timestamp
                 AND owner_name IN %s
             AND title IS NOT NULL
             AND POSITION('/' IN title) > 0
