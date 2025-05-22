@@ -105,7 +105,7 @@ jobs:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
-          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
           SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
