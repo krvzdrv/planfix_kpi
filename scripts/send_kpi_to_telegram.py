@@ -138,6 +138,39 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     for row in debug_all_results:
         logger.info(f"Manager: {row[0]}, Next Task: {row[1]}, Date: {row[2]}, Formatted: {row[3]}, Deleted: {row[4]}, Template: {row[5]}")
     
+    # Debug query to count all tasks by type and manager (excluding current month)
+    debug_total_tasks_query = """
+        WITH current_month_start AS (
+            SELECT date_trunc('month', CURRENT_DATE) as start_date
+        )
+        SELECT 
+            owner_name,
+            nastepne_zadanie,
+            COUNT(*) as task_count
+        FROM planfix_tasks
+        WHERE data_zakonczenia_zadania IS NOT NULL
+        AND data_zakonczenia_zadania < (SELECT start_date FROM current_month_start)
+        AND is_deleted = false
+        AND nastepne_zadanie IN (
+            'Nawiązać pierwszy kontakt',
+            'Przeprowadzić pierwszą rozmowę telefoniczną',
+            'Zadzwonić do klienta',
+            'Przeprowadzić spotkanie',
+            'Wysłać materiały',
+            'Odpowiedzieć na pytanie techniczne',
+            'Zapisać na media społecznościowe',
+            'Opowiedzieć o nowościach',
+            'Zebrać opinie',
+            'Przywrócić klienta'
+        )
+        GROUP BY owner_name, nastepne_zadanie
+        ORDER BY owner_name, nastepne_zadanie;
+    """
+    debug_total_results = _execute_kpi_query(debug_total_tasks_query, (), "debug total tasks")
+    logger.info("\nDebug - Total tasks by type and manager (excluding current month):")
+    for row in debug_total_results:
+        logger.info(f"Manager: {row[0]}, Task Type: {row[1]}, Count: {row[2]}")
+    
     # Основной KPI-запрос
     query = f"""
         WITH task_counts AS (
