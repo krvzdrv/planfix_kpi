@@ -101,6 +101,10 @@ jobs:
             exit 1
           fi
         env:
+          PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
+          PLANFIX_USER_TOKEN: ${{ secrets.PLANFIX_USER_TOKEN }}
+          PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
           SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
