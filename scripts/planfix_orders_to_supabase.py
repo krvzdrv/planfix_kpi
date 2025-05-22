@@ -218,7 +218,12 @@ def main():
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
         'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
-        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING
+        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
+        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
+        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
+        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
+        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
+        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT
     }
     try:
         planfix_utils.check_required_env_vars(required_env_vars)

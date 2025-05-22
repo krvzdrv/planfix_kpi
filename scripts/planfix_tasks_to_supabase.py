@@ -134,7 +134,12 @@ def main():
         'PLANFIX_API_KEY': os.environ.get('PLANFIX_API_KEY'),
         'PLANFIX_USER_TOKEN': os.environ.get('PLANFIX_USER_TOKEN'),
         'PLANFIX_ACCOUNT': os.environ.get('PLANFIX_ACCOUNT'),
-        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING')
+        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
+        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
+        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
+        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
+        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
+        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT')
     }
     try:
         check_required_env_vars(required_env_vars)

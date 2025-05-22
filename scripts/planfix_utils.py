@@ -33,6 +33,21 @@ def check_required_env_vars(env_vars_dict: dict) -> None:
         logger.error(error_message)
         raise ValueError(error_message)
 
+    # Если SUPABASE_CONNECTION_STRING не указан, проверяем наличие всех параметров подключения
+    if not env_vars_dict.get('SUPABASE_CONNECTION_STRING'):
+        supabase_params = {
+            'SUPABASE_HOST': SUPABASE_HOST,
+            'SUPABASE_DB': SUPABASE_DB,
+            'SUPABASE_USER': SUPABASE_USER,
+            'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
+            'SUPABASE_PORT': SUPABASE_PORT
+        }
+        missing_params = [name for name, value in supabase_params.items() if not value]
+        if missing_params:
+            error_message = f"Missing required Supabase connection parameters: {', '.join(missing_params)}"
+            logger.error(error_message)
+            raise ValueError(error_message)
+
 def dict_to_xml(data, root_tag=None):
     """
     Рекурсивно преобразует dict/list/str в XML-строку.

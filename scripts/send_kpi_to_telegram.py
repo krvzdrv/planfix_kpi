@@ -5,6 +5,7 @@ import os
 import logging # Added logging
 from dotenv import load_dotenv
 from config import MANAGERS_KPI 
+import planfix_utils
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,9 +31,17 @@ PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
-        'SUPABASE_HOST': PG_HOST, 'SUPABASE_DB': PG_DB, 'SUPABASE_USER': PG_USER,
-        'SUPABASE_PASSWORD': PG_PASSWORD, 'SUPABASE_PORT': PG_PORT,
-        'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN, 'TELEGRAM_CHAT_ID': CHAT_ID
+        'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
+        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
+        'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
+        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
+        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
+        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
+        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
+        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
+        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT,
+        'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN,
+        'TELEGRAM_CHAT_ID': CHAT_ID
     }
     missing_vars = [var for var, value in required_env_vars.items() if not value]
     if missing_vars:
