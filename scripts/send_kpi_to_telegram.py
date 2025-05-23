@@ -437,7 +437,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             
             # Add tasks section second
             message += "zadania\n"
-            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
@@ -479,7 +479,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             
             # Add tasks section second
             message += "zadania\n"
-            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
