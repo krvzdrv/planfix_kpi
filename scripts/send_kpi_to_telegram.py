@@ -346,7 +346,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for row in task_results:
             manager = row[0]
             task_type = row[1]
-            count = row[2]
+            count = int(row[2]) if row[2] is not None else 0
             
             if manager in data and task_type in data[manager]:
                 data[manager][task_type] = count
@@ -355,7 +355,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for row in client_results:
             manager = row[0]
             status = row[1]
-            count = row[2]
+            count = int(row[2]) if row[2] is not None else 0
             
             if manager in data and status in data[manager]:
                 data[manager][status] = count
@@ -363,8 +363,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         # Process order results
         for row in order_results:
             manager_id = row[0]
-            count = row[1]
-            amount = row[2]
+            count = int(row[1]) if row[1] is not None else 0
+            amount = float(row[2]) if row[2] is not None else 0.0
             
             # Find manager name by ID
             manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
@@ -389,7 +389,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for task_type in task_order:
             kozik_count = data['Kozik Andrzej'][task_type]
             stukalo_count = data['Stukalo Nazarii'][task_type]
-            message += f"{task_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         
         # Add task totals
         kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
@@ -404,7 +404,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for status in client_order:
             kozik_count = data['Kozik Andrzej'][status]
             stukalo_count = data['Stukalo Nazarii'][status]
-            message += f"{status} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         message += "───────────────────────\n"
         
         # Add orders section
@@ -413,7 +413,10 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for order_type in order_order:
             kozik_count = data['Kozik Andrzej'][order_type]
             stukalo_count = data['Stukalo Nazarii'][order_type]
-            message += f"{order_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            if order_type == 'PRC':
+                message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+            else:
+                message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         message += "═══════════════════════\n"
         
         # Monthly report
@@ -427,7 +430,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for task_type in task_order:
             kozik_count = data['Kozik Andrzej'][task_type]
             stukalo_count = data['Stukalo Nazarii'][task_type]
-            message += f"{task_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         
         # Add task totals
         message += "───────────────────────\n"
@@ -439,7 +442,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for status in client_order:
             kozik_count = data['Kozik Andrzej'][status]
             stukalo_count = data['Stukalo Nazarii'][status]
-            message += f"{status} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         message += "───────────────────────\n"
         
         # Add orders section
@@ -447,7 +450,10 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         for order_type in order_order:
             kozik_count = data['Kozik Andrzej'][order_type]
             stukalo_count = data['Stukalo Nazarii'][order_type]
-            message += f"{order_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            if order_type == 'PRC':
+                message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+            else:
+                message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
         message += "═══════════════════════\n"
         message += "```"  # End monospace block
         
