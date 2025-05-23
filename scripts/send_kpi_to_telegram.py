@@ -155,6 +155,22 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END
+        ),
+        kzi_counts AS (
+            SELECT
+                owner_name AS manager,
+                'KZI' AS task_type,
+                COUNT(*) AS task_count
+            FROM planfix_tasks
+            WHERE
+                data_zakonczenia_zadania IS NOT NULL
+                AND data_zakonczenia_zadania >= %s::timestamp
+                AND data_zakonczenia_zadania < %s::timestamp
+                AND owner_name IN %s
+                AND is_deleted = false
+                AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
+                AND wynik = 'Klient jest zainteresowany'
+            GROUP BY owner_name
         )
         SELECT 
             manager,
@@ -162,6 +178,12 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             task_count
         FROM task_counts
         WHERE task_type IS NOT NULL
+        UNION ALL
+        SELECT 
+            manager,
+            task_type,
+            task_count
+        FROM kzi_counts
         ORDER BY manager, 
             CASE task_type
                 WHEN 'WDM' THEN 1
@@ -178,7 +200,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 ELSE 12
             END;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
     return results
 
@@ -371,7 +393,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             if manager in data:
                 data[manager]['OFW'] = count
                 data[manager]['ZAM'] = count
-                data[manager]['PRC'] = amount
+                data[manager]['PRC'] = round(amount)  # Округляем PRC до целых
 
         # Format message
         today = date.today()
@@ -415,7 +437,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if order_type == 'PRC':
-                    message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
                 else:
                     message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "═══════════════════════\n"
@@ -457,7 +479,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if order_type == 'PRC':
-                    message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
                 else:
                     message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "═══════════════════════\n"
