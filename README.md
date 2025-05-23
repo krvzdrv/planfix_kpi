@@ -8,16 +8,16 @@
 .
 ├── .github/
 │   └── workflows/
-│       └── send_kpi_to_telegram.yml  # GitHub Actions workflow
+│       └── send_kpi_to_telegram.yml   # GitHub Actions workflow
 ├── scripts/
-│   ├── config.py                     # Конфигурация менеджеров
+│   ├── config.py                      # Конфигурация менеджеров
 │   ├── planfix_clients_to_supabase.py # Синхронизация клиентов
 │   ├── planfix_orders_to_supabase.py  # Синхронизация заказов
 │   ├── planfix_tasks_to_supabase.py   # Синхронизация задач
-│   ├── planfix_utils.py              # Утилиты для работы с Planfix API
-│   └── send_kpi_to_telegram.py       # Генерация и отправка KPI отчетов
-├── requirements.txt                  # Зависимости Python
-└── README.md                        # Документация
+│   ├── planfix_utils.py               # Утилиты для работы с Planfix API
+│   └── send_kpi_to_telegram.py        # Генерация и отправка KPI отчетов
+├── requirements.txt                   # Зависимости Python
+└── README.md                          # Документация
 ```
 
 ## Установка
