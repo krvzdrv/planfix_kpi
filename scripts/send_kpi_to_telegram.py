@@ -377,84 +377,91 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         today = date.today()
         message = "```\n"  # Start monospace block
         
-        # Daily report
-        message += f"RAPORT {today.strftime('%d.%m.%Y')}\n"
-        message += "═══════════════════════\n"
-        message += "KPI | Kozik   | Stukalo\n"
-        message += "───────────────────────\n"
+        if report_type == 'daily':
+            # Daily report
+            message += f"RAPORT {today.strftime('%d.%m.%Y')}\n"
+            message += "═══════════════════════\n"
+            message += "KPI | Kozik   | Stukalo\n"
+            message += "───────────────────────\n"
+            
+            # Add tasks section
+            message += "zadania\n"
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
+            for task_type in task_order:
+                kozik_count = data['Kozik Andrzej'][task_type]
+                stukalo_count = data['Stukalo Nazarii'][task_type]
+                message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            
+            # Add task totals
+            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
+            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
+            message += "───────────────────────\n"
+            message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add clients section
+            message += "klienci\n"
+            client_order = ['NWI', 'WTR', 'PSK']
+            for status in client_order:
+                kozik_count = data['Kozik Andrzej'][status]
+                stukalo_count = data['Stukalo Nazarii'][status]
+                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add orders section
+            message += "zamówienia\n"
+            order_order = ['OFW', 'ZAM', 'PRC']
+            for order_type in order_order:
+                kozik_count = data['Kozik Andrzej'][order_type]
+                stukalo_count = data['Stukalo Nazarii'][order_type]
+                if order_type == 'PRC':
+                    message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+                else:
+                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "═══════════════════════\n"
+        else:
+            # Monthly report
+            message += f"RAPORT {today.strftime('%m.%Y')}\n"
+            message += "═══════════════════════\n"
+            message += "KPI | Kozik   | Stukalo\n"
+            message += "───────────────────────\n"
+            
+            # Add tasks section
+            message += "zadania\n"
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
+            for task_type in task_order:
+                kozik_count = data['Kozik Andrzej'][task_type]
+                stukalo_count = data['Stukalo Nazarii'][task_type]
+                message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            
+            # Add task totals
+            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
+            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
+            message += "───────────────────────\n"
+            message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add clients section
+            message += "klienci\n"
+            client_order = ['NWI', 'WTR', 'PSK']
+            for status in client_order:
+                kozik_count = data['Kozik Andrzej'][status]
+                stukalo_count = data['Stukalo Nazarii'][status]
+                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add orders section
+            message += "zamówienia\n"
+            order_order = ['OFW', 'ZAM', 'PRC']
+            for order_type in order_order:
+                kozik_count = data['Kozik Andrzej'][order_type]
+                stukalo_count = data['Stukalo Nazarii'][order_type]
+                if order_type == 'PRC':
+                    message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
+                else:
+                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "═══════════════════════\n"
         
-        # Add tasks section
-        message += "zadania\n"
-        task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
-        for task_type in task_order:
-            kozik_count = data['Kozik Andrzej'][task_type]
-            stukalo_count = data['Stukalo Nazarii'][task_type]
-            message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        
-        # Add task totals
-        kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
-        stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
-        message += "───────────────────────\n"
-        message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
-        message += "───────────────────────\n"
-        
-        # Add clients section
-        message += "klienci\n"
-        client_order = ['NWI', 'WTR', 'PSK']
-        for status in client_order:
-            kozik_count = data['Kozik Andrzej'][status]
-            stukalo_count = data['Stukalo Nazarii'][status]
-            message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        message += "───────────────────────\n"
-        
-        # Add orders section
-        message += "zamówienia\n"
-        order_order = ['OFW', 'ZAM', 'PRC']
-        for order_type in order_order:
-            kozik_count = data['Kozik Andrzej'][order_type]
-            stukalo_count = data['Stukalo Nazarii'][order_type]
-            if order_type == 'PRC':
-                message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
-            else:
-                message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        message += "═══════════════════════\n"
-        
-        # Monthly report
-        message += f"\nRAPORT {today.strftime('%m.%Y')}\n"
-        message += "═══════════════════════\n"
-        message += "KPI | Kozik   | Stukalo\n"
-        message += "───────────────────────\n"
-        
-        # Add tasks section
-        message += "zadania\n"
-        for task_type in task_order:
-            kozik_count = data['Kozik Andrzej'][task_type]
-            stukalo_count = data['Stukalo Nazarii'][task_type]
-            message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        
-        # Add task totals
-        message += "───────────────────────\n"
-        message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
-        message += "───────────────────────\n"
-        
-        # Add clients section
-        message += "klienci\n"
-        for status in client_order:
-            kozik_count = data['Kozik Andrzej'][status]
-            stukalo_count = data['Stukalo Nazarii'][status]
-            message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        message += "───────────────────────\n"
-        
-        # Add orders section
-        message += "zamówienia\n"
-        for order_type in order_order:
-            kozik_count = data['Kozik Andrzej'][order_type]
-            stukalo_count = data['Stukalo Nazarii'][order_type]
-            if order_type == 'PRC':
-                message += f"{order_type:3} | {kozik_count:6.2f} | {stukalo_count:6.2f}\n"
-            else:
-                message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-        message += "═══════════════════════\n"
         message += "```"  # End monospace block
         
         # Send to Telegram
@@ -524,7 +531,7 @@ if __name__ == "__main__":
         clients_daily = count_client_statuses(start_daily, end_daily)
         send_to_telegram(tasks_daily, offers_daily, orders_daily, clients_daily, 'daily')
         
-        # Send monthly report always
+        # Send monthly report
         logger.info("Generating monthly KPI report.")
         start_monthly, end_monthly = get_date_range('monthly')
         tasks_monthly = count_tasks_by_type(start_monthly, end_monthly)
