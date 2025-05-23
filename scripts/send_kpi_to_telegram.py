@@ -120,6 +120,19 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
+                CASE 
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 1
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 2
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 4
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 5
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 6
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 7
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 8
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 9
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 10
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 11
+                    ELSE 12
+                END AS task_order,
                 COUNT(*) AS task_count
             FROM planfix_tasks
             WHERE
@@ -154,12 +167,26 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
+                END,
+                CASE 
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 1
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 2
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 4
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 5
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 6
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 7
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 8
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 9
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 10
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 11
+                    ELSE 12
                 END
         ),
         kzi_counts AS (
             SELECT
                 owner_name AS manager,
                 'KZI' AS task_type,
+                3 AS task_order,
                 COUNT(*) AS task_count
             FROM planfix_tasks
             WHERE
@@ -176,31 +203,15 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
             manager,
             task_type,
             task_count
-        FROM task_counts
+        FROM (
+            SELECT * FROM task_counts
+            UNION ALL
+            SELECT * FROM kzi_counts
+        ) combined_results
         WHERE task_type IS NOT NULL
-        UNION ALL
-        SELECT 
-            manager,
-            task_type,
-            task_count
-        FROM kzi_counts
-        ORDER BY manager, 
-            CASE task_type
-                WHEN 'WDM' THEN 1
-                WHEN 'PRZ' THEN 2
-                WHEN 'KZI' THEN 3
-                WHEN 'ZKL' THEN 4
-                WHEN 'SPT' THEN 5
-                WHEN 'MAT' THEN 6
-                WHEN 'TPY' THEN 7
-                WHEN 'MSP' THEN 8
-                WHEN 'NOW' THEN 9
-                WHEN 'OPI' THEN 10
-                WHEN 'WRK' THEN 11
-                ELSE 12
-            END;
+        ORDER BY manager, task_order;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "tasks by type")
     logger.info(f"Task results: {results}")
     return results
 
