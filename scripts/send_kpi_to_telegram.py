@@ -377,7 +377,10 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Format message
         today = date.today()
-        message = f"RAPORT {today.strftime('%m.%Y')}\n"
+        message = "```\n"  # Start monospace block
+        
+        # Daily report
+        message += f"RAPORT {today.strftime('%d.%m.%Y')}\n"
         message += "═══════════════════════\n"
         message += "KPI | Kozik   | Stukalo\n"
         message += "───────────────────────\n"
@@ -414,6 +417,41 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             stukalo_count = data['Stukalo Nazarii'][order_type]
             message += f"{order_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
         message += "═══════════════════════\n"
+        
+        # Monthly report
+        message += f"\nRAPORT {today.strftime('%m.%Y')}\n"
+        message += "═══════════════════════\n"
+        message += "KPI | Kozik   | Stukalo\n"
+        message += "───────────────────────\n"
+        
+        # Add tasks section
+        message += "zadania\n"
+        for task_type in task_order:
+            kozik_count = data['Kozik Andrzej'][task_type]
+            stukalo_count = data['Stukalo Nazarii'][task_type]
+            message += f"{task_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+        
+        # Add task totals
+        message += "───────────────────────\n"
+        message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+        message += "───────────────────────\n"
+        
+        # Add clients section
+        message += "klienci\n"
+        for status in client_order:
+            kozik_count = data['Kozik Andrzej'][status]
+            stukalo_count = data['Stukalo Nazarii'][status]
+            message += f"{status} | {kozik_count:6d} | {stukalo_count:6d}\n"
+        message += "───────────────────────\n"
+        
+        # Add orders section
+        message += "zamówienia\n"
+        for order_type in order_order:
+            kozik_count = data['Kozik Andrzej'][order_type]
+            stukalo_count = data['Stukalo Nazarii'][order_type]
+            message += f"{order_type} | {kozik_count:6d} | {stukalo_count:6d}\n"
+        message += "═══════════════════════\n"
+        message += "```"  # End monospace block
         
         # Send to Telegram
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
