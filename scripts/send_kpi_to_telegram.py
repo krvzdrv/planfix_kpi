@@ -109,7 +109,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 owner_name AS manager,
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
@@ -144,7 +144,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 owner_name, 
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' AND wynik = 'Klient jest zainteresowany' THEN 'PRZ'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
@@ -492,7 +492,9 @@ def get_date_range(report_type: str) -> tuple[str, str]:
         
     start_date_str = start_date_obj.strftime('%Y-%m-%d %H:%M:%S')
     end_date_str = end_date_obj.strftime('%Y-%m-%d %H:%M:%S')
-    logger.info(f"Generated date range for {report_type} report: {start_date_str} to {end_date_str}")
+    logger.info(f"Generated date range for {report_type} report:")
+    logger.info(f"Start date: {start_date_str}")
+    logger.info(f"End date: {end_date_str}")
     return start_date_str, end_date_str
 
 
