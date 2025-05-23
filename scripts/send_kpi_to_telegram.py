@@ -426,7 +426,16 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             message += "KPI | Kozik   | Stukalo\n"
             message += "───────────────────────\n"
             
-            # Add tasks section
+            # Add clients section first
+            message += "klienci\n"
+            client_order = ['NWI', 'WTR', 'PSK']
+            for status in client_order:
+                kozik_count = data['Kozik Andrzej'][status]
+                stukalo_count = data['Stukalo Nazarii'][status]
+                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add tasks section second
             message += "zadania\n"
             task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
             for task_type in task_order:
@@ -441,16 +450,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
             message += "───────────────────────\n"
             
-            # Add clients section
-            message += "klienci\n"
-            client_order = ['NWI', 'WTR', 'PSK']
-            for status in client_order:
-                kozik_count = data['Kozik Andrzej'][status]
-                stukalo_count = data['Stukalo Nazarii'][status]
-                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-            message += "───────────────────────\n"
-            
-            # Add orders section
+            # Add orders section last
             message += "zamówienia\n"
             order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
@@ -468,7 +468,16 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             message += "KPI | Kozik   | Stukalo\n"
             message += "───────────────────────\n"
             
-            # Add tasks section
+            # Add clients section first
+            message += "klienci\n"
+            client_order = ['NWI', 'WTR', 'PSK']
+            for status in client_order:
+                kozik_count = data['Kozik Andrzej'][status]
+                stukalo_count = data['Stukalo Nazarii'][status]
+                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+            message += "───────────────────────\n"
+            
+            # Add tasks section second
             message += "zadania\n"
             task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'MAT', 'NOW', 'OPI']
             for task_type in task_order:
@@ -483,16 +492,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
             message += "───────────────────────\n"
             
-            # Add clients section
-            message += "klienci\n"
-            client_order = ['NWI', 'WTR', 'PSK']
-            for status in client_order:
-                kozik_count = data['Kozik Andrzej'][status]
-                stukalo_count = data['Stukalo Nazarii'][status]
-                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-            message += "───────────────────────\n"
-            
-            # Add orders section
+            # Add orders section last
             message += "zamówienia\n"
             order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
