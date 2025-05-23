@@ -432,7 +432,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for status in client_order:
                 kozik_count = data['Kozik Andrzej'][status]
                 stukalo_count = data['Stukalo Nazarii'][status]
-                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "───────────────────────\n"
             
             # Add tasks section second
@@ -441,13 +442,15 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
-                message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             
             # Add task totals
             kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
             stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
-            message += "───────────────────────\n"
-            message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+            if kozik_total > 0 or stukalo_total > 0:  # Пропускаем если оба показателя равны 0
+                message += "───────────────────────\n"
+                message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
             message += "───────────────────────\n"
             
             # Add orders section last
@@ -456,10 +459,11 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for order_type in order_order:
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]
-                if order_type == 'PRC':
-                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-                else:
-                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    if order_type == 'PRC':
+                        message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                    else:
+                        message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "═══════════════════════\n"
         else:
             # Monthly report
@@ -474,7 +478,8 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for status in client_order:
                 kozik_count = data['Kozik Andrzej'][status]
                 stukalo_count = data['Stukalo Nazarii'][status]
-                message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    message += f"{status:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "───────────────────────\n"
             
             # Add tasks section second
@@ -483,13 +488,15 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
-                message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             
             # Add task totals
             kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
             stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
-            message += "───────────────────────\n"
-            message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
+            if kozik_total > 0 or stukalo_total > 0:  # Пропускаем если оба показателя равны 0
+                message += "───────────────────────\n"
+                message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
             message += "───────────────────────\n"
             
             # Add orders section last
@@ -498,10 +505,11 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             for order_type in order_order:
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]
-                if order_type == 'PRC':
-                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
-                else:
-                    message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                if kozik_count > 0 or stukalo_count > 0:  # Пропускаем если оба показателя равны 0
+                    if order_type == 'PRC':
+                        message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
+                    else:
+                        message += f"{order_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             message += "═══════════════════════\n"
         
         message += "```"  # End monospace block
