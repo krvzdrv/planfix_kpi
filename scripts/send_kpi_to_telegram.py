@@ -402,9 +402,18 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             # Find manager name by ID
             manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
             if manager in data:
-                data[manager]['OFW'] = count
-                data[manager]['ZAM'] = count
+                data[manager]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager]['PRC'] = round(amount)  # Округляем PRC до целых
+
+        # Process offer results
+        for row in offer_results:
+            manager_id = row[0]
+            count = int(row[1]) if row[1] is not None else 0
+            
+            # Find manager name by ID
+            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            if manager in data:
+                data[manager]['OFW'] = count  # Количество отправленных предложений
 
         # Format message
         today = date.today()
