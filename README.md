@@ -1,42 +1,31 @@
-# Planfix KPI
+# Planfix KPI Reports
 
-Скрипты для синхронизации данных между Planfix CRM и Supabase, с последующей отправкой KPI отчетов в Telegram.
-
-## Описание
-
-Этот проект содержит набор скриптов для автоматической синхронизации данных:
-- Клиентов из Planfix в Supabase (`planfix_clients_to_supabase.py`)
-- Заказов из Planfix в Supabase (`planfix_orders_to_supabase.py`)
-- Задач из Planfix в Supabase (`planfix_tasks_to_supabase.py`)
-- Отправки KPI отчетов в Telegram (`send_kpi_to_telegram.py`)
-
-Общие служебные функции для взаимодействия с API Planfix и операций с базой данных Supabase централизованы в модуле `scripts/planfix_utils.py` для улучшения удобства сопровождения. Основные скрипты синхронизации были рефакторены для использования этих утилит.
-
-Все скрипты теперь используют стандартный модуль `logging` Python для вывода информации и ошибок, что полезно для мониторинга и отладки.
+Система автоматической генерации и отправки KPI отчетов в Telegram на основе данных из Planfix.
 
 ## Структура проекта
 
 ```
-planfix_sync/
+.
 ├── .github/
-│   └── workflows/          # GitHub Actions конфигурации
-├── scripts/               # Python скрипты
-│   ├── planfix_utils.py   # Общие утилиты
-│   ├── config.py          # Конфигурация менеджеров для KPI
-│   ├── planfix_clients_to_supabase.py
-│   ├── planfix_orders_to_supabase.py
-│   ├── planfix_tasks_to_supabase.py
-│   └── send_kpi_to_telegram.py
-├── requirements.txt       # Зависимости Python
-└── README.md             # Документация
+│   └── workflows/
+│       └── send_kpi_to_telegram.yml  # GitHub Actions workflow
+├── scripts/
+│   ├── config.py                     # Конфигурация менеджеров
+│   ├── planfix_clients_to_supabase.py # Синхронизация клиентов
+│   ├── planfix_orders_to_supabase.py  # Синхронизация заказов
+│   ├── planfix_tasks_to_supabase.py   # Синхронизация задач
+│   ├── planfix_utils.py              # Утилиты для работы с Planfix API
+│   └── send_kpi_to_telegram.py       # Генерация и отправка KPI отчетов
+├── requirements.txt                  # Зависимости Python
+└── README.md                        # Документация
 ```
 
 ## Установка
 
 1. Клонируйте репозиторий:
 ```bash
-git clone https://github.com/krvzdrv/planfix_sync.git
-cd planfix_sync
+git clone https://github.com/krvzdrv/planfix_kpi.git
+cd planfix_kpi
 ```
 
 2. Установите зависимости:
@@ -46,29 +35,36 @@ pip install -r requirements.txt
 
 ## Настройка
 
-Для работы скриптов необходимо настроить следующие переменные окружения:
-
-### Planfix
+### 1. Planfix API
 - `PLANFIX_API_KEY` - API ключ Planfix
 - `PLANFIX_TOKEN` - токен пользователя Planfix
 - `PLANFIX_ACCOUNT` - аккаунт Planfix
 
-### Supabase
+### 2. Supabase Database
 Для скриптов синхронизации (`planfix_clients_to_supabase.py`, `planfix_orders_to_supabase.py`, `planfix_tasks_to_supabase.py`):
 - `SUPABASE_CONNECTION_STRING` - полная строка подключения к Supabase (например, `postgresql://user:password@host:port/database`)
 
-Для скрипта отправки KPI (`send_kpi_to_telegram.py` все еще использует индивидуальные переменные):
+Для скрипта отправки KPI (`send_kpi_to_telegram.py`):
 - `SUPABASE_HOST` - хост Supabase
 - `SUPABASE_DB` - имя базы данных
 - `SUPABASE_USER` - пользователь
 - `SUPABASE_PASSWORD` - пароль
 - `SUPABASE_PORT` - порт
 
-### Telegram
-- `TELEGRAM_BOT_TOKEN` - токен бота
-- `TELEGRAM_CHAT_ID` - ID чата для отправки отчетов
+### 3. Telegram Bot
+1. Создайте нового бота через [@BotFather](https://t.me/BotFather)
+2. Получите токен бота
+3. Создайте группу в Telegram
+4. Добавьте бота в группу и назначьте его администратором
+5. Отправьте любое сообщение в группу
+6. Получите ID группы:
+   - Перейдите по ссылке `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Найдите поле `chat.id` в ответе - это и будет ID вашей группы
+7. Настройте переменные окружения:
+   - `TELEGRAM_BOT_TOKEN` - токен вашего бота
+   - `TELEGRAM_CHAT_ID` - ID группы (например, `-4797051683`)
 
-### Конфигурация менеджеров для KPI
+### 4. Конфигурация менеджеров для KPI
 
 Данные менеджеров для отчетов KPI настраиваются в файле `scripts/config.py`. Измените список `MANAGERS_KPI` в этом файле, чтобы добавить, удалить или изменить менеджеров, включенных в отчеты KPI. Каждый менеджер представлен в виде словаря:
 
@@ -80,24 +76,59 @@ MANAGERS_KPI = [
     # Добавьте сюда других менеджеров
 ]
 ```
-- `planfix_user_name`: Полное имя менеджера, как оно указано в Planfix (используется для фильтрации задач/клиентов).
-- `planfix_user_id`: ID пользователя Planfix для менеджера (используется для фильтрации заказов).
-- `telegram_alias`: Короткий псевдоним, используемый для отображения в заголовке отчета Telegram.
+
+Поля:
+- `planfix_user_name`: Полное имя менеджера в Planfix (для фильтрации задач/клиентов)
+- `planfix_user_id`: ID пользователя Planfix (для фильтрации заказов)
+- `telegram_alias`: Короткий псевдоним для отображения в отчете
 
 ## Автоматизация
 
-Скрипты настроены на автоматический запуск через GitHub Actions каждый будний день в 16:00 по варшавскому времени (CET/CEST в зависимости от сезона).
+Скрипты настроены на автоматический запуск через GitHub Actions каждый будний день в 16:00 по варшавскому времени (CET/CEST в зависимости от сезона):
+
+- Летнее время (март-октябрь): 14:00 UTC = 16:00 CEST
+- Зимнее время (октябрь-март): 15:00 UTC = 16:00 CET
 
 ## Ручной запуск
 
 Для ручного запуска используйте следующие команды:
 
 ```bash
+# Синхронизация данных
 python scripts/planfix_clients_to_supabase.py
 python scripts/planfix_orders_to_supabase.py
 python scripts/planfix_tasks_to_supabase.py
+
+# Отправка KPI отчета
 python scripts/send_kpi_to_telegram.py
 ```
+
+## Формат KPI отчета
+
+Отчет включает следующие метрики:
+
+### Клиенты
+- NWI - Новые клиенты
+- WTR - Клиенты в работе
+- PSK - Перспективные клиенты
+
+### Задачи
+- WDM - Первый контакт
+- PRZ - Первый телефонный разговор
+- KZI - Клиент заинтересован
+- ZKL - Позвонить клиенту
+- SPT - Провести встречу
+- MAT - Отправить материалы
+- TPY - Ответить на технический вопрос
+- MSP - Записать в соцсети
+- NOW - Рассказать о новостях
+- OPI - Собрать отзывы
+- WRK - Вернуть клиента
+
+### Заказы
+- OFW - Отправленные предложения
+- ZAM - Подтвержденные заказы
+- PRC - Сумма реализованных заказов
 
 ## Лицензия
 
