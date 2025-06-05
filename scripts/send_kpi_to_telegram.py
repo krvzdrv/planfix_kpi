@@ -446,8 +446,9 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                     message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             
             # Add task totals
-            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
-            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order if t != 'KZI')
+            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order if t != 'KZI')
             if kozik_total > 0 or stukalo_total > 0:  # Пропускаем если оба показателя равны 0
                 message += "───────────────────────\n"
                 message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
@@ -492,8 +493,9 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                     message += f"{task_type:3} | {kozik_count:6d} | {stukalo_count:6d}\n"
             
             # Add task totals
-            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order)
-            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order)
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+            kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order if t != 'KZI')
+            stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order if t != 'KZI')
             if kozik_total > 0 or stukalo_total > 0:  # Пропускаем если оба показателя равны 0
                 message += "───────────────────────\n"
                 message += f"TTL | {kozik_total:6d} | {stukalo_total:6d}\n"
