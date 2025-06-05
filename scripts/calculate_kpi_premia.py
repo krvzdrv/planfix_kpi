@@ -72,7 +72,7 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
         if conn:
             conn.close()
 
-def get_kpi_metrics(current_month: int, current_year: int) -> dict:
+def get_kpi_metrics(current_month: int, current_year: int) -> list:
     """Get KPI metrics and their weights for the current month."""
     query = """
         SELECT 
@@ -95,35 +95,26 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     
     if not results:
         logger.warning(f"No KPI metrics found for {current_month}/{current_year}")
-        return {}
+        return []
     
-    # Get the first (and should be only) row
     row = results[0]
+    kpi_codes = ['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'ZKL', 'SPT', 'OFW', 'TTL']
+    plans = row[3:]
+    premia_kpi = row[2]
     
-    # Create a dictionary of KPI codes and their plans
-    metrics = {
-        'NWI': {'plan': row[3], 'weight': 0},  # nwi
-        'WTR': {'plan': row[4], 'weight': 0},  # wtr
-        'PSK': {'plan': row[5], 'weight': 0},  # psk
-        'WDM': {'plan': row[6], 'weight': 0},  # wdm
-        'PRZ': {'plan': row[7], 'weight': 0},  # prz
-        'ZKL': {'plan': row[8], 'weight': 0},  # zkl
-        'SPT': {'plan': row[9], 'weight': 0},  # spt
-        'OFW': {'plan': row[10], 'weight': 0}, # ofw
-        'TTL': {'plan': row[11], 'weight': 0}  # ttl
-    }
-    
-    # Calculate weight based on number of active KPIs (non-null plans)
-    active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
-    if active_kpis > 0:
-        weight = 1.0 / active_kpis
-        for metric in metrics.values():
-            if metric['plan'] is not None:
-                metric['weight'] = weight
-    
-    # Add premia value
-    metrics['premia'] = row[2]  # premia_kpi
-    
+    # Формируем список метрик
+    metrics = []
+    active_kpis = sum(1 for plan in plans if plan is not None)
+    weight = 1.0 / active_kpis if active_kpis > 0 else 0
+    for idx, kpi_code in enumerate(kpi_codes):
+        plan = plans[idx]
+        metrics.append({
+            'kpi_code': kpi_code,
+            'plan_kozik': plan,  # если нужны разные планы для менеджеров, здесь можно доработать
+            'plan_stukalo': plan,
+            'weight': weight,
+            'premia_kpi': premia_kpi
+        })
     return metrics
 
 def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
