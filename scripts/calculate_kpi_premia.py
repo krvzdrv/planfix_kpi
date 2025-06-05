@@ -246,48 +246,56 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     
     return actual_values
 
-def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
+def calculate_kpi_coefficients(metrics: list, actual_values: dict) -> dict:
     """Calculate KPI coefficients for each manager."""
-    results = {
+    coefficients = {
         'Kozik Andrzej': {'coefficients': {}, 'total': 0, 'premia': 0},
         'Stukalo Nazarii': {'coefficients': {}, 'total': 0, 'premia': 0}
     }
     
-    # Set premia value for both managers
-    premia = metrics.get('premia', 0)
-    results['Kozik Andrzej']['premia'] = premia
-    results['Stukalo Nazarii']['premia'] = premia
+    # Calculate total weight for each manager
+    total_weights = {
+        'Kozik Andrzej': sum(float(metric['weight']) for metric in metrics if metric['plan_kozik'] is not None),
+        'Stukalo Nazarii': sum(float(metric['weight']) for metric in metrics if metric['plan_stukalo'] is not None)
+    }
     
     # Calculate coefficients for each KPI
-    for kpi_code, metric_data in metrics.items():
-        if kpi_code == 'premia':
-            continue
-            
-        plan = metric_data['plan']
-        weight = metric_data['weight']
+    for metric in metrics:
+        kpi_code = metric['kpi_code']
+        weight = float(metric['weight'])
         
-        if plan is None or weight == 0:
-            continue
-            
-        for manager in results.keys():
-            actual = actual_values[manager].get(kpi_code, 0)
-            
-            # Calculate coefficient
-            coefficient = min(1.0, actual / plan)
-            
-            # Store coefficient and weighted value
-            results[manager]['coefficients'][kpi_code] = {
-                'actual': actual,
-                'plan': plan,
-                'coefficient': coefficient,
-                'weight': weight,
-                'weighted': coefficient * weight
+        # Calculate for Kozik
+        if metric['plan_kozik'] is not None:
+            plan = float(metric['plan_kozik'])
+            actual = float(actual_values['Kozik Andrzej'].get(kpi_code, 0))
+            coefficient = actual / plan if plan > 0 else 0
+            weighted_coefficient = coefficient * (weight / total_weights['Kozik Andrzej'])
+            coefficients['Kozik Andrzej']['coefficients'][kpi_code] = {
+                'raw': coefficient,
+                'weighted': weighted_coefficient
             }
-            
-            # Update total
-            results[manager]['total'] += coefficient * weight
+        
+        # Calculate for Stukalo
+        if metric['plan_stukalo'] is not None:
+            plan = float(metric['plan_stukalo'])
+            actual = float(actual_values['Stukalo Nazarii'].get(kpi_code, 0))
+            coefficient = actual / plan if plan > 0 else 0
+            weighted_coefficient = coefficient * (weight / total_weights['Stukalo Nazarii'])
+            coefficients['Stukalo Nazarii']['coefficients'][kpi_code] = {
+                'raw': coefficient,
+                'weighted': weighted_coefficient
+            }
     
-    return results
+    # Calculate totals and premia
+    for manager in coefficients:
+        total = sum(coef['weighted'] for coef in coefficients[manager]['coefficients'].values())
+        coefficients[manager]['total'] = total
+        
+        # Get premia value from metrics
+        premia = next((float(m['premia_kpi']) for m in metrics if m['premia_kpi'] is not None), 0)
+        coefficients[manager]['premia'] = premia
+    
+    return coefficients
 
 def get_additional_premia(start_date: str, end_date: str) -> dict:
     """Get additional premia (PRW) from planfix_orders table."""
