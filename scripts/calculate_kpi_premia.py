@@ -382,9 +382,9 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     
     # Display totals
     message += "───────────────────────\n"
-    # Округляем SUM до 2 знаков после запятой
-    kozik_sum = round(coefficients['Kozik Andrzej']['total'], 2)
-    stukalo_sum = round(coefficients['Stukalo Nazarii']['total'], 2)
+    # Используем точные значения без округления
+    kozik_sum = coefficients['Kozik Andrzej']['total']
+    stukalo_sum = coefficients['Stukalo Nazarii']['total']
     message += f"SUM | {kozik_sum:6.2f} | {stukalo_sum:6.2f}\n"
     
     # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
