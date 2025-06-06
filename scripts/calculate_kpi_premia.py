@@ -72,7 +72,7 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
         if conn:
             conn.close()
 
-def get_kpi_metrics(current_month: int, current_year: int) -> list:
+def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     """Get KPI metrics and their weights for the current month."""
     query = """
         SELECT 
@@ -95,26 +95,35 @@ def get_kpi_metrics(current_month: int, current_year: int) -> list:
     
     if not results:
         logger.warning(f"No KPI metrics found for {current_month}/{current_year}")
-        return []
+        return {}
     
+    # Get the first (and should be only) row
     row = results[0]
-    kpi_codes = ['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'ZKL', 'SPT', 'OFW', 'TTL']
-    plans = row[3:]
-    premia_kpi = row[2]
     
-    # Формируем список метрик
-    metrics = []
-    active_kpis = sum(1 for plan in plans if plan is not None)
-    weight = 1.0 / active_kpis if active_kpis > 0 else 0
-    for idx, kpi_code in enumerate(kpi_codes):
-        plan = plans[idx]
-        metrics.append({
-            'kpi_code': kpi_code,
-            'plan_kozik': plan,  # если нужны разные планы для менеджеров, здесь можно доработать
-            'plan_stukalo': plan,
-            'weight': weight,
-            'premia_kpi': premia_kpi
-        })
+    # Create a dictionary of KPI codes and their plans
+    metrics = {
+        'NWI': {'plan': row[3], 'weight': 0},  # nwi
+        'WTR': {'plan': row[4], 'weight': 0},  # wtr
+        'PSK': {'plan': row[5], 'weight': 0},  # psk
+        'WDM': {'plan': row[6], 'weight': 0},  # wdm
+        'PRZ': {'plan': row[7], 'weight': 0},  # prz
+        'ZKL': {'plan': row[8], 'weight': 0},  # zkl
+        'SPT': {'plan': row[9], 'weight': 0},  # spt
+        'OFW': {'plan': row[10], 'weight': 0}, # ofw
+        'TTL': {'plan': row[11], 'weight': 0}  # ttl
+    }
+    
+    # Calculate weight based on number of active KPIs (non-null plans)
+    active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
+    if active_kpis > 0:
+        weight = 1.0 / active_kpis
+        for metric in metrics.values():
+            if metric['plan'] is not None:
+                metric['weight'] = weight
+    
+    # Add premia value
+    metrics['premia'] = row[2]  # premia_kpi
+    
     return metrics
 
 def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
@@ -162,6 +171,32 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                 AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
                 AND wynik = 'Klient jest zainteresowany'
             GROUP BY owner_name
+        ),
+        ttl_counts AS (
+            SELECT
+                owner_name AS manager,
+                'TTL' AS task_type,
+                COUNT(*) AS task_count
+            FROM planfix_tasks
+            WHERE
+                data_zakonczenia_zadania IS NOT NULL
+                AND data_zakonczenia_zadania >= %s::timestamp
+                AND data_zakonczenia_zadania < %s::timestamp
+                AND owner_name IN %s
+                AND is_deleted = false
+                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
+                    'Nawiązać pierwszy kontakt',
+                    'Przeprowadzić pierwszą rozmowę telefoniczną',
+                    'Zadzwonić do klienta',
+                    'Przeprowadzić spotkanie',
+                    'Wysłać materiały',
+                    'Odpowiedzieć na pytanie techniczne',
+                    'Zapisać na media społecznościowe',
+                    'Opowiedzieć o nowościach',
+                    'Zebrać opinie',
+                    'Przywrócić klienta'
+                )
+            GROUP BY owner_name
         )
         SELECT 
             manager,
@@ -171,6 +206,8 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
             SELECT * FROM task_counts
             UNION ALL
             SELECT * FROM kzi_counts
+            UNION ALL
+            SELECT * FROM ttl_counts
         ) combined_results
         WHERE task_type IS NOT NULL;
     """
@@ -212,6 +249,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     
     task_results = _execute_query(task_query, (
         start_date, end_date, PLANFIX_USER_NAMES,
+        start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES
     ), "task counts")
     
@@ -237,56 +275,48 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     
     return actual_values
 
-def calculate_kpi_coefficients(metrics: list, actual_values: dict) -> dict:
+def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     """Calculate KPI coefficients for each manager."""
-    coefficients = {
+    results = {
         'Kozik Andrzej': {'coefficients': {}, 'total': 0, 'premia': 0},
         'Stukalo Nazarii': {'coefficients': {}, 'total': 0, 'premia': 0}
     }
     
-    # Calculate total weight for each manager
-    total_weights = {
-        'Kozik Andrzej': sum(float(metric['weight']) for metric in metrics if metric['plan_kozik'] is not None),
-        'Stukalo Nazarii': sum(float(metric['weight']) for metric in metrics if metric['plan_stukalo'] is not None)
-    }
+    # Set premia value for both managers
+    premia = metrics.get('premia', 0)
+    results['Kozik Andrzej']['premia'] = premia
+    results['Stukalo Nazarii']['premia'] = premia
     
     # Calculate coefficients for each KPI
-    for metric in metrics:
-        kpi_code = metric['kpi_code']
-        weight = float(metric['weight'])
+    for kpi_code, metric_data in metrics.items():
+        if kpi_code == 'premia':
+            continue
+            
+        plan = metric_data['plan']
+        weight = metric_data['weight']
         
-        # Calculate for Kozik
-        if metric['plan_kozik'] is not None:
-            plan = float(metric['plan_kozik'])
-            actual = float(actual_values['Kozik Andrzej'].get(kpi_code, 0))
-            coefficient = actual / plan if plan > 0 else 0
-            weighted_coefficient = coefficient * (weight / total_weights['Kozik Andrzej'])
-            coefficients['Kozik Andrzej']['coefficients'][kpi_code] = {
-                'raw': coefficient,
-                'weighted': weighted_coefficient
+        if plan is None or weight == 0:
+            continue
+            
+        for manager in results.keys():
+            actual = actual_values[manager].get(kpi_code, 0)
+            
+            # Calculate coefficient
+            coefficient = min(1.0, actual / plan)
+            
+            # Store coefficient and weighted value
+            results[manager]['coefficients'][kpi_code] = {
+                'actual': actual,
+                'plan': plan,
+                'coefficient': coefficient,
+                'weight': weight,
+                'weighted': float(coefficient) * float(weight)
             }
-        
-        # Calculate for Stukalo
-        if metric['plan_stukalo'] is not None:
-            plan = float(metric['plan_stukalo'])
-            actual = float(actual_values['Stukalo Nazarii'].get(kpi_code, 0))
-            coefficient = actual / plan if plan > 0 else 0
-            weighted_coefficient = coefficient * (weight / total_weights['Stukalo Nazarii'])
-            coefficients['Stukalo Nazarii']['coefficients'][kpi_code] = {
-                'raw': coefficient,
-                'weighted': weighted_coefficient
-            }
+            
+            # Update total
+            results[manager]['total'] += float(coefficient) * float(weight)
     
-    # Calculate totals and premia
-    for manager in coefficients:
-        total = sum(coef['weighted'] for coef in coefficients[manager]['coefficients'].values())
-        coefficients[manager]['total'] = total
-        
-        # Get premia value from metrics
-        premia = next((float(m['premia_kpi']) for m in metrics if m['premia_kpi'] is not None), 0)
-        coefficients[manager]['premia'] = premia
-    
-    return coefficients
+    return results
 
 def get_additional_premia(start_date: str, end_date: str) -> dict:
     """Get additional premia (PRW) from planfix_orders table."""
@@ -334,16 +364,16 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     message += "KPI |   Kozik | Stukalo\n"
     message += "───────────────────────\n"
     
-    # Get all KPI codes that have non-zero coefficients
-    kpi_codes = set()
-    for manager_data in coefficients.values():
-        kpi_codes.update(manager_data['coefficients'].keys())
-    
-    # Sort KPI codes for consistent display
-    kpi_codes = sorted(kpi_codes)
+    # Определяем порядок показателей
+    kpi_order = [
+        'TTL', 'KZI', 'KZP', 'KZN', 'KZK', 'KZT', 'KZR', 'KZS',
+        'NWI', 'WTR', 'PSK',
+        'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
+        'OFW', 'ZAM', 'PRC'
+    ]
     
     # Display coefficients
-    for kpi_code in kpi_codes:
+    for kpi_code in kpi_order:
         kozik_coef = coefficients['Kozik Andrzej']['coefficients'].get(kpi_code, {}).get('weighted', 0)
         stukalo_coef = coefficients['Stukalo Nazarii']['coefficients'].get(kpi_code, {}).get('weighted', 0)
         
@@ -353,19 +383,22 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     # Display totals
     message += "───────────────────────\n"
     message += f"SUM | {coefficients['Kozik Andrzej']['total']:6.2f} | {coefficients['Stukalo Nazarii']['total']:6.2f}\n"
-    message += f"FND | {coefficients['Kozik Andrzej']['premia']:6.0f} | {coefficients['Stukalo Nazarii']['premia']:6.0f}\n"
+    
+    # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
+    fnd = coefficients['Kozik Andrzej']['premia']  # Значение из таблицы (2000)
+    message += f"FND | {fnd:6.0f} | {fnd:6.0f}\n"
     message += "───────────────────────\n"
     
-    # Calculate and display premia
-    kozik_premia = coefficients['Kozik Andrzej']['total'] * coefficients['Kozik Andrzej']['premia']
-    stukalo_premia = coefficients['Stukalo Nazarii']['total'] * coefficients['Stukalo Nazarii']['premia']
+    # Calculate and display premia (PRK = SUM * FND)
+    kozik_premia = coefficients['Kozik Andrzej']['total'] * float(coefficients['Kozik Andrzej']['premia'])
+    stukalo_premia = coefficients['Stukalo Nazarii']['total'] * float(coefficients['Stukalo Nazarii']['premia'])
     
     message += f"PRK | {kozik_premia:6.0f} | {stukalo_premia:6.0f}\n"
     
     # Display additional premia (PRW)
     message += f"PRW | {additional_premia['Kozik Andrzej']:6.0f} | {additional_premia['Stukalo Nazarii']:6.0f}\n"
     
-    # Calculate and display total
+    # Calculate and display total (TOT = PRK + PRW)
     message += f"TOT | {kozik_premia + additional_premia['Kozik Andrzej']:6.0f} | {stukalo_premia + additional_premia['Stukalo Nazarii']:6.0f}\n"
     message += "═══════════════════════\n"
     message += "```"
