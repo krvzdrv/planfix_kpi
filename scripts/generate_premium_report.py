@@ -102,21 +102,21 @@ def calculate_premium(kpi_data):
     """Рассчитывает премию на основе KPI данных."""
     premium_data = {}
     for manager, data in kpi_data.items():
-        # Рассчитываем показатели
-        ttl = data['TTL'] / 100 if data['TTL'] > 0 else 0
-        nwi = data['NWI'] / 100 if data['NWI'] > 0 else 0
-        psk = data['PSK'] / 100 if data['PSK'] > 0 else 0
-        prz = data['PRZ'] / 100 if data['PRZ'] > 0 else 0
-        zkl = data['ZKL'] / 100 if data['ZKL'] > 0 else 0
+        # Сначала округляем значения
+        ttl = round(data['TTL'], 2) if data['TTL'] > 0 else 0
+        nwi = round(data['NWI'], 2) if data['NWI'] > 0 else 0
+        psk = round(data['PSK'], 2) if data['PSK'] > 0 else 0
+        prz = round(data['PRZ'], 2) if data['PRZ'] > 0 else 0
+        zkl = round(data['ZKL'], 2) if data['ZKL'] > 0 else 0
 
-        # Округляем каждый показатель до 2 знаков после запятой
-        ttl = round(ttl, 2)
-        nwi = round(nwi, 2)
-        psk = round(psk, 2)
-        prz = round(prz, 2)
-        zkl = round(zkl, 2)
+        # Затем делим на 100
+        ttl = ttl / 100
+        nwi = nwi / 100
+        psk = psk / 100
+        prz = prz / 100
+        zkl = zkl / 100
 
-        # Суммируем округленные показатели
+        # Суммируем показатели
         total = ttl + nwi + psk + prz + zkl
 
         # Базовая премия
