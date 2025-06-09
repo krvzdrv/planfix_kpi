@@ -184,22 +184,33 @@ def get_status_name(task_id: int, status_value: int) -> str:
     try:
         # Получаем список возможных статусов для задачи
         response = planfix_utils.make_planfix_request(
-            method="task.getPossibleStatusToChange",
-            params={
+            "task.getPossibleStatusToChange",
+            {
                 "task": {
                     "id": task_id
                 }
             }
         )
         
-        if not response or 'statuses' not in response:
-            logger.error(f"Failed to get statuses for task {task_id}: Invalid response")
+        if not response:
+            logger.error(f"Failed to get statuses for task {task_id}: Empty response")
+            return ""
+            
+        # Парсим XML ответ
+        root = ET.fromstring(response)
+        if root.attrib.get("status") == "error":
+            code = root.findtext("code")
+            message = root.findtext("message")
+            logger.error(f"Planfix API error for task {task_id}: code={code}, message={message}")
             return ""
             
         # Ищем статус по значению
-        for status in response['statuses']:
-            if status.get('value') == status_value:
-                status_name = status.get('name', '')
+        for status in root.findall(".//statusList/status"):
+            value = status.find("value")
+            title = status.find("title")
+            
+            if value is not None and value.text == str(status_value) and title is not None:
+                status_name = title.text.strip()
                 logger.info(f"Found status name for task {task_id}: {status_name} (value: {status_value})")
                 return status_name
                 
