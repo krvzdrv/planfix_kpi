@@ -86,7 +86,7 @@ def get_planfix_orders(page):
         '<request method="task.getList">'
         f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
-        '<pageSize>100</pageSize>'
+        f'<pageSize>100</pageSize>'
         '<filters>'
         '  <filter>'
         '    <type>51</type>'
@@ -120,6 +120,12 @@ def get_planfix_orders(page):
         auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
     )
     response.raise_for_status()
+    
+    # Добавляем отладочный вывод XML-ответа
+    if page == 1:
+        logger.info("XML Response from Planfix API:")
+        logger.info(response.text)
+    
     return response.text
 
 def parse_date(date_str):
