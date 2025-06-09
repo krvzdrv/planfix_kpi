@@ -1,14 +1,22 @@
-import psycopg2
-import requests
-from datetime import datetime, date
 import os
+import sys
 import logging
+from datetime import datetime, timedelta
+import psycopg2
 from dotenv import load_dotenv
+import math
+import requests
 from config import MANAGERS_KPI
-import planfix_utils
+from planfix_utils import (
+    check_required_env_vars,
+    get_supabase_connection
+)
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configure logging
 logging.basicConfig(
@@ -32,6 +40,13 @@ CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
+
+# Список всех возможных KPI показателей в нужном порядке
+ALL_KPI_METRICS = [
+    'NWI', 'WTR', 'PSK',
+    'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL',
+    'OFW', 'ZAM', 'PRC'
+]
 
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
@@ -72,403 +87,419 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
         if conn:
             conn.close()
 
-def get_kpi_metrics(current_month: int, current_year: int) -> dict:
-    """Get KPI metrics and their weights for the current month."""
-    query = """
-        SELECT 
-            month,
-            year,
-            premia_kpi,
-            nwi,
-            wtr,
-            psk,
-            wdm,
-            prz,
-            zkl,
-            spt,
-            ofw,
-            ttl
-        FROM kpi_metrics
-        WHERE month = %s AND year = %s
-    """
-    results = _execute_query(query, (f"{current_month:02d}", current_year), "KPI metrics")
+def get_active_kpi_metrics(conn, month, year):
+    """Получает список активных KPI показателей и их плановые значения."""
+    active_metrics = {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                manager,
+                metrics_for_calculation,
+                revenue_plan,
+                kpi_base
+            FROM kpi_metrics 
+            WHERE year = %s AND month = %s
+        """, (year, month))
+        
+        for row in cur.fetchall():
+            manager = row[0]
+            metrics = row[1].split(',') if row[1] else []
+            revenue_plan = row[2]
+            kpi_base = row[3]
+            
+            active_metrics[manager] = {
+                'metrics': metrics,
+                'revenue_plan': revenue_plan,
+                'kpi_base': kpi_base
+            }
     
-    if not results:
-        logger.warning(f"No KPI metrics found for {current_month}/{current_year}")
-        return {}
-    
-    # Get the first (and should be only) row
-    row = results[0]
-    
-    # Create a dictionary of KPI codes and their plans
-    metrics = {
-        'NWI': {'plan': row[3], 'weight': 0},  # nwi
-        'WTR': {'plan': row[4], 'weight': 0},  # wtr
-        'PSK': {'plan': row[5], 'weight': 0},  # psk
-        'WDM': {'plan': row[6], 'weight': 0},  # wdm
-        'PRZ': {'plan': row[7], 'weight': 0},  # prz
-        'ZKL': {'plan': row[8], 'weight': 0},  # zkl
-        'SPT': {'plan': row[9], 'weight': 0},  # spt
-        'OFW': {'plan': row[10], 'weight': 0}, # ofw
-        'TTL': {'plan': row[11], 'weight': 0}  # ttl
-    }
-    
-    # Calculate weight based on number of active KPIs (non-null plans)
-    active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
-    if active_kpis > 0:
-        weight = 1.0 / active_kpis
-        for metric in metrics.values():
-            if metric['plan'] is not None:
-                metric['weight'] = weight
-    
-    # Add premia value
-    metrics['premia'] = row[2]  # premia_kpi
-    
-    return metrics
+    return active_metrics
 
-def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
-    """Get actual KPI values for the period."""
-    # Get task counts
-    task_query = """
-        WITH task_counts AS (
-            SELECT
-                owner_name AS manager,
-                CASE 
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                    ELSE NULL
-                END AS task_type,
-                COUNT(*) AS task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
+def get_actual_kpi_values(conn, month, year):
+    """Получает фактические значения KPI показателей."""
+    actual_values = {}
+    
+    # Получаем первый и последний день месяца
+    first_day = datetime(year, month, 1)
+    if month == 12:
+        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+    
+    # Форматируем даты
+    first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
+    last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
+    
+    with conn.cursor() as cur:
+        # Получаем значения для клиентских статусов
+        client_query = """
+            WITH client_statuses AS (
+                SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
+                FROM planfix_clients
+                WHERE data_dodania_do_nowi IS NOT NULL AND data_dodania_do_nowi != ''
+                    AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
+                    AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
+                    AND menedzer IN %s
+                    AND is_deleted = false
+                GROUP BY menedzer
+                UNION ALL
+                SELECT menedzer AS manager, 'WTR' as status, COUNT(*) as count
+                FROM planfix_clients
+                WHERE data_dodania_do_w_trakcie IS NOT NULL AND data_dodania_do_w_trakcie != ''
+                    AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s::date
+                    AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s::date
+                    AND menedzer IN %s
+                    AND is_deleted = false
+                GROUP BY menedzer
+                UNION ALL
+                SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
+                FROM planfix_clients
+                WHERE data_dodania_do_perspektywiczni IS NOT NULL AND data_dodania_do_perspektywiczni != ''
+                    AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
+                    AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
+                    AND menedzer IN %s
+                    AND is_deleted = false
+                GROUP BY menedzer
+            )
+            SELECT manager, status, count FROM client_statuses;
+        """
+        
+        # Получаем значения для задач
+        task_query = """
+            WITH task_counts AS (
+                SELECT
+                    owner_name AS manager,
+                    CASE 
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                        ELSE NULL
+                    END AS task_type,
+                    COUNT(*) AS task_count
+                FROM planfix_tasks
+                WHERE
+                    data_zakonczenia_zadania IS NOT NULL
+                    AND data_zakonczenia_zadania >= %s::timestamp
+                    AND data_zakonczenia_zadania < %s::timestamp
+                    AND owner_name IN %s
+                    AND is_deleted = false
+                GROUP BY owner_name, task_type
+            ),
+            kzi_counts AS (
+                SELECT
+                    owner_name AS manager,
+                    'KZI' AS task_type,
+                    COUNT(*) AS task_count
+                FROM planfix_tasks
+                WHERE
+                    data_zakonczenia_zadania IS NOT NULL
+                    AND data_zakonczenia_zadania >= %s::timestamp
+                    AND data_zakonczenia_zadania < %s::timestamp
+                    AND owner_name IN %s
+                    AND is_deleted = false
+                    AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
+                    AND wynik = 'Klient jest zainteresowany'
+                GROUP BY owner_name
+            ),
+            ttl_counts AS (
+                SELECT
+                    owner_name AS manager,
+                    'TTL' AS task_type,
+                    COUNT(*) AS task_count
+                FROM planfix_tasks
+                WHERE
+                    data_zakonczenia_zadania IS NOT NULL
+                    AND data_zakonczenia_zadania >= %s::timestamp
+                    AND data_zakonczenia_zadania < %s::timestamp
+                    AND owner_name IN %s
+                    AND is_deleted = false
+                    AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
+                        'Nawiązać pierwszy kontakt',
+                        'Przeprowadzić pierwszą rozmowę telefoniczną',
+                        'Zadzwonić do klienta',
+                        'Przeprowadzić spotkanie',
+                        'Wysłać materiały',
+                        'Odpowiedzieć na pytanie techniczne',
+                        'Zapisać na media społecznościowe',
+                        'Opowiedzieć o nowościach',
+                        'Zebrać opinie',
+                        'Przywrócić klienta'
+                    )
+                GROUP BY owner_name
+            )
+            SELECT 
+                manager,
+                task_type,
+                task_count
+            FROM (
+                SELECT * FROM task_counts
+                UNION ALL
+                SELECT * FROM kzi_counts
+                UNION ALL
+                SELECT * FROM ttl_counts
+            ) combined_results
+            WHERE task_type IS NOT NULL;
+        """
+        
+        # Получаем значения для заказов
+        order_query = """
+            SELECT 
+                menedzher,
+                status,
+                COUNT(*) as count
+            FROM planfix_orders
+            WHERE 
+                TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
+                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
+                AND status IN ('OFW', 'ZAM', 'PRC')
                 AND is_deleted = false
-            GROUP BY owner_name, task_type
-        ),
-        kzi_counts AS (
-            SELECT
-                owner_name AS manager,
-                'KZI' AS task_type,
-                COUNT(*) AS task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
-                AND is_deleted = false
-                AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
-                AND wynik = 'Klient jest zainteresowany'
-            GROUP BY owner_name
-        ),
-        ttl_counts AS (
-            SELECT
-                owner_name AS manager,
-                'TTL' AS task_type,
-                COUNT(*) AS task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
-                AND is_deleted = false
-                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
-                    'Nawiązać pierwszy kontakt',
-                    'Przeprowadzić pierwszą rozmowę telefoniczną',
-                    'Zadzwonić do klienta',
-                    'Przeprowadzić spotkanie',
-                    'Wysłać materiały',
-                    'Odpowiedzieć na pytanie techniczne',
-                    'Zapisać na media społecznościowe',
-                    'Opowiedzieć o nowościach',
-                    'Zebrać opinie',
-                    'Przywrócić klienta'
-                )
-            GROUP BY owner_name
-        )
-        SELECT 
-            manager,
-            task_type,
-            task_count
-        FROM (
-            SELECT * FROM task_counts
-            UNION ALL
-            SELECT * FROM kzi_counts
-            UNION ALL
-            SELECT * FROM ttl_counts
-        ) combined_results
-        WHERE task_type IS NOT NULL;
-    """
-    
-    # Get client status counts
-    client_query = """
-        WITH client_statuses AS (
-            SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
-            FROM planfix_clients
-            WHERE data_dodania_do_nowi IS NOT NULL AND data_dodania_do_nowi != ''
-                AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
-                AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN %s
-                AND is_deleted = false
-            GROUP BY menedzer
-            UNION ALL
-            SELECT menedzer AS manager, 'WTR' as status, COUNT(*) as count
-            FROM planfix_clients
-            WHERE data_dodania_do_w_trakcie IS NOT NULL AND data_dodania_do_w_trakcie != ''
-                AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s::date
-                AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN %s
-                AND is_deleted = false
-            GROUP BY menedzer
-            UNION ALL
-            SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
-            FROM planfix_clients
-            WHERE data_dodania_do_perspektywiczni IS NOT NULL AND data_dodania_do_perspektywiczni != ''
-                AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
-                AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
-                AND menedzer IN %s
-                AND is_deleted = false
-            GROUP BY menedzer
-        )
-        SELECT manager, status, count FROM client_statuses;
-    """
-    
-    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-    
-    task_results = _execute_query(task_query, (
-        start_date, end_date, PLANFIX_USER_NAMES,
-        start_date, end_date, PLANFIX_USER_NAMES,
-        start_date, end_date, PLANFIX_USER_NAMES
-    ), "task counts")
-    
-    client_results = _execute_query(client_query, (
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES,
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES,
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES
-    ), "client statuses")
-    
-    # Combine results into a single dictionary
-    actual_values = {
-        'Kozik Andrzej': {},
-        'Stukalo Nazarii': {}
-    }
-    
-    for row in task_results:
-        manager, metric, value = row
-        actual_values[manager][metric] = value
-    
-    for row in client_results:
-        manager, metric, value = row
-        actual_values[manager][metric] = value
+            GROUP BY menedzher, status
+        """
+        
+        # Выполняем запросы
+        PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+        
+        # Получаем значения клиентских статусов
+        cur.execute(client_query, (
+            first_day.date(), last_day.date(), PLANFIX_USER_NAMES,
+            first_day.date(), last_day.date(), PLANFIX_USER_NAMES,
+            first_day.date(), last_day.date(), PLANFIX_USER_NAMES
+        ))
+        
+        for row in cur.fetchall():
+            manager, status, count = row
+            if manager not in actual_values:
+                actual_values[manager] = {}
+            actual_values[manager][status] = count
+        
+        # Получаем значения задач
+        cur.execute(task_query, (
+            first_day_str, last_day_str, PLANFIX_USER_NAMES,
+            first_day_str, last_day_str, PLANFIX_USER_NAMES,
+            first_day_str, last_day_str, PLANFIX_USER_NAMES
+        ))
+        
+        for row in cur.fetchall():
+            manager, task_type, count = row
+            if manager not in actual_values:
+                actual_values[manager] = {}
+            actual_values[manager][task_type] = count
+        
+        # Получаем значения заказов
+        cur.execute(order_query, (first_day_str, last_day_str))
+        
+        for row in cur.fetchall():
+            manager, status, count = row
+            if manager not in actual_values:
+                actual_values[manager] = {}
+            actual_values[manager][status] = count
     
     return actual_values
 
-def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
-    """Calculate KPI coefficients for each manager."""
-    results = {
-        'Kozik Andrzej': {'coefficients': {}, 'total': 0, 'premia': 0},
-        'Stukalo Nazarii': {'coefficients': {}, 'total': 0, 'premia': 0}
-    }
+def get_additional_premia(conn, month, year):
+    """Получает дополнительные премии (PRW) из таблицы planfix_orders."""
+    # Получаем первый и последний день месяца
+    first_day = datetime(year, month, 1)
+    if month == 12:
+        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
     
-    # Set premia value for both managers
-    premia = metrics.get('premia', 0)
-    results['Kozik Andrzej']['premia'] = premia
-    results['Stukalo Nazarii']['premia'] = premia
+    # Форматируем даты
+    first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
+    last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
     
-    # Calculate coefficients for each KPI
-    for kpi_code, metric_data in metrics.items():
-        if kpi_code == 'premia':
-            continue
-            
-        plan = metric_data['plan']
-        weight = metric_data['weight']
+    additional_premia = {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                menedzher,
+                COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
+            FROM planfix_orders
+            WHERE 
+                data_realizacji IS NOT NULL 
+                AND data_realizacji != ''
+                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
+                AND menedzher IN %s
+                AND is_deleted = false
+            GROUP BY menedzher
+        """, (first_day_str, last_day_str, tuple(m['planfix_user_name'] for m in MANAGERS_KPI)))
         
-        if plan is None or weight == 0:
-            continue
-            
-        for manager in results.keys():
-            actual = actual_values[manager].get(kpi_code, 0)
-            
-            # Calculate coefficient
-            coefficient = min(1.0, actual / plan)
-            
-            # Store coefficient and weighted value
-            results[manager]['coefficients'][kpi_code] = {
-                'actual': actual,
-                'plan': plan,
-                'coefficient': coefficient,
-                'weight': weight,
-                'weighted': float(coefficient) * float(weight)
-            }
-            
-            # Update total
-            results[manager]['total'] += float(coefficient) * float(weight)
-    
-    return results
-
-def get_additional_premia(start_date: str, end_date: str) -> dict:
-    """Get additional premia (PRW) from planfix_orders table."""
-    query = """
-        SELECT 
-            menedzher,
-            COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
-        FROM planfix_orders
-        WHERE 
-            data_realizacji IS NOT NULL 
-            AND data_realizacji != ''
-            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
-            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
-            AND menedzher IN %s
-            AND is_deleted = false
-        GROUP BY menedzher
-    """
-    
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
-    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_IDS), "additional premia")
-    
-    # Initialize with zeros
-    additional_premia = {
-        'Kozik Andrzej': 0,
-        'Stukalo Nazarii': 0
-    }
-    
-    # Map results to manager names
-    for row in results:
-        manager_id = row[0]
-        premia = float(row[1]) if row[1] is not None else 0
-        
-        # Find manager name by ID
-        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
-        if manager:
-            additional_premia[manager] = premia
+        for row in cur.fetchall():
+            manager = row[0]
+            premia = float(row[1]) if row[1] is not None else 0
+            additional_premia[manager] = round(premia, 0)
     
     return additional_premia
 
-def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
-    """Format the premia report for Telegram."""
-    message = "```\n"
-    message += f"PREMIA {current_month:02d}.{current_year}\n"
-    message += "═══════════════════════\n"
-    message += "KPI |   Kozik | Stukalo\n"
-    message += "───────────────────────\n"
+def calculate_kpi_premia(conn):
+    """Рассчитывает премии на основе KPI показателей."""
+    # Получаем текущий месяц и год
+    now = datetime.now()
+    month = now.month
+    year = now.year
     
-    # Определяем порядок показателей
-    kpi_order = [
-        'TTL', 'KZI', 'KZP', 'KZN', 'KZK', 'KZT', 'KZR', 'KZS',
-        'NWI', 'WTR', 'PSK',
-        'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
-        'OFW', 'ZAM', 'PRC'
-    ]
+    # Получаем активные KPI показатели
+    active_metrics = get_active_kpi_metrics(conn, month, year)
     
-    # Display coefficients
-    for kpi_code in kpi_order:
-        kozik_coef = coefficients['Kozik Andrzej']['coefficients'].get(kpi_code, {}).get('weighted', 0)
-        stukalo_coef = coefficients['Stukalo Nazarii']['coefficients'].get(kpi_code, {}).get('weighted', 0)
+    # Получаем фактические значения
+    actual_values = get_actual_kpi_values(conn, month, year)
+    
+    # Получаем дополнительные премии
+    additional_premia = get_additional_premia(conn, month, year)
+    
+    # Рассчитываем премии
+    premium_data = {}
+    
+    for manager, data in active_metrics.items():
+        metrics = data['metrics']
+        if not metrics:
+            continue
+            
+        # Вычисляем вес каждого показателя
+        weight = 1.0 / len(metrics)
         
-        if kozik_coef > 0 or stukalo_coef > 0:
-            message += f"{kpi_code:3} | {kozik_coef:6.2f} | {stukalo_coef:6.2f}\n"
+        # Рассчитываем KPI для каждого показателя
+        kpi_values = {}
+        total_kpi = 0
+        
+        for metric in metrics:
+            actual = actual_values.get(manager, {}).get(metric, 0)
+            plan = data.get('revenue_plan', 0)
+            
+            if plan > 0:
+                kpi = (actual / plan) * weight
+                kpi = math.floor(kpi * 100 + 0.5) / 100  # Математическое округление до 2 знаков
+                kpi_values[metric] = kpi
+                total_kpi += kpi
+        
+        # Рассчитываем премию
+        base = data.get('kpi_base', 2000)  # По умолчанию 2000
+        premium = round(total_kpi * base, 0)
+        
+        premium_data[manager] = {
+            **kpi_values,
+            'SUM': math.floor(total_kpi * 100 + 0.5) / 100,  # Математическое округление до 2 знаков
+            'FND': base,
+            'PRK': premium,
+            'PRW': additional_premia.get(manager, 0),
+            'TOT': premium + additional_premia.get(manager, 0)
+        }
     
-    # Display totals
-    message += "───────────────────────\n"
-    # Используем точные значения без округления
-    kozik_sum = coefficients['Kozik Andrzej']['total']
-    stukalo_sum = coefficients['Stukalo Nazarii']['total']
-    message += f"SUM | {kozik_sum:6.2f} | {stukalo_sum:6.2f}\n"
+    return premium_data
+
+def generate_premium_report(premium_data, month, year):
+    """Генерирует отчет по премиям."""
+    report = []
+    report.append(f"PREMIA {month:02d}.{year}")
+    report.append("═" * 21)
     
-    # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
-    fnd = float(coefficients['Kozik Andrzej']['premia'])  # Значение из таблицы (2000)
-    message += f"FND | {fnd:6.0f} | {fnd:6.0f}\n"
-    message += "───────────────────────\n"
+    # Заголовок с именами менеджеров
+    header = "KPI |"
+    for manager in MANAGERS_KPI:
+        header += f" {manager:>8} |"
+    report.append(header)
+    report.append("─" * (len(header) + 2))
     
-    # Calculate and display premia (PRK = SUM * FND)
-    kozik_premia = int(kozik_sum * fnd)
-    stukalo_premia = int(stukalo_sum * fnd)
+    # Показатели в нужном порядке
+    for metric in ALL_KPI_METRICS:
+        line = f"{metric:3} |"
+        for manager in MANAGERS_KPI:
+            if manager in premium_data and metric in premium_data[manager]:
+                line += f" {premium_data[manager][metric]:>8.2f} |"
+            else:
+                line += f" {'0.00':>8} |"
+        report.append(line)
     
-    message += f"PRK | {kozik_premia:6.0f} | {stukalo_premia:6.0f}\n"
+    report.append("─" * (len(header) + 2))
     
-    # Display additional premia (PRW)
-    message += f"PRW | {additional_premia['Kozik Andrzej']:6.0f} | {additional_premia['Stukalo Nazarii']:6.0f}\n"
+    # Сумма и премия
+    summary_metrics = ['SUM', 'FND', 'PRK', 'PRW', 'TOT']
+    for metric in summary_metrics:
+        line = f"{metric:3} |"
+        for manager in MANAGERS_KPI:
+            if manager in premium_data:
+                if metric in ['PRK', 'PRW', 'TOT']:
+                    line += f" {premium_data[manager][metric]:>8.0f} |"
+                else:
+                    line += f" {premium_data[manager][metric]:>8.2f} |"
+            else:
+                line += f" {'0.00':>8} |"
+        report.append(line)
+        if metric == 'FND':
+            report.append("─" * (len(header) + 2))
     
-    # Calculate and display total (TOT = PRK + PRW)
-    message += f"TOT | {kozik_premia + additional_premia['Kozik Andrzej']:6.0f} | {stukalo_premia + additional_premia['Stukalo Nazarii']:6.0f}\n"
-    message += "═══════════════════════\n"
-    message += "```"
-    
-    return message
+    report.append("═" * 21)
+    return "\n".join(report)
 
 def send_to_telegram(message: str):
-    """Send the premia report to Telegram."""
+    """Отправляет сообщение в Telegram."""
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            'chat_id': CHAT_ID,
-            'text': message,
-            'parse_mode': 'Markdown'
+        # Get Telegram configuration from environment variables
+        telegram_token = os.getenv('TELEGRAM_TOKEN')
+        telegram_chat_id = os.getenv('TELEGRAM_CHAT_ID')
+        
+        if not telegram_token or not telegram_chat_id:
+            logger.error("Telegram configuration is missing")
+            return
+        
+        # Send message to Telegram
+        url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
+        data = {
+            "chat_id": telegram_chat_id,
+            "text": message,
+            "parse_mode": "Markdown"
         }
         
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code != 200:
-            logger.error(f"Failed to send message to Telegram: {response.text}")
-        else:
-            logger.info("Message sent successfully to Telegram")
-            
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        
     except Exception as e:
-        logger.error(f"Error sending to Telegram: {str(e)}")
+        logger.error(f"Error sending message to Telegram: {str(e)}")
         raise
 
 def main():
-    """Main function to calculate and send KPI premia report."""
+    """Основная функция."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+    logger.info("Starting KPI premium calculation...")
+    
     try:
         _check_env_vars()
         
-        # Get current month and year
-        today = date.today()
-        current_month = today.month
-        current_year = today.year
+        # Connect to Supabase
+        conn = get_supabase_connection()
         
-        # Get start and end dates for the current month
-        start_date = datetime(current_year, current_month, 1).strftime('%Y-%m-%d %H:%M:%S')
-        if current_month == 12:
-            end_date = datetime(current_year + 1, 1, 1).strftime('%Y-%m-%d %H:%M:%S')
-        else:
-            end_date = datetime(current_year, current_month + 1, 1).strftime('%Y-%m-%d %H:%M:%S')
+        # Calculate premiums
+        premium_data = calculate_kpi_premia(conn)
         
-        # Get KPI metrics and their weights
-        metrics = get_kpi_metrics(current_month, current_year)
-        if not metrics:
-            logger.error("No KPI metrics found for the current month")
-            return
+        # Generate report
+        report = generate_premium_report(premium_data, datetime.now().month, datetime.now().year)
         
-        # Get actual KPI values
-        actual_values = get_actual_kpi_values(start_date, end_date)
-        
-        # Calculate KPI coefficients
-        coefficients = calculate_kpi_coefficients(metrics, actual_values)
-        
-        # Get additional premia (PRW)
-        additional_premia = get_additional_premia(start_date, end_date)
-        
-        # Format and send report
-        message = format_premia_report(coefficients, current_month, current_year, additional_premia)
-        send_to_telegram(message)
+        # Send report to Telegram
+        send_to_telegram(report)
         
         logger.info("KPI premia report sent successfully")
         
     except Exception as e:
-        logger.error(f"Error in KPI premia calculation: {str(e)}")
+        logger.error(f"Error calculating KPI premiums: {str(e)}")
         raise
+    finally:
+        if conn:
+            conn.close()
+            logger.info("Supabase connection closed.")
+        logger.info("KPI premium calculation finished.")
 
 if __name__ == "__main__":
     main() 
