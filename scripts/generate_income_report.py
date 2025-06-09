@@ -69,28 +69,27 @@ def get_income_data(conn, month, year):
             """, (first_day, last_day))
             fakt_data = {row[0]: row[1] for row in cur.fetchall()}
 
-            # Получаем все заказы со статусом "Weryfikacja" (dlug)
+            # Получаем все заказы со статусом 140 (dlug)
             cur.execute("""
                 SELECT 
                     menedzher,
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as dlug
                 FROM planfix_orders
                 WHERE 
-                    status_name = 'Weryfikacja'
+                    status = 140
                     AND is_deleted = false
                 GROUP BY menedzher
             """)
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
 
-            # Получаем все заказы со статусом 140 (brak)
+            # Получаем все заказы (brak)
             cur.execute("""
                 SELECT 
                     menedzher,
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as brak
                 FROM planfix_orders
                 WHERE 
-                    status = 140
-                    AND is_deleted = false
+                    is_deleted = false
                 GROUP BY menedzher
             """)
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
