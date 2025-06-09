@@ -164,6 +164,12 @@ def parse_orders(xml_text):
         task_type = None
         if title and '/' in title:
             task_type = title.split('/')[0].strip()
+            
+        # Добавляем отладочный вывод
+        status = get_text('status')
+        status_name = get_text('statusName')
+        logger.info(f"Order {title}: status={status}, status_name={status_name}")
+        
         # Парсим customData
         custom_data = {}
         custom_result = {v: None for v in custom_fields.values()}
@@ -204,7 +210,6 @@ def parse_orders(xml_text):
             "client_id": int(get_text('client/id')) if get_text('client/id') else None,
             "client_name": get_text('client/name'),
             "begin_datetime": parse_date(get_text('beginDateTime')),
-            "end_time": parse_date(get_text('endTime')),
             "general": int(get_text('general')) if get_text('general') else None,
             "is_overdued": get_text('isOverdued') == '1',
             "is_close_to_deadline": get_text('isCloseToDeadline') == '1',
