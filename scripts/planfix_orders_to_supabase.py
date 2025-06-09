@@ -76,6 +76,37 @@ CUSTOM_MAP = {
 
 logger = logging.getLogger(__name__)
 
+# Кэш для хранения маппинга статусов
+STATUS_MAPPING = {}
+
+def get_all_status_mapping():
+    """
+    Получает все доступные статусы из Planfix.
+    :return: Словарь {status_id: status_name}
+    """
+    try:
+        params = {
+            "account": os.environ.get("PLANFIX_ACCOUNT")
+        }
+
+        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
+        root = ET.fromstring(response_xml)
+
+        status_mapping = {}
+        for status_elem in root.findall(".//statusList/status"):
+            value_elem = status_elem.find("value")
+            title_elem = status_elem.find("title")
+
+            if value_elem is not None and title_elem is not None:
+                status_mapping[value_elem.text] = title_elem.text.strip()
+                logger.info(f"Found status mapping: {value_elem.text} -> {title_elem.text.strip()}")
+
+        return status_mapping
+
+    except Exception as e:
+        logger.error(f"Error fetching all status names: {e}")
+        return {}
+
 def get_planfix_orders(page):
     headers = {
         'Content-Type': 'application/xml',
@@ -209,8 +240,8 @@ def parse_orders(xml_text):
         # Получаем статус и его название
         status = get_text('status')
         status_name = None
-        if status and task_id:
-            status_name = get_status_name(status, task_id)
+        if status:
+            status_name = STATUS_MAPPING.get(str(status))
             logger.info(f"Retrieved status name for order {title}: task_id={task_id}, status={status}, status_name={status_name}")
         
         # Логируем информацию только для заказа A-10051
@@ -343,6 +374,15 @@ def main():
 
     supabase_conn = None
     try:
+        # Загружаем маппинг статусов при запуске
+        global STATUS_MAPPING
+        STATUS_MAPPING = get_all_status_mapping()
+        if not STATUS_MAPPING:
+            logger.error("Failed to load status mapping. Will continue without status names.")
+        else:
+            logger.info(f"Successfully loaded {len(STATUS_MAPPING)} status mappings")
+
+        # Получаем соединение с Supabase
         supabase_conn = planfix_utils.get_supabase_connection()
         all_orders = []
         all_ids = []
