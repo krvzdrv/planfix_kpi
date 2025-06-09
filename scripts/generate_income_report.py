@@ -55,6 +55,15 @@ def get_income_data(conn, month, year):
 
         # Получаем все заказы за указанный месяц
         with conn.cursor() as cur:
+            # Проверяем всех менеджеров в базе
+            cur.execute("""
+                SELECT DISTINCT menedzher 
+                FROM planfix_orders 
+                WHERE is_deleted = false
+            """)
+            all_managers = [row[0] for row in cur.fetchall()]
+            logger.info(f"All managers in database: {all_managers}")
+
             # Получаем все заказы с датой реализации в текущем месяце (fakt)
             cur.execute("""
                 SELECT 
@@ -68,6 +77,7 @@ def get_income_data(conn, month, year):
                 GROUP BY menedzher
             """, (first_day, last_day))
             fakt_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Fakt data: {fakt_data}")
 
             # Получаем все заказы со статусом 140 (dlug)
             cur.execute("""
@@ -81,6 +91,7 @@ def get_income_data(conn, month, year):
                 GROUP BY menedzher
             """)
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Dlug data: {dlug_data}")
 
             # Получаем все заказы (brak)
             cur.execute("""
@@ -93,10 +104,12 @@ def get_income_data(conn, month, year):
                 GROUP BY menedzher
             """)
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Brak data: {brak_data}")
 
         # Объединяем данные
         income_data = {}
         all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()) + list(brak_data.keys()))
+        logger.info(f"Combined managers: {all_managers}")
         
         for manager in all_managers:
             income_data[manager] = {
@@ -104,6 +117,7 @@ def get_income_data(conn, month, year):
                 'dlug': dlug_data.get(manager, 0),
                 'brak': brak_data.get(manager, 0)
             }
+            logger.info(f"Manager {manager} data: {income_data[manager]}")
 
         return income_data
     except Exception as e:
