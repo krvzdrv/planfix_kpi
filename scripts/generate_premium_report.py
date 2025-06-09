@@ -26,109 +26,77 @@ def format_float(value):
     return f"{value:.2f}"
 
 def get_kpi_data(conn, month, year):
-    """Получает данные о KPI из Supabase."""
-    try:
-        # Получаем первый и последний день месяца
-        first_day = datetime(year, month, 1)
-        if month == 12:
-            last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-
-        # Форматируем даты в нужный формат для PostgreSQL
-        first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
-        last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Получаем все заказы за указанный месяц
-        with conn.cursor() as cur:
-            # Получаем данные по задачам
-            cur.execute("""
-                WITH task_counts AS (
-                    SELECT
-                        owner_name AS manager,
-                        CASE 
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'TTL'
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                            ELSE NULL
-                        END AS task_type,
-                        COUNT(*) AS task_count
-                    FROM planfix_tasks
-                    WHERE
-                        data_zakonczenia_zadania IS NOT NULL
-                        AND data_zakonczenia_zadania >= %s::timestamp
-                        AND data_zakonczenia_zadania < %s::timestamp
-                        AND owner_name IN %s
-                        AND is_deleted = false
-                    GROUP BY
-                        owner_name,
-                        CASE 
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'TTL'
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                            WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                            ELSE NULL
-                        END
-                )
-                SELECT manager, task_type, task_count
-                FROM task_counts
-                WHERE task_type IS NOT NULL
-                ORDER BY manager, task_type;
-            """, (first_day_str, last_day_str, tuple(m['planfix_user_name'] for m in MANAGERS_KPI)))
-            task_data = cur.fetchall()
-            logger.info(f"Task data: {task_data}")
-
-            # Получаем данные по клиентам
-            cur.execute("""
-                WITH client_statuses AS (
-                    SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
-                    FROM planfix_clients
-                    WHERE data_dodania_do_nowi IS NOT NULL AND data_dodania_do_nowi != ''
-                        AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
-                        AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
-                        AND menedzer IN %s
-                        AND is_deleted = false
-                    GROUP BY menedzer
-                    UNION ALL
-                    SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
-                    FROM planfix_clients
-                    WHERE data_dodania_do_perspektywiczni IS NOT NULL AND data_dodania_do_perspektywiczni != ''
-                        AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
-                        AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
-                        AND menedzer IN %s
-                        AND is_deleted = false
-                    GROUP BY menedzer
-                )
-                SELECT manager, status, count FROM client_statuses ORDER BY manager, status;
-            """, (
-                first_day_str.split(' ')[0], last_day_str.split(' ')[0], tuple(m['planfix_user_name'] for m in MANAGERS_KPI),
-                first_day_str.split(' ')[0], last_day_str.split(' ')[0], tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-            ))
-            client_data = cur.fetchall()
-            logger.info(f"Client data: {client_data}")
-
-        # Объединяем данные
-        kpi_data = {}
-        for manager in [m['planfix_user_name'] for m in MANAGERS_KPI]:
+    """Получает данные KPI из базы данных."""
+    kpi_data = {}
+    
+    # Получаем плановые значения выручки
+    revenue_plans = {}
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT manager, revenue_plan 
+            FROM kpi_metrics 
+            WHERE year = %s AND month = %s
+        """, (year, month))
+        for row in cur.fetchall():
+            revenue_plans[row[0]] = row[1]
+    
+    # Получаем данные по задачам
+    with conn.cursor() as cur:
+        cur.execute("""
+            WITH task_counts AS (
+                SELECT 
+                    t.manager,
+                    COUNT(*) FILTER (WHERE t.status = 'TTL') as ttl_count,
+                    COUNT(*) FILTER (WHERE t.status = 'NWI') as nwi_count,
+                    COUNT(*) FILTER (WHERE t.status = 'PSK') as psk_count,
+                    COUNT(*) FILTER (WHERE t.status = 'PRZ') as prz_count,
+                    COUNT(*) FILTER (WHERE t.status = 'ZKL') as zkl_count
+                FROM tasks t
+                WHERE EXTRACT(MONTH FROM t.date) = %s 
+                AND EXTRACT(YEAR FROM t.date) = %s
+                GROUP BY t.manager
+            ),
+            client_status AS (
+                SELECT 
+                    t.manager,
+                    SUM(CASE WHEN c.status = 'Fakt' THEN c.amount ELSE 0 END) as fakt_amount,
+                    SUM(CASE WHEN c.status = 'Dług' THEN c.amount ELSE 0 END) as dlug_amount,
+                    SUM(CASE WHEN c.status = 'Brak' THEN c.amount ELSE 0 END) as brak_amount
+                FROM tasks t
+                JOIN clients c ON t.client_id = c.id
+                WHERE EXTRACT(MONTH FROM t.date) = %s 
+                AND EXTRACT(YEAR FROM t.date) = %s
+                GROUP BY t.manager
+            )
+            SELECT 
+                tc.manager,
+                tc.ttl_count,
+                tc.nwi_count,
+                tc.psk_count,
+                tc.prz_count,
+                tc.zkl_count,
+                COALESCE(cs.fakt_amount, 0) as fakt_amount,
+                COALESCE(cs.dlug_amount, 0) as dlug_amount,
+                COALESCE(cs.brak_amount, 0) as brak_amount
+            FROM task_counts tc
+            LEFT JOIN client_status cs ON tc.manager = cs.manager
+        """, (month, year, month, year))
+        
+        for row in cur.fetchall():
+            manager = row[0]
             kpi_data[manager] = {
-                'TTL': 0, 'NWI': 0, 'PSK': 0, 'PRZ': 0, 'ZKL': 0
+                'TTL': row[1],
+                'NWI': row[2],
+                'PSK': row[3],
+                'PRZ': row[4],
+                'ZKL': row[5],
+                'fakt_amount': row[6],
+                'dlug_amount': row[7],
+                'brak_amount': row[8],
+                'revenue_plan': revenue_plans.get(manager, 0)
             }
-
-        # Заполняем данные по задачам
-        for row in task_data:
-            manager, task_type, count = row
-            if manager in kpi_data and task_type in kpi_data[manager]:
-                kpi_data[manager][task_type] = count
-
-        # Заполняем данные по клиентам
-        for row in client_data:
-            manager, status, count = row
-            if manager in kpi_data and status in kpi_data[manager]:
-                kpi_data[manager][status] = count
-
-        return kpi_data
-    except Exception as e:
-        logger.error(f"Error getting KPI data: {e}")
-        return {}
+            
+    return kpi_data
 
 def calculate_premium(kpi_data):
     """Рассчитывает премию на основе KPI данных."""
@@ -174,60 +142,92 @@ def calculate_premium(kpi_data):
     return premium_data
 
 def generate_premium_report(conn):
-    """
-    Generate premium report for all managers in MANAGERS_KPI.
-    """
-    current_date = datetime.now()
-    current_month = current_date.month
-    current_year = current_date.year
+    """Генерирует отчет по премиям."""
+    # Получаем текущий месяц и год
+    now = datetime.now()
+    month = now.month
+    year = now.year
     
-    kpi_data = get_kpi_data(conn, current_month, current_year)
+    # Получаем данные KPI
+    kpi_data = get_kpi_data(conn, month, year)
+    
+    # Рассчитываем премии
     premium_data = calculate_premium(kpi_data)
     
-    # Формируем отчет
+    # Форматируем отчет
     report = []
-    report.append(f"PREMIA {current_month:02d}.{current_year}")
-    report.append("═══════════════════════")
-    report.append("KPI |   Kozik | Stukalo")
-    report.append("───────────────────────")
+    report.append(f"PREMIA {month:02d}.{year}")
+    report.append("═" * 21)
     
-    # Добавляем показатели
-    indicators = ['TTL', 'NWI', 'PSK', 'PRZ', 'ZKL']
-    for indicator in indicators:
-        kozik_value = premium_data['Kozik Andrzej'][indicator]
-        stukalo_value = premium_data['Stukalo Nazarii'][indicator]
-        report.append(f"{indicator:3} | {format_float(kozik_value):>7} | {format_float(stukalo_value):>7}")
+    # Заголовок с именами менеджеров
+    header = "KPI |"
+    for manager in MANAGERS_KPI:
+        header += f" {manager:>8} |"
+    report.append(header)
+    report.append("─" * (len(header) + 2))
     
-    report.append("───────────────────────")
+    # Показатели
+    metrics = ['TTL', 'NWI', 'PSK', 'PRZ', 'ZKL']
+    for metric in metrics:
+        line = f"{metric:3} |"
+        for manager in MANAGERS_KPI:
+            if manager in premium_data:
+                line += f" {premium_data[manager][metric]:>8.2f} |"
+            else:
+                line += f" {'0.00':>8} |"
+        report.append(line)
     
-    # Добавляем сумму
-    kozik_sum = premium_data['Kozik Andrzej']['SUM']
-    stukalo_sum = premium_data['Stukalo Nazarii']['SUM']
-    report.append(f"SUM | {format_float(kozik_sum):>7} | {format_float(stukalo_sum):>7}")
+    report.append("─" * (len(header) + 2))
     
-    # Добавляем базовую премию
-    kozik_fnd = premium_data['Kozik Andrzej']['FND']
-    stukalo_fnd = premium_data['Stukalo Nazarii']['FND']
-    report.append(f"FND | {kozik_fnd:>7} | {stukalo_fnd:>7}")
+    # Сумма и премия
+    summary_metrics = ['SUM', 'FND', 'PRK', 'PRW', 'TOT']
+    for metric in summary_metrics:
+        line = f"{metric:3} |"
+        for manager in MANAGERS_KPI:
+            if manager in premium_data:
+                if metric in ['PRK', 'PRW', 'TOT']:
+                    line += f" {premium_data[manager][metric]:>8.0f} |"
+                else:
+                    line += f" {premium_data[manager][metric]:>8.2f} |"
+            else:
+                line += f" {'0.00':>8} |"
+        report.append(line)
+        if metric == 'FND':
+            report.append("─" * (len(header) + 2))
     
-    report.append("───────────────────────")
+    report.append("═" * 21)
     
-    # Добавляем премию и итоги
-    kozik_prk = premium_data['Kozik Andrzej']['PRK']
-    stukalo_prk = premium_data['Stukalo Nazarii']['PRK']
-    report.append(f"PRK | {kozik_prk:>7} | {stukalo_prk:>7}")
+    # Добавляем информацию о выручке
+    report.append(f"\nPRZYCHODY {month}/{year}\n")
     
-    kozik_prw = premium_data['Kozik Andrzej']['PRW']
-    stukalo_prw = premium_data['Stukalo Nazarii']['PRW']
-    report.append(f"PRW | {kozik_prw:>7} | {stukalo_prw:>7}")
+    for manager in MANAGERS_KPI:
+        if manager in kpi_data:
+            data = kpi_data[manager]
+            total = data['fakt_amount'] + data['dlug_amount'] + data['brak_amount']
+            
+            # Рассчитываем проценты
+            fakt_percent = (data['fakt_amount'] / total * 100) if total > 0 else 0
+            dlug_percent = (data['dlug_amount'] / total * 100) if total > 0 else 0
+            brak_percent = (data['brak_amount'] / total * 100) if total > 0 else 0
+            
+            # Создаем прогресс-бар
+            fakt_bars = int(fakt_percent / 5)
+            dlug_bars = int(dlug_percent / 5)
+            brak_bars = int(brak_percent / 5)
+            
+            progress = "█" * fakt_bars + "▒" * dlug_bars + "░" * brak_bars
+            progress = progress.ljust(20)
+            
+            report.append(f"{manager}:")
+            report.append(f"[{progress}]")
+            report.append(f" █  Fakt: {data['fakt_amount']:>6.0f} PLN ({fakt_percent:>4.1f}%)")
+            report.append(f" ▒  Dług: {data['dlug_amount']:>6.0f} PLN ({dlug_percent:>4.1f}%)")
+            report.append(f" ░  Brak: {data['brak_amount']:>6.0f} PLN ({brak_percent:>4.1f}%)")
+            report.append(f"    Fakt: {data['fakt_amount']:>6.0f} PLN")
+            report.append(f"    Plan: {data['revenue_plan']:>6.0f} PLN")
+            report.append("")
     
-    kozik_tot = premium_data['Kozik Andrzej']['TOT']
-    stukalo_tot = premium_data['Stukalo Nazarii']['TOT']
-    report.append(f"TOT | {kozik_tot:>7} | {stukalo_tot:>7}")
-    
-    report.append("═══════════════════════")
-    
-    return "```\n" + "\n".join(report) + "\n```"
+    return "\n".join(report)
 
 def send_to_telegram(message):
     """
