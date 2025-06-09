@@ -153,21 +153,21 @@ def parse_orders(xml_text):
         "Data zakończenia zadania": "data_zakonczenia_zadania",
         "Запустить сценарий \"Обновить данные в KPI\"": "zapustit_scenarij_obnovit_dannye_v_kpi"
     }
-    for order in root.findall('.//task'):
-        template_id = order.findtext('template/id')
+    for task in root.findall('.//task'):
+        template_id = task.findtext('template/id')
         if str(template_id) != str(ORDER_TEMPLATE_ID):
             continue
         def get_text(tag):
-            el = order.find(tag)
+            el = task.find(tag)
             return el.text if el is not None else None
         title = get_text('title')
-        order_type = None
+        task_type = None
         if title and '/' in title:
-            order_type = title.split('/')[0].strip()
+            task_type = title.split('/')[0].strip()
         # Парсим customData
         custom_data = {}
         custom_result = {v: None for v in custom_fields.values()}
-        custom_data_root = order.find('customData')
+        custom_data_root = task.find('customData')
         if custom_data_root is not None:
             for cv in custom_data_root.findall('customValue'):
                 field = cv.find('field/name')
@@ -191,11 +191,10 @@ def parse_orders(xml_text):
             "description": get_text('description'),
             "importance": get_text('importance'),
             "status": get_text('status'),
-            "status_name": get_text('statusName'),  # Добавляем название статуса
+            "status_name": get_text('statusName'),
             "status_set": int(get_text('statusSet')) if get_text('statusSet') else None,
             "check_result": get_text('checkResult') == '1',
             "type": get_text('type'),
-            "additional_description_data": get_text('additionalDescriptionData'),
             "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
             "owner_name": get_text('owner/name'),
             "parent_id": int(get_text('parent/id')) if get_text('parent/id') else None,
@@ -244,9 +243,16 @@ def main():
     )
     logger.info("Starting Planfix orders to Supabase synchronization...")
 
+    # Добавляем отладочный вывод
+    logger.info("Environment variables:")
+    logger.info(f"PLANFIX_API_KEY: {os.environ.get('PLANFIX_API_KEY')[:3]}..." if os.environ.get('PLANFIX_API_KEY') else "Not set")
+    logger.info(f"PLANFIX_USER_TOKEN: {os.environ.get('PLANFIX_USER_TOKEN')[:3]}..." if os.environ.get('PLANFIX_USER_TOKEN') else "Not set")
+    logger.info(f"PLANFIX_ACCOUNT: {os.environ.get('PLANFIX_ACCOUNT')}")
+    logger.info(f"PLANFIX_API_URL: {os.environ.get('PLANFIX_API_URL')}")
+
     required_env_vars = {
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
+        'PLANFIX_USER_TOKEN': planfix_utils.PLANFIX_USER_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
         'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
         'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
