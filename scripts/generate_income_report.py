@@ -53,6 +53,10 @@ def get_income_data(conn, month, year):
         else:
             last_day = datetime(year, month + 1, 1) - timedelta(days=1)
 
+        # Форматируем даты в нужный формат для PostgreSQL
+        first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
+        last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
+
         # Получаем все заказы за указанный месяц
         with conn.cursor() as cur:
             # Проверяем всех менеджеров в базе
@@ -71,11 +75,11 @@ def get_income_data(conn, month, year):
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as fakt
                 FROM planfix_orders
                 WHERE 
-                    data_realizacji::timestamp >= %s::timestamp 
-                    AND data_realizacji::timestamp <= %s::timestamp
+                    TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
+                    AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
                     AND is_deleted = false
                 GROUP BY menedzher
-            """, (first_day, last_day))
+            """, (first_day_str, last_day_str))
             fakt_data = {row[0]: row[1] for row in cur.fetchall()}
             logger.info(f"Fakt data: {fakt_data}")
 
@@ -143,9 +147,10 @@ def generate_income_report(conn):
         fakt = round(data['fakt'])
         dlug = round(data['dlug'])
         brak = round(data['brak'])
-        fakt_percent = (fakt / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
-        dlug_percent = (dlug / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
-        brak_percent = (brak / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
+        total = fakt + dlug + brak
+        fakt_percent = (fakt / total) * 100 if total > 0 else 0
+        dlug_percent = (dlug / total) * 100 if total > 0 else 0
+        brak_percent = (brak / total) * 100 if total > 0 else 0
         all_lines.append({
             'manager': display_name,
             'fakt': fakt,
