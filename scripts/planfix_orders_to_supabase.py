@@ -274,9 +274,20 @@ def parse_orders(xml_data: str) -> List[Dict]:
         
         for task in root.findall('.//task'):
             try:
-                # Получаем основные данные
-                task_id = int(task.find('id').text)
-                status_value = int(task.find('status').text)
+                # Получаем основные данные с проверкой на None
+                task_id_elem = task.find('id')
+                if task_id_elem is None or task_id_elem.text is None:
+                    logger.error(f"Task ID is missing or empty")
+                    continue
+                    
+                task_id = int(task_id_elem.text)
+                
+                status_elem = task.find('status')
+                if status_elem is None or status_elem.text is None:
+                    logger.error(f"Status is missing or empty for task {task_id}")
+                    continue
+                    
+                status_value = int(status_elem.text)
                 
                 # Получаем название статуса
                 status_name = get_status_name(task_id, status_value)
@@ -287,30 +298,48 @@ def parse_orders(xml_data: str) -> List[Dict]:
                 custom_data_elem = task.find('customData')
                 if custom_data_elem is not None:
                     for item in custom_data_elem.findall('customValue'):
-                        name = item.find('name').text
-                        value = item.find('value').text
-                        custom_data[name] = value
+                        name_elem = item.find('name')
+                        value_elem = item.find('value')
+                        if name_elem is not None and name_elem.text is not None and value_elem is not None:
+                            name = name_elem.text
+                            value = value_elem.text if value_elem.text is not None else ""
+                            custom_data[name] = value
                 
                 # Формируем данные заказа
                 order_data = {
-                    'task_id': task_id,
-                    'status_id': status_value,
-                    'status_name': status_name,
-                    'custom_data': custom_data
+                    "planfix_id": task_id,
+                    "status": status_value,
+                    "status_name": status_name,
+                    "title": task.findtext('title', ''),
+                    "description": task.findtext('description', ''),
+                    "date_create": parse_date(task.findtext('dateCreate')),
+                    "date_start": parse_date(task.findtext('dateStart')),
+                    "date_end": parse_date(task.findtext('dateEnd')),
+                    "date_complete": parse_date(task.findtext('dateComplete')),
+                    "last_update_date": parse_date(task.findtext('lastUpdateDate')),
+                    "type": task.findtext('type', ''),
+                    "template_id": task.findtext('template/id', ''),
+                    "assigner_id": task.findtext('assigner/id', ''),
+                    "assigner_name": task.findtext('assigner/name', ''),
+                    "owner_id": task.findtext('owner/id', ''),
+                    "owner_name": task.findtext('owner/name', '')
                 }
                 
-                logger.info(f"Order {task_id} data prepared: {order_data}")
+                # Добавляем custom поля
+                for custom_name, column_name in CUSTOM_MAP.items():
+                    order_data[column_name] = custom_data.get(custom_name, '')
+                
                 orders.append(order_data)
+                logger.info(f"Successfully processed task {task_id}")
                 
             except Exception as e:
-                logger.error(f"Error processing task: {str(e)}")
+                logger.error(f"Error processing task {task_id if 'task_id' in locals() else 'unknown'}: {str(e)}")
                 continue
-                
-        logger.info(f"Successfully parsed {len(orders)} orders")
+        
         return orders
         
     except Exception as e:
-        logger.error(f"Error parsing XML: {str(e)}")
+        logger.error(f"Error parsing orders XML: {str(e)}")
         return []
 
 def upsert_orders(orders, supabase_conn):
