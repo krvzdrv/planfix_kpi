@@ -121,10 +121,16 @@ def get_planfix_orders(page):
     )
     response.raise_for_status()
     
-    # Добавляем отладочный вывод XML-ответа
+    # Добавляем отладочный вывод XML-ответа только для заказа A-10051
     if page == 1:
-        logger.info("XML Response from Planfix API:")
-        logger.info(response.text)
+        root = ET.fromstring(response.text)
+        for task in root.findall('.//task'):
+            title = task.findtext('title')
+            if title and 'A-10051' in title:
+                logger.info("XML Response for order A-10051:")
+                task_xml = ET.tostring(task, encoding='unicode')
+                logger.info(task_xml)
+                break
     
     return response.text
 
@@ -167,6 +173,28 @@ def parse_orders(xml_text):
             el = task.find(tag)
             return el.text if el is not None else None
         title = get_text('title')
+        
+        # Логируем информацию только для заказа A-10051
+        if title and 'A-10051' in title:
+            task_type = None
+            if title and '/' in title:
+                task_type = title.split('/')[0].strip()
+                
+            status = get_text('status')
+            status_name = get_text('statusName')
+            logger.info(f"Order {title}: status={status}, status_name={status_name}")
+            
+            # Логируем все customData для этого заказа
+            custom_data_root = task.find('customData')
+            if custom_data_root is not None:
+                logger.info("Custom data for order A-10051:")
+                for cv in custom_data_root.findall('customValue'):
+                    field = cv.find('field/name')
+                    value = cv.find('value')
+                    text = cv.find('text')
+                    if field is not None:
+                        logger.info(f"Field: {field.text}, Value: {value.text if value is not None else None}, Text: {text.text if text is not None else None}")
+        
         task_type = None
         if title and '/' in title:
             task_type = title.split('/')[0].strip()
