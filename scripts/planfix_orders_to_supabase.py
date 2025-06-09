@@ -144,6 +144,26 @@ def parse_date(date_str):
             continue
     return None
 
+def get_status_name(status_id, status_set):
+    """
+    Получает название статуса из Planfix API
+    """
+    try:
+        params = {
+            'status': {
+                'id': status_id,
+                'statusSet': status_set
+            }
+        }
+        response_xml = make_planfix_request('status.get', params)
+        root = ET.fromstring(response_xml)
+        status_name_element = root.find(".//status/name")
+        if status_name_element is not None and status_name_element.text:
+            return status_name_element.text.strip()
+    except Exception as e:
+        logger.error(f"Error getting status name for status_id={status_id}, status_set={status_set}: {e}")
+    return None
+
 def parse_orders(xml_text):
     root = ET.fromstring(xml_text)
     if root.attrib.get("status") == "error":
@@ -155,7 +175,6 @@ def parse_orders(xml_text):
     custom_fields = {
         "Zadanie powiązane": "zadanie_powiazane",
         "Kontakt": "kontakt",
-        "Następne zadanie": "nastepne_zadanie",
         "Wynik": "wynik",
         "Prywatna notatka": "prywatna_notatka",
         "Zmień nazwę zadania": "zmien_nazwe_zadania",
@@ -174,14 +193,20 @@ def parse_orders(xml_text):
             return el.text if el is not None else None
         title = get_text('title')
         
+        # Получаем статус и его название
+        status = get_text('status')
+        status_set = get_text('statusSet')
+        status_name = None
+        if status and status_set:
+            status_name = get_status_name(status, status_set)
+            logger.info(f"Retrieved status name for order {title}: status={status}, status_set={status_set}, status_name={status_name}")
+        
         # Логируем информацию только для заказа A-10051
         if title and 'A-10051' in title:
             task_type = None
             if title and '/' in title:
                 task_type = title.split('/')[0].strip()
                 
-            status = get_text('status')
-            status_name = get_text('statusName')
             logger.info(f"Order {title}: status={status}, status_name={status_name}")
             
             # Логируем все customData для этого заказа
@@ -200,8 +225,6 @@ def parse_orders(xml_text):
             task_type = title.split('/')[0].strip()
             
         # Добавляем отладочный вывод
-        status = get_text('status')
-        status_name = get_text('statusName')
         logger.info(f"Order {title}: status={status}, status_name={status_name}")
         
         # Парсим customData
