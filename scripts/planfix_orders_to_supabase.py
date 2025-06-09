@@ -247,19 +247,13 @@ def get_status_name(task_id: int, status_value: int) -> str:
             logger.error(f"Planfix API error for task {task_id}: code={code}, message={message}")
             return ""
             
-        # Получаем название статуса из customData
-        custom_data = root.find(".//task/customData")
-        if custom_data is not None:
-            for custom_value in custom_data.findall("customValue"):
-                field = custom_value.find("field")
-                if field is not None and field.find("name") is not None and field.find("name").text == "Статус":
-                    value = custom_value.find("text")
-                    if value is not None and value.text:
-                        status_name = value.text.strip()
-                        logger.info(f"Found status name for task {task_id}: {status_name}")
-                        return status_name
+        # Получаем название статуса из системного поля
+        status_name = root.findtext(".//task/statusName")
+        if status_name:
+            logger.info(f"Found status name for task {task_id}: {status_name}")
+            return status_name.strip()
                 
-        logger.warning(f"Status name not found in customData for task {task_id}")
+        logger.warning(f"Status name not found for task {task_id}")
         return ""
         
     except Exception as e:
