@@ -77,9 +77,6 @@ CUSTOM_MAP = {
 
 logger = logging.getLogger(__name__)
 
-# Кэш для хранения маппинга статусов
-STATUS_MAPPING = {}
-
 def get_all_status_mapping():
     """
     Получает все доступные статусы из Planfix.
@@ -221,18 +218,48 @@ def get_status_mapping():
 def get_status_name(task_id: int, status_value: int) -> str:
     """Получает название статуса из Planfix API."""
     try:
-        # Получаем маппинг статусов, если он еще не получен
-        global STATUS_MAPPING
-        if not STATUS_MAPPING:
-            STATUS_MAPPING = get_status_mapping()
+        # Формируем XML запрос для получения информации о задаче
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<request method="task.get">'
+            f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
+            '<task>'
+            f'<id>{task_id}</id>'
+            '<general>1</general>'
+            '</task>'
+            '</request>'
+        )
         
-        # Получаем название статуса из маппинга
-        status_name = STATUS_MAPPING.get(str(status_value))
-        if status_name:
-            logger.info(f"Found status name for task {task_id}: {status_name} (value: {status_value})")
-            return status_name
+        # Отправляем запрос
+        response = requests.post(
+            os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
+            data=body.encode('utf-8'),
+            headers={'Content-Type': 'application/xml'},
+            auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
+        )
+        response.raise_for_status()
+        
+        # Парсим XML ответ
+        root = ET.fromstring(response.text)
+        if root.attrib.get("status") == "error":
+            code = root.findtext("code")
+            message = root.findtext("message")
+            logger.error(f"Planfix API error for task {task_id}: code={code}, message={message}")
+            return ""
             
-        logger.warning(f"Status value {status_value} not found in mapping for task {task_id}")
+        # Получаем название статуса из customData
+        custom_data = root.find(".//task/customData")
+        if custom_data is not None:
+            for custom_value in custom_data.findall("customValue"):
+                field = custom_value.find("field")
+                if field is not None and field.find("name") is not None and field.find("name").text == "Статус":
+                    value = custom_value.find("text")
+                    if value is not None and value.text:
+                        status_name = value.text.strip()
+                        logger.info(f"Found status name for task {task_id}: {status_name}")
+                        return status_name
+                
+        logger.warning(f"Status name not found in customData for task {task_id}")
         return ""
         
     except Exception as e:
@@ -361,12 +388,11 @@ def main():
     supabase_conn = None
     try:
         # Загружаем маппинг статусов при запуске
-        global STATUS_MAPPING
-        STATUS_MAPPING = get_all_status_mapping()
-        if not STATUS_MAPPING:
+        status_mapping = get_all_status_mapping()
+        if not status_mapping:
             logger.error("Failed to load status mapping. Will continue without status names.")
         else:
-            logger.info(f"Successfully loaded {len(STATUS_MAPPING)} status mappings")
+            logger.info(f"Successfully loaded {len(status_mapping)} status mappings")
 
         # Получаем соединение с Supabase
         supabase_conn = planfix_utils.get_supabase_connection()
