@@ -178,19 +178,19 @@ def parse_date(date_str):
             continue
     return None
 
-def get_status_name(status_id, status_set):
+def get_status_name(status_id, task_id):
     """
     Получает название статуса из Planfix через task.getPossibleStatusToChange
     :param status_id: ID статуса задачи
-    :param status_set: ID набора статусов
+    :param task_id: ID задачи
     :return: Название статуса или None
     """
     try:
         params = {
-            "statusSet": status_set
+            "task": {"id": task_id}
         }
 
-        response_xml = planfix_utils.make_planfix_request("status.getList", params)
+        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
         root = ET.fromstring(response_xml)
 
         # Поиск статуса по значению (value == status_id)
@@ -200,14 +200,14 @@ def get_status_name(status_id, status_set):
 
             if value_elem is not None and value_elem.text == str(status_id) and title_elem is not None:
                 status_name = title_elem.text.strip()
-                logger.info(f"Found status name for status_id={status_id}, status_set={status_set}: {status_name}")
+                logger.info(f"Found status name for task_id={task_id}, status_id={status_id}: {status_name}")
                 return status_name
 
-        logger.warning(f"No status name found for status_id={status_id}, status_set={status_set}")
+        logger.warning(f"No status name found for status_id={status_id}, task_id={task_id}")
         return None
 
     except Exception as e:
-        logger.error(f"Error getting status name for status_id={status_id}, status_set={status_set}: {e}")
+        logger.error(f"Error getting status name for status_id={status_id}, task_id={task_id}: {e}")
         return None
 
 def parse_orders(xml_text):
@@ -242,11 +242,10 @@ def parse_orders(xml_text):
         
         # Получаем статус и его название
         status = get_text('status')
-        status_set = get_text('statusSet')
         status_name = None
-        if status and status_set:
-            status_name = get_status_name(status, status_set)
-            logger.info(f"Order {title}: status={status}, status_set={status_set}, status_name={status_name}")
+        if status and task_id:
+            status_name = get_status_name(status, task_id)
+            logger.info(f"Order {title}: status={status}, status_name={status_name}")
         
         # Логируем информацию только для заказа A-10051
         if title and 'A-10051' in title:
