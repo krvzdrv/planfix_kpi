@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 import psycopg2
 import requests
 from dotenv import load_dotenv
+from typing import List, Dict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -178,149 +179,83 @@ def parse_date(date_str):
             continue
     return None
 
-def get_status_name(status_id, task_id):
-    """
-    Получает название статуса из Planfix через task.getPossibleStatusToChange
-    :param status_id: ID статуса задачи
-    :param task_id: ID задачи
-    :return: Название статуса или None
-    """
+def get_status_name(task_id: int, status_value: int) -> str:
+    """Получает название статуса из Planfix API."""
     try:
-        params = {
-            "task": {"id": task_id}
-        }
-
-        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
-        root = ET.fromstring(response_xml)
-
-        # Поиск статуса по значению (value == status_id)
-        for status_elem in root.findall(".//statusList/status"):
-            value_elem = status_elem.find("value")
-            title_elem = status_elem.find("title")
-
-            if value_elem is not None and value_elem.text == str(status_id) and title_elem is not None:
-                status_name = title_elem.text.strip()
-                logger.info(f"Found status name for task_id={task_id}, status_id={status_id}: {status_name}")
+        # Получаем список возможных статусов для задачи
+        response = planfix_utils.make_planfix_request(
+            method="task.getPossibleStatusToChange",
+            params={
+                "task": {
+                    "id": task_id
+                }
+            }
+        )
+        
+        if not response or 'statuses' not in response:
+            logger.error(f"Failed to get statuses for task {task_id}: Invalid response")
+            return ""
+            
+        # Ищем статус по значению
+        for status in response['statuses']:
+            if status.get('value') == status_value:
+                status_name = status.get('name', '')
+                logger.info(f"Found status name for task {task_id}: {status_name} (value: {status_value})")
                 return status_name
-
-        logger.warning(f"No status name found for status_id={status_id}, task_id={task_id}")
-        return None
-
-    except Exception as e:
-        logger.error(f"Error getting status name for status_id={status_id}, task_id={task_id}: {e}")
-        return None
-
-def parse_orders(xml_text):
-    root = ET.fromstring(xml_text)
-    if root.attrib.get("status") == "error":
-        code = root.findtext("code")
-        message = root.findtext("message")
-        logger.error(f"Ошибка Planfix API: code={code}, message={message}")
-        return []
-    orders = []
-    custom_fields = {
-        "Zadanie powiązane": "zadanie_powiazane",
-        "Kontakt": "kontakt",
-        "Wynik": "wynik",
-        "Prywatna notatka": "prywatna_notatka",
-        "Zmień nazwę zadania": "zmien_nazwe_zadania",
-        "Ostatni komentarz": "ostatni_komentarz",
-        "Autor komentarza": "autor_komentarza",
-        "Data utworzenia zadania": "data_utworzenia_zadania",
-        "Data zakończenia zadania": "data_zakonczenia_zadania",
-        "Запустить сценарий \"Обновить данные в KPI\"": "zapustit_scenarij_obnovit_dannye_v_kpi"
-    }
-    for task in root.findall('.//task'):
-        template_id = task.findtext('template/id')
-        if str(template_id) != str(ORDER_TEMPLATE_ID):
-            continue
-        def get_text(tag):
-            el = task.find(tag)
-            return el.text if el is not None else None
-        title = get_text('title')
-        task_id = get_text('id')
-        
-        # Получаем статус и его название
-        status = get_text('status')
-        status_name = None
-        if status and task_id:
-            status_name = get_status_name(status, task_id)
-            logger.info(f"Order {title}: status={status}, status_name={status_name}")
-        
-        # Логируем информацию только для заказа A-10051
-        if title and 'A-10051' in title:
-            task_type = None
-            if title and '/' in title:
-                task_type = title.split('/')[0].strip()
                 
-            logger.info(f"Order {title}: task_id={task_id}, status={status}, status_name={status_name}")
-            
-            # Логируем все customData для этого заказа
-            custom_data_root = task.find('customData')
-            if custom_data_root is not None:
-                logger.info("Custom data for order A-10051:")
-                for cv in custom_data_root.findall('customValue'):
-                    field = cv.find('field/name')
-                    value = cv.find('value')
-                    text = cv.find('text')
-                    if field is not None:
-                        logger.info(f"Field: {field.text}, Value: {value.text if value is not None else None}, Text: {text.text if text is not None else None}")
+        logger.warning(f"Status value {status_value} not found for task {task_id}")
+        return ""
         
-        task_type = None
-        if title and '/' in title:
-            task_type = title.split('/')[0].strip()
-            
-        # Добавляем отладочный вывод
-        logger.info(f"Order {title}: status={status}, status_name={status_name}")
+    except Exception as e:
+        logger.error(f"Error getting status name for task {task_id}: {str(e)}")
+        return ""
+
+def parse_orders(xml_data: str) -> List[Dict]:
+    """Парсит XML с заказами и возвращает список словарей."""
+    try:
+        root = ET.fromstring(xml_data)
+        orders = []
         
-        # Парсим customData
-        custom_data = {}
-        custom_result = {v: None for v in custom_fields.values()}
-        custom_data_root = task.find('customData')
-        if custom_data_root is not None:
-            for cv in custom_data_root.findall('customValue'):
-                field = cv.find('field/name')
-                value = cv.find('value')
-                text = cv.find('text')
-                if field is not None:
-                    field_name = field.text
-                    if field_name in custom_fields:
-                        # Для дат парсим value как дату, если это дата
-                        if field_name in ["Data utworzenia zadania", "Data zakończenia zadania"]:
-                            custom_result[custom_fields[field_name]] = parse_date(value.text) if value is not None else None
-                        else:
-                            custom_result[custom_fields[field_name]] = value.text if value is not None else text.text if text is not None else None
-                    custom_data[field_name] = {
-                        "value": value.text if value is not None else None,
-                        "text": text.text if text is not None else None
-                    }
+        for task in root.findall('.//task'):
+            try:
+                # Получаем основные данные
+                task_id = int(task.find('id').text)
+                status_value = int(task.find('status').text)
+                
+                # Получаем название статуса
+                status_name = get_status_name(task_id, status_value)
+                logger.info(f"Processing order {task_id}: status={status_value}, status_name={status_name}")
+                
+                # Получаем customData
+                custom_data = {}
+                custom_data_elem = task.find('customData')
+                if custom_data_elem is not None:
+                    for item in custom_data_elem.findall('customValue'):
+                        name = item.find('name').text
+                        value = item.find('value').text
+                        custom_data[name] = value
+                
+                # Формируем данные заказа
+                order_data = {
+                    'task_id': task_id,
+                    'status_id': status_value,
+                    'status_name': status_name,
+                    'custom_data': custom_data
+                }
+                
+                logger.info(f"Order {task_id} data prepared: {order_data}")
+                orders.append(order_data)
+                
+            except Exception as e:
+                logger.error(f"Error processing task: {str(e)}")
+                continue
+                
+        logger.info(f"Successfully parsed {len(orders)} orders")
+        return orders
         
-        # Формируем запись для Supabase
-        order_data = {
-            "planfix_id": task_id,
-            "title": title,
-            "status": status,
-            "status_name": status_name,
-            "task_type": task_type,
-            "description": get_text('description'),
-            "assigner": get_text('assigner/name'),
-            "owner": get_text('owner/name'),
-            "date_create": parse_date(get_text('dateCreate')),
-            "date_start": parse_date(get_text('dateStart')),
-            "date_end": parse_date(get_text('dateEnd')),
-            "date_complete": parse_date(get_text('dateComplete')),
-            "last_update_date": parse_date(get_text('lastUpdateDate')),
-            "custom_data": json.dumps(custom_data) if custom_data else None,
-            "updated_at": datetime.now().isoformat(),
-            "is_deleted": False
-        }
-        
-        # Добавляем кастомные поля
-        order_data.update(custom_result)
-        
-        orders.append(order_data)
-    
-    return orders
+    except Exception as e:
+        logger.error(f"Error parsing XML: {str(e)}")
+        return []
 
 def upsert_orders(orders, supabase_conn):
     if not orders:
