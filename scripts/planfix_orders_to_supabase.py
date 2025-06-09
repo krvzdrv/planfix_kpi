@@ -108,6 +108,9 @@ def get_all_status_mapping():
         return {}
 
 def get_planfix_orders(page):
+    """
+    Получает список заказов из Planfix API
+    """
     headers = {
         'Content-Type': 'application/xml',
         'Accept': 'application/xml'
@@ -130,7 +133,7 @@ def get_planfix_orders(page):
         '  <field>title</field>'
         '  <field>description</field>'
         '  <field>status</field>'
-        '  <field>statusName</field>'
+        '  <field>statusSet</field>'
         '  <field>assigner</field>'
         '  <field>owner</field>'
         '  <field>dateCreate</field>'
@@ -175,19 +178,19 @@ def parse_date(date_str):
             continue
     return None
 
-def get_status_name(status_id, task_id):
+def get_status_name(status_id, status_set):
     """
     Получает название статуса из Planfix через task.getPossibleStatusToChange
     :param status_id: ID статуса задачи
-    :param task_id: ID самой задачи
+    :param status_set: ID набора статусов
     :return: Название статуса или None
     """
     try:
         params = {
-            "task": {"id": task_id}
+            "statusSet": status_set
         }
 
-        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
+        response_xml = planfix_utils.make_planfix_request("status.getList", params)
         root = ET.fromstring(response_xml)
 
         # Поиск статуса по значению (value == status_id)
@@ -197,14 +200,14 @@ def get_status_name(status_id, task_id):
 
             if value_elem is not None and value_elem.text == str(status_id) and title_elem is not None:
                 status_name = title_elem.text.strip()
-                logger.info(f"Found status name for task_id={task_id}, status_id={status_id}: {status_name}")
+                logger.info(f"Found status name for status_id={status_id}, status_set={status_set}: {status_name}")
                 return status_name
 
-        logger.warning(f"No status name found for status_id={status_id}, task_id={task_id}")
+        logger.warning(f"No status name found for status_id={status_id}, status_set={status_set}")
         return None
 
     except Exception as e:
-        logger.error(f"Error getting status name for status_id={status_id}, task_id={task_id}: {e}")
+        logger.error(f"Error getting status name for status_id={status_id}, status_set={status_set}: {e}")
         return None
 
 def parse_orders(xml_text):
@@ -239,10 +242,11 @@ def parse_orders(xml_text):
         
         # Получаем статус и его название
         status = get_text('status')
+        status_set = get_text('statusSet')
         status_name = None
-        if status:
-            status_name = STATUS_MAPPING.get(str(status))
-            logger.info(f"Retrieved status name for order {title}: task_id={task_id}, status={status}, status_name={status_name}")
+        if status and status_set:
+            status_name = get_status_name(status, status_set)
+            logger.info(f"Order {title}: status={status}, status_set={status_set}, status_name={status_name}")
         
         # Логируем информацию только для заказа A-10051
         if title and 'A-10051' in title:
@@ -291,39 +295,32 @@ def parse_orders(xml_text):
                         "value": value.text if value is not None else None,
                         "text": text.text if text is not None else None
                     }
-        orders.append({
-            "planfix_id": int(get_text('id')) if get_text('id') else None,
+        
+        # Формируем запись для Supabase
+        order_data = {
+            "planfix_id": task_id,
             "title": title,
+            "status": status,
+            "status_name": status_name,
+            "task_type": task_type,
             "description": get_text('description'),
-            "importance": get_text('importance'),
-            "status": get_text('status'),
-            "status_name": get_text('statusName'),
-            "status_set": int(get_text('statusSet')) if get_text('statusSet') else None,
-            "check_result": get_text('checkResult') == '1',
-            "type": get_text('type'),
-            "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
-            "owner_name": get_text('owner/name'),
-            "parent_id": int(get_text('parent/id')) if get_text('parent/id') else None,
-            "template_id": int(get_text('template/id')) if get_text('template/id') else None,
-            "project_id": int(get_text('project/id')) if get_text('project/id') else None,
-            "project_title": get_text('project/title'),
-            "client_id": int(get_text('client/id')) if get_text('client/id') else None,
-            "client_name": get_text('client/name'),
-            "begin_datetime": parse_date(get_text('beginDateTime')),
-            "general": int(get_text('general')) if get_text('general') else None,
-            "is_overdued": get_text('isOverdued') == '1',
-            "is_close_to_deadline": get_text('isCloseToDeadline') == '1',
-            "is_not_accepted_in_time": get_text('isNotAcceptedInTime') == '1',
-            "is_summary": get_text('isSummary') == '1',
-            "starred": get_text('starred') == '1',
-            # Пользовательские поля
-            **custom_result,
-            # Всё customData в JSON
+            "assigner": get_text('assigner/name'),
+            "owner": get_text('owner/name'),
+            "date_create": parse_date(get_text('dateCreate')),
+            "date_start": parse_date(get_text('dateStart')),
+            "date_end": parse_date(get_text('dateEnd')),
+            "date_complete": parse_date(get_text('dateComplete')),
+            "last_update_date": parse_date(get_text('lastUpdateDate')),
             "custom_data": json.dumps(custom_data) if custom_data else None,
-            "workers": None,  # Можно доработать если появятся исполнители
-            "updated_at": datetime.now(),
+            "updated_at": datetime.now().isoformat(),
             "is_deleted": False
-        })
+        }
+        
+        # Добавляем кастомные поля
+        order_data.update(custom_result)
+        
+        orders.append(order_data)
+    
     return orders
 
 def upsert_orders(orders, supabase_conn):
