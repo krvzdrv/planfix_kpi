@@ -72,7 +72,7 @@ def get_income_data(conn, month, year):
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as fakt
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as fakt
                 FROM planfix_orders
                 WHERE 
                     TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
@@ -87,7 +87,7 @@ def get_income_data(conn, month, year):
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as dlug
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as dlug
                 FROM planfix_orders
                 WHERE 
                     status = 140
@@ -101,7 +101,7 @@ def get_income_data(conn, month, year):
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as brak
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as brak
                 FROM planfix_orders
                 WHERE 
                     is_deleted = false
