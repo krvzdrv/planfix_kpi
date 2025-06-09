@@ -29,16 +29,19 @@ def get_kpi_data(conn, month, year):
     """Получает данные KPI из базы данных."""
     kpi_data = {}
     
-    # Получаем плановые значения выручки
+    # Получаем плановые значения выручки и список показателей для расчета
     revenue_plans = {}
+    metrics_for_calculation = set()
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT manager, revenue_plan 
+            SELECT manager, revenue_plan, metrics_for_calculation 
             FROM kpi_metrics 
             WHERE year = %s AND month = %s
         """, (year, month))
         for row in cur.fetchall():
             revenue_plans[row[0]] = row[1]
+            if row[2]:  # если metrics_for_calculation не NULL
+                metrics_for_calculation.update(row[2].split(','))
     
     # Получаем данные по задачам
     with conn.cursor() as cur:
@@ -93,7 +96,8 @@ def get_kpi_data(conn, month, year):
                 'fakt_amount': row[6],
                 'dlug_amount': row[7],
                 'brak_amount': row[8],
-                'revenue_plan': revenue_plans.get(manager, 0)
+                'revenue_plan': revenue_plans.get(manager, 0),
+                'metrics_for_calculation': metrics_for_calculation
             }
             
     return kpi_data
@@ -102,6 +106,9 @@ def calculate_premium(kpi_data):
     """Рассчитывает премию на основе KPI данных."""
     premium_data = {}
     for manager, data in kpi_data.items():
+        # Получаем список показателей для расчета
+        metrics_for_calculation = data.get('metrics_for_calculation', set())
+        
         # Сначала округляем значения
         ttl = round(data['TTL'], 2) if data['TTL'] > 0 else 0
         nwi = round(data['NWI'], 2) if data['NWI'] > 0 else 0
@@ -116,8 +123,18 @@ def calculate_premium(kpi_data):
         prz = prz / 100
         zkl = zkl / 100
 
-        # Суммируем показатели
-        total = ttl + nwi + psk + prz + zkl
+        # Суммируем только те показатели, которые используются для расчета
+        total = 0
+        if 'TTL' in metrics_for_calculation:
+            total += ttl
+        if 'NWI' in metrics_for_calculation:
+            total += nwi
+        if 'PSK' in metrics_for_calculation:
+            total += psk
+        if 'PRZ' in metrics_for_calculation:
+            total += prz
+        if 'ZKL' in metrics_for_calculation:
+            total += zkl
 
         # Базовая премия
         base = 2000
