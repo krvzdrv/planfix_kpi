@@ -258,18 +258,44 @@ def parse_orders(xml_data: str) -> List[Dict]:
         return []
 
 def upsert_orders(orders, supabase_conn):
-    if not orders:
-        return
-    first_item_keys = orders[0].keys()
-    all_column_names = list(first_item_keys)
-    planfix_utils.upsert_data_to_supabase(
-        supabase_conn,
-        ORDERS_TABLE_NAME,
-        ORDERS_PK_COLUMN,
-        all_column_names,
-        orders
-    )
-    logger.info(f"Upserted {len(orders)} orders.")
+    """Обновляет или добавляет заказы в Supabase."""
+    try:
+        logger.info(f"Starting upsert of {len(orders)} orders to Supabase")
+        
+        for order in orders:
+            try:
+                # Логируем данные перед отправкой
+                logger.info(f"Preparing to upsert order {order.get('planfix_id')}:")
+                logger.info(f"  Status ID: {order.get('status')}")
+                logger.info(f"  Status Name: {order.get('status_name')}")
+                logger.info(f"  Full order data: {json.dumps(order, ensure_ascii=False, indent=2)}")
+                
+                # Проверяем типы данных
+                if order.get('status_name') is not None:
+                    logger.info(f"  Status Name type: {type(order.get('status_name'))}")
+                    logger.info(f"  Status Name value: '{order.get('status_name')}'")
+                
+                # Выполняем upsert
+                result = supabase_conn.table('orders').upsert(order).execute()
+                
+                # Логируем результат
+                if result.data:
+                    logger.info(f"Successfully upserted order {order.get('planfix_id')}")
+                    logger.info(f"  Response data: {json.dumps(result.data, ensure_ascii=False)}")
+                else:
+                    logger.warning(f"No data returned for order {order.get('planfix_id')}")
+                    logger.warning(f"  Response: {result}")
+                
+            except Exception as e:
+                logger.error(f"Error upserting order {order.get('planfix_id')}: {str(e)}")
+                logger.error(f"  Order data: {json.dumps(order, ensure_ascii=False)}")
+                continue
+                
+        logger.info("Finished upserting orders to Supabase")
+        
+    except Exception as e:
+        logger.error(f"Error in upsert_orders: {str(e)}")
+        raise
 
 def main():
     logging.basicConfig(
