@@ -82,14 +82,15 @@ def get_income_data(conn, month, year):
             """)
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
 
-            # Получаем все заказы (brak)
+            # Получаем все заказы со статусом 140 (brak)
             cur.execute("""
                 SELECT 
                     menedzher,
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as brak
                 FROM planfix_orders
                 WHERE 
-                    is_deleted = false
+                    status = 140
+                    AND is_deleted = false
                 GROUP BY menedzher
             """)
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
