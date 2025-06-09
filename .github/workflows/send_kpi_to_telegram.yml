@@ -98,9 +98,45 @@ jobs:
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
 
+      - name: Send Daily Activity Report
+        id: send-activity
+        if: steps.update-tasks.outcome == 'success'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
+          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          echo "Starting daily activity report generation..."
+          echo "Environment variables:"
+          echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
+          echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
+          echo "SUPABASE_DB: ${SUPABASE_DB:+set}"
+          echo "SUPABASE_USER: ${SUPABASE_USER:+set}"
+          echo "SUPABASE_PASSWORD: ${SUPABASE_PASSWORD:+set}"
+          echo "SUPABASE_PORT: ${SUPABASE_PORT:+set}"
+          echo "TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:+set}"
+          echo "TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:+set}"
+          
+          # Check if all required variables are set
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::error::Missing required Telegram configuration for daily activity report"
+            exit 1
+          fi
+          
+          # Run the script with debug output
+          if ! python -u scripts/send_daily_activity_report.py; then
+            echo "::error::Failed to send daily activity report"
+            exit 1
+          fi
+
       - name: Send KPI to Telegram
         id: send-kpi
-        if: steps.update-tasks.outcome == 'success'
+        if: steps.send-activity.outcome == 'success'
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
@@ -142,7 +178,7 @@ jobs:
 
       - name: Calculate and Send KPI Premia
         id: send-premia
-        continue-on-error: true  # Продолжать выполнение даже при ошибке
+        if: steps.send-kpi.outcome == 'success'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
@@ -166,19 +202,19 @@ jobs:
           
           # Check if all required variables are set
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::warning::Missing required Telegram configuration for premia calculation"
-            exit 0  # Выходим с успешным статусом
+            echo "::error::Missing required Telegram configuration for KPI premia"
+            exit 1
           fi
           
           # Run the script with debug output
           if ! python -u scripts/calculate_kpi_premia.py; then
-            echo "::warning::Failed to calculate and send KPI premia"
-            exit 0  # Выходим с успешным статусом
+            echo "::error::Failed to calculate and send KPI premia"
+            exit 1
           fi
 
-      - name: Send Daily Activity Report
-        id: send-activity
-        continue-on-error: true  # Продолжать выполнение даже при ошибке
+      - name: Send Income Report
+        id: send-income
+        if: steps.send-premia.outcome == 'success'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
@@ -189,7 +225,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting daily activity report generation..."
+          echo "Starting income report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
@@ -202,14 +238,14 @@ jobs:
           
           # Check if all required variables are set
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::warning::Missing required Telegram configuration for daily activity report"
-            exit 0  # Выходим с успешным статусом
+            echo "::error::Missing required Telegram configuration for income report"
+            exit 1
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/send_daily_activity_report.py; then
-            echo "::warning::Failed to send daily activity report"
-            exit 0  # Выходим с успешным статусом
+          if ! python -u scripts/generate_income_report.py; then
+            echo "::error::Failed to generate and send income report"
+            exit 1
           fi
 
       - name: Notify on failure

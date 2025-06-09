@@ -83,10 +83,10 @@ def get_planfix_orders(page):
     }
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        f'<request method="task.getList">'
-        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
+        '<request method="task.getList">'
+        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
-        f'<pageSize>100</pageSize>'
+        '<pageSize>100</pageSize>'
         '<filters>'
         '  <filter>'
         '    <type>51</type>'
@@ -98,33 +98,26 @@ def get_planfix_orders(page):
         '  <field>id</field>'
         '  <field>title</field>'
         '  <field>description</field>'
-        '  <field>importance</field>'
         '  <field>status</field>'
-        '  <field>statusSet</field>'
         '  <field>statusName</field>'
-        '  <field>checkResult</field>'
-        '  <field>type</field>'
+        '  <field>assigner</field>'
         '  <field>owner</field>'
-        '  <field>parent</field>'
+        '  <field>dateCreate</field>'
+        '  <field>dateStart</field>'
+        '  <field>dateEnd</field>'
+        '  <field>dateComplete</field>'
+        '  <field>lastUpdateDate</field>'
+        '  <field>type</field>'
         '  <field>template</field>'
-        '  <field>project</field>'
-        '  <field>client</field>'
-        '  <field>beginDateTime</field>'
-        '  <field>general</field>'
-        '  <field>isOverdued</field>'
-        '  <field>isCloseToDeadline</field>'
-        '  <field>isNotAcceptedInTime</field>'
-        '  <field>isSummary</field>'
-        '  <field>starred</field>'
         '  <field>customData</field>'
         '</fields>'
         '</request>'
     )
     response = requests.post(
-        planfix_utils.PLANFIX_API_URL,
+        os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
+        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_USER_TOKEN"))
     )
     response.raise_for_status()
     return response.text
@@ -147,30 +140,62 @@ def parse_orders(xml_text):
         logger.error(f"Ошибка Planfix API: code={code}, message={message}")
         return []
     orders = []
-    for task in root.findall('.//task'):
+    custom_fields = {
+        "Zadanie powiązane": "zadanie_powiazane",
+        "Kontakt": "kontakt",
+        "Następne zadanie": "nastepne_zadanie",
+        "Wynik": "wynik",
+        "Prywatna notatka": "prywatna_notatka",
+        "Zmień nazwę zadania": "zmien_nazwe_zadania",
+        "Ostatni komentarz": "ostatni_komentarz",
+        "Autor komentarza": "autor_komentarza",
+        "Data utworzenia zadania": "data_utworzenia_zadania",
+        "Data zakończenia zadania": "data_zakonczenia_zadania",
+        "Запустить сценарий \"Обновить данные в KPI\"": "zapustit_scenarij_obnovit_dannye_v_kpi"
+    }
+    for order in root.findall('.//task'):
+        template_id = order.findtext('template/id')
+        if str(template_id) != str(ORDER_TEMPLATE_ID):
+            continue
         def get_text(tag):
-            el = task.find(tag)
+            el = order.find(tag)
             return el.text if el is not None else None
-
-        # customData as dict
-        custom_fields = {v: None for v in CUSTOM_MAP.values()}
-        custom_data_root = task.find('customData')
+        title = get_text('title')
+        order_type = None
+        if title and '/' in title:
+            order_type = title.split('/')[0].strip()
+        # Парсим customData
+        custom_data = {}
+        custom_result = {v: None for v in custom_fields.values()}
+        custom_data_root = order.find('customData')
         if custom_data_root is not None:
             for cv in custom_data_root.findall('customValue'):
                 field = cv.find('field/name')
                 value = cv.find('value')
-                if field is not None and field.text in CUSTOM_MAP:
-                    custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
-
+                text = cv.find('text')
+                if field is not None:
+                    field_name = field.text
+                    if field_name in custom_fields:
+                        # Для дат парсим value как дату, если это дата
+                        if field_name in ["Data utworzenia zadania", "Data zakończenia zadania"]:
+                            custom_result[custom_fields[field_name]] = parse_date(value.text) if value is not None else None
+                        else:
+                            custom_result[custom_fields[field_name]] = value.text if value is not None else text.text if text is not None else None
+                    custom_data[field_name] = {
+                        "value": value.text if value is not None else None,
+                        "text": text.text if text is not None else None
+                    }
         orders.append({
             "planfix_id": int(get_text('id')) if get_text('id') else None,
-            "title": get_text('title'),
+            "title": title,
             "description": get_text('description'),
             "importance": get_text('importance'),
-            "status": get_text('statusName') or get_text('status'),
+            "status": get_text('status'),
+            "status_name": get_text('statusName'),  # Добавляем название статуса
             "status_set": int(get_text('statusSet')) if get_text('statusSet') else None,
-            "check_result": int(get_text('checkResult')) if get_text('checkResult') else None,
+            "check_result": get_text('checkResult') == '1',
             "type": get_text('type'),
+            "additional_description_data": get_text('additionalDescriptionData'),
             "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
             "owner_name": get_text('owner/name'),
             "parent_id": int(get_text('parent/id')) if get_text('parent/id') else None,
@@ -180,13 +205,18 @@ def parse_orders(xml_text):
             "client_id": int(get_text('client/id')) if get_text('client/id') else None,
             "client_name": get_text('client/name'),
             "begin_datetime": parse_date(get_text('beginDateTime')),
+            "end_time": parse_date(get_text('endTime')),
             "general": int(get_text('general')) if get_text('general') else None,
-            "is_overdued": get_text('isOverdued') == "1",
-            "is_close_to_deadline": get_text('isCloseToDeadline') == "1",
-            "is_not_accepted_in_time": get_text('isNotAcceptedInTime') == "1",
-            "is_summary": get_text('isSummary') == "1",
-            "starred": get_text('starred') == "1",
-            **custom_fields,
+            "is_overdued": get_text('isOverdued') == '1',
+            "is_close_to_deadline": get_text('isCloseToDeadline') == '1',
+            "is_not_accepted_in_time": get_text('isNotAcceptedInTime') == '1',
+            "is_summary": get_text('isSummary') == '1',
+            "starred": get_text('starred') == '1',
+            # Пользовательские поля
+            **custom_result,
+            # Всё customData в JSON
+            "custom_data": json.dumps(custom_data) if custom_data else None,
+            "workers": None,  # Можно доработать если появятся исполнители
             "updated_at": datetime.now(),
             "is_deleted": False
         })
