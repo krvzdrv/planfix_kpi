@@ -76,6 +76,39 @@ CUSTOM_MAP = {
 
 logger = logging.getLogger(__name__)
 
+def make_planfix_request(method, params):
+    """
+    Выполняет запрос к API Planfix
+    :param method: Метод API
+    :param params: Параметры запроса
+    :return: XML-ответ
+    """
+    url = f"https://{os.environ.get('PLANFIX_ACCOUNT')}.planfix.ru/rest/{method}"
+    
+    headers = {
+        'Content-Type': 'application/xml',
+        'X-Planfix-API-Key': os.environ.get('PLANFIX_API_KEY'),
+        'X-Planfix-Token': os.environ.get('PLANFIX_TOKEN')
+    }
+
+    # Формируем XML-запрос
+    data = "<request>"
+    for key, value in params.items():
+        if isinstance(value, dict):
+            data += f"<{key}>"
+            for sub_key, sub_value in value.items():
+                data += f"<{sub_key}>{sub_value}</{sub_key}>"
+            data += f"</{key}>"
+        else:
+            data += f"<{key}>{value}</{key}>"
+    data += "</request>"
+
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code != 200:
+        raise Exception(f"Failed to make Planfix request: {response.status_code} - {response.text}")
+    
+    return response.text
+
 def get_planfix_orders(page):
     headers = {
         'Content-Type': 'application/xml',
