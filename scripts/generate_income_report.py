@@ -71,8 +71,8 @@ def get_income_data(conn, month, year):
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as fakt
                 FROM planfix_orders
                 WHERE 
-                    data_realizacji >= %s 
-                    AND data_realizacji <= %s
+                    data_realizacji::timestamp >= %s::timestamp 
+                    AND data_realizacji::timestamp <= %s::timestamp
                     AND is_deleted = false
                 GROUP BY menedzher
             """, (first_day, last_day))

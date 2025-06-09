@@ -181,7 +181,7 @@ def get_status_mapping():
     try:
         body = (
             '<?xml version="1.0" encoding="UTF-8"?>'
-            '<request method="task.getStatusList">'
+            '<request method="task.getPossibleStatusToChange">'
             f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
             '</request>'
         )
@@ -202,10 +202,10 @@ def get_status_mapping():
             return {}
             
         status_mapping = {}
-        for status in root.findall(".//status"):
+        for status in root.findall(".//statusList/status"):
             value = status.find("value")
             title = status.find("title")
-            if value is not None and title is not None:
+            if value is not None and value.text and title is not None and title.text:
                 status_mapping[value.text] = title.text.strip()
                 logger.info(f"Found status mapping: {value.text} -> {title.text.strip()}")
         
@@ -218,42 +218,18 @@ def get_status_mapping():
 def get_status_name(task_id: int, status_value: int) -> str:
     """Получает название статуса из Planfix API."""
     try:
-        # Формируем XML запрос для получения информации о задаче
-        body = (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            '<request method="task.get">'
-            f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
-            '<task>'
-            f'<id>{task_id}</id>'
-            '<general>1</general>'
-            '</task>'
-            '</request>'
-        )
+        # Получаем маппинг статусов, если он еще не получен
+        global STATUS_MAPPING
+        if not STATUS_MAPPING:
+            STATUS_MAPPING = get_status_mapping()
         
-        # Отправляем запрос
-        response = requests.post(
-            os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
-            data=body.encode('utf-8'),
-            headers={'Content-Type': 'application/xml'},
-            auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
-        )
-        response.raise_for_status()
-        
-        # Парсим XML ответ
-        root = ET.fromstring(response.text)
-        if root.attrib.get("status") == "error":
-            code = root.findtext("code")
-            message = root.findtext("message")
-            logger.error(f"Planfix API error for task {task_id}: code={code}, message={message}")
-            return ""
-            
-        # Получаем название статуса из системного поля
-        status_name = root.findtext(".//task/statusName")
+        # Получаем название статуса из маппинга
+        status_name = STATUS_MAPPING.get(str(status_value))
         if status_name:
-            logger.info(f"Found status name for task {task_id}: {status_name}")
-            return status_name.strip()
-                
-        logger.warning(f"Status name not found for task {task_id}")
+            logger.info(f"Found status name for task {task_id}: {status_name} (value: {status_value})")
+            return status_name
+            
+        logger.warning(f"Status value {status_value} not found in mapping for task {task_id}")
         return ""
         
     except Exception as e:
