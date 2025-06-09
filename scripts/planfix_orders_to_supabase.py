@@ -144,25 +144,37 @@ def parse_date(date_str):
             continue
     return None
 
-def get_status_name(status_id, status_set):
+def get_status_name(status_id, task_id):
     """
-    Получает название статуса из Planfix API
+    Получает название статуса из Planfix через task.getPossibleStatusToChange
+    :param status_id: ID статуса задачи
+    :param task_id: ID самой задачи
+    :return: Название статуса или None
     """
     try:
         params = {
-            'status': {
-                'id': status_id,
-                'statusSet': status_set
-            }
+            "task": {"id": task_id}
         }
-        response_xml = planfix_utils.make_planfix_request('status.get', params)
+
+        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
         root = ET.fromstring(response_xml)
-        status_name_element = root.find(".//status/name")
-        if status_name_element is not None and status_name_element.text:
-            return status_name_element.text.strip()
+
+        # Поиск статуса по значению (value == status_id)
+        for status_elem in root.findall(".//statusList/status"):
+            value_elem = status_elem.find("value")
+            title_elem = status_elem.find("title")
+
+            if value_elem is not None and value_elem.text == str(status_id) and title_elem is not None:
+                status_name = title_elem.text.strip()
+                logger.info(f"Found status name for task_id={task_id}, status_id={status_id}: {status_name}")
+                return status_name
+
+        logger.warning(f"No status name found for status_id={status_id}, task_id={task_id}")
+        return None
+
     except Exception as e:
-        logger.error(f"Error getting status name for status_id={status_id}, status_set={status_set}: {e}")
-    return None
+        logger.error(f"Error getting status name for status_id={status_id}, task_id={task_id}: {e}")
+        return None
 
 def parse_orders(xml_text):
     root = ET.fromstring(xml_text)
@@ -192,14 +204,14 @@ def parse_orders(xml_text):
             el = task.find(tag)
             return el.text if el is not None else None
         title = get_text('title')
+        task_id = get_text('id')
         
         # Получаем статус и его название
         status = get_text('status')
-        status_set = get_text('statusSet')
         status_name = None
-        if status and status_set:
-            status_name = get_status_name(status, status_set)
-            logger.info(f"Retrieved status name for order {title}: status={status}, status_set={status_set}, status_name={status_name}")
+        if status and task_id:
+            status_name = get_status_name(status, task_id)
+            logger.info(f"Retrieved status name for order {title}: task_id={task_id}, status={status}, status_name={status_name}")
         
         # Логируем информацию только для заказа A-10051
         if title and 'A-10051' in title:
@@ -207,7 +219,7 @@ def parse_orders(xml_text):
             if title and '/' in title:
                 task_type = title.split('/')[0].strip()
                 
-            logger.info(f"Order {title}: status={status}, status_name={status_name}")
+            logger.info(f"Order {title}: task_id={task_id}, status={status}, status_name={status_name}")
             
             # Логируем все customData для этого заказа
             custom_data_root = task.find('customData')
