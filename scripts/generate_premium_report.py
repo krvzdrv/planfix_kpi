@@ -46,24 +46,11 @@ def get_kpi_data(conn, month, year):
             WITH task_counts AS (
                 SELECT 
                     t.manager,
-                    COUNT(*) FILTER (WHERE t.status = 'NWI') as nwi_count,
-                    COUNT(*) FILTER (WHERE t.status = 'WTR') as wtr_count,
-                    COUNT(*) FILTER (WHERE t.status = 'PSK') as psk_count,
-                    COUNT(*) FILTER (WHERE t.status = 'WDM') as wdm_count,
-                    COUNT(*) FILTER (WHERE t.status = 'PRZ') as prz_count,
-                    COUNT(*) FILTER (WHERE t.status = 'KZI') as kzi_count,
-                    COUNT(*) FILTER (WHERE t.status = 'ZKL') as zkl_count,
-                    COUNT(*) FILTER (WHERE t.status = 'SPT') as spt_count,
-                    COUNT(*) FILTER (WHERE t.status = 'MAT') as mat_count,
-                    COUNT(*) FILTER (WHERE t.status = 'TPY') as tpy_count,
-                    COUNT(*) FILTER (WHERE t.status = 'MSP') as msp_count,
-                    COUNT(*) FILTER (WHERE t.status = 'NOW') as now_count,
-                    COUNT(*) FILTER (WHERE t.status = 'OPI') as opi_count,
-                    COUNT(*) FILTER (WHERE t.status = 'WRK') as wrk_count,
                     COUNT(*) FILTER (WHERE t.status = 'TTL') as ttl_count,
-                    COUNT(*) FILTER (WHERE t.status = 'OFW') as ofw_count,
-                    COUNT(*) FILTER (WHERE t.status = 'ZAM') as zam_count,
-                    COUNT(*) FILTER (WHERE t.status = 'PRC') as prc_count
+                    COUNT(*) FILTER (WHERE t.status = 'NWI') as nwi_count,
+                    COUNT(*) FILTER (WHERE t.status = 'PSK') as psk_count,
+                    COUNT(*) FILTER (WHERE t.status = 'PRZ') as prz_count,
+                    COUNT(*) FILTER (WHERE t.status = 'ZKL') as zkl_count
                 FROM tasks t
                 WHERE EXTRACT(MONTH FROM t.date) = %s 
                 AND EXTRACT(YEAR FROM t.date) = %s
@@ -83,24 +70,11 @@ def get_kpi_data(conn, month, year):
             )
             SELECT 
                 tc.manager,
-                tc.nwi_count,
-                tc.wtr_count,
-                tc.psk_count,
-                tc.wdm_count,
-                tc.prz_count,
-                tc.kzi_count,
-                tc.zkl_count,
-                tc.spt_count,
-                tc.mat_count,
-                tc.tpy_count,
-                tc.msp_count,
-                tc.now_count,
-                tc.opi_count,
-                tc.wrk_count,
                 tc.ttl_count,
-                tc.ofw_count,
-                tc.zam_count,
-                tc.prc_count,
+                tc.nwi_count,
+                tc.psk_count,
+                tc.prz_count,
+                tc.zkl_count,
                 COALESCE(cs.fakt_amount, 0) as fakt_amount,
                 COALESCE(cs.dlug_amount, 0) as dlug_amount,
                 COALESCE(cs.brak_amount, 0) as brak_amount
@@ -111,27 +85,14 @@ def get_kpi_data(conn, month, year):
         for row in cur.fetchall():
             manager = row[0]
             kpi_data[manager] = {
-                'NWI': row[1],
-                'WTR': row[2],
+                'TTL': row[1],
+                'NWI': row[2],
                 'PSK': row[3],
-                'WDM': row[4],
-                'PRZ': row[5],
-                'KZI': row[6],
-                'ZKL': row[7],
-                'SPT': row[8],
-                'MAT': row[9],
-                'TPY': row[10],
-                'MSP': row[11],
-                'NOW': row[12],
-                'OPI': row[13],
-                'WRK': row[14],
-                'TTL': row[15],
-                'OFW': row[16],
-                'ZAM': row[17],
-                'PRC': row[18],
-                'fakt_amount': row[19],
-                'dlug_amount': row[20],
-                'brak_amount': row[21],
+                'PRZ': row[4],
+                'ZKL': row[5],
+                'fakt_amount': row[6],
+                'dlug_amount': row[7],
+                'brak_amount': row[8],
                 'revenue_plan': revenue_plans.get(manager, 0)
             }
             
@@ -142,47 +103,21 @@ def calculate_premium(kpi_data):
     premium_data = {}
     for manager, data in kpi_data.items():
         # Рассчитываем показатели
-        nwi = data['NWI'] / 100 if data['NWI'] > 0 else 0
-        wtr = data['WTR'] / 100 if data['WTR'] > 0 else 0
-        psk = data['PSK'] / 100 if data['PSK'] > 0 else 0
-        wdm = data['WDM'] / 100 if data['WDM'] > 0 else 0
-        prz = data['PRZ'] / 100 if data['PRZ'] > 0 else 0
-        kzi = data['KZI'] / 100 if data['KZI'] > 0 else 0
-        zkl = data['ZKL'] / 100 if data['ZKL'] > 0 else 0
-        spt = data['SPT'] / 100 if data['SPT'] > 0 else 0
-        mat = data['MAT'] / 100 if data['MAT'] > 0 else 0
-        tpy = data['TPY'] / 100 if data['TPY'] > 0 else 0
-        msp = data['MSP'] / 100 if data['MSP'] > 0 else 0
-        now = data['NOW'] / 100 if data['NOW'] > 0 else 0
-        opi = data['OPI'] / 100 if data['OPI'] > 0 else 0
-        wrk = data['WRK'] / 100 if data['WRK'] > 0 else 0
         ttl = data['TTL'] / 100 if data['TTL'] > 0 else 0
-        ofw = data['OFW'] / 100 if data['OFW'] > 0 else 0
-        zam = data['ZAM'] / 100 if data['ZAM'] > 0 else 0
-        prc = data['PRC'] / 100 if data['PRC'] > 0 else 0
+        nwi = data['NWI'] / 100 if data['NWI'] > 0 else 0
+        psk = data['PSK'] / 100 if data['PSK'] > 0 else 0
+        prz = data['PRZ'] / 100 if data['PRZ'] > 0 else 0
+        zkl = data['ZKL'] / 100 if data['ZKL'] > 0 else 0
 
         # Округляем каждый показатель до 2 знаков после запятой
-        nwi = round(nwi, 2)
-        wtr = round(wtr, 2)
-        psk = round(psk, 2)
-        wdm = round(wdm, 2)
-        prz = round(prz, 2)
-        kzi = round(kzi, 2)
-        zkl = round(zkl, 2)
-        spt = round(spt, 2)
-        mat = round(mat, 2)
-        tpy = round(tpy, 2)
-        msp = round(msp, 2)
-        now = round(now, 2)
-        opi = round(opi, 2)
-        wrk = round(wrk, 2)
         ttl = round(ttl, 2)
-        ofw = round(ofw, 2)
-        zam = round(zam, 2)
-        prc = round(prc, 2)
+        nwi = round(nwi, 2)
+        psk = round(psk, 2)
+        prz = round(prz, 2)
+        zkl = round(zkl, 2)
 
         # Суммируем округленные показатели
-        total = nwi + wtr + psk + wdm + prz + kzi + zkl + spt + mat + tpy + msp + now + opi + wrk + ttl + ofw + zam + prc
+        total = ttl + nwi + psk + prz + zkl
 
         # Базовая премия
         base = 2000
@@ -191,24 +126,11 @@ def calculate_premium(kpi_data):
         premium = round(total * base, 0)
 
         premium_data[manager] = {
-            'NWI': nwi,
-            'WTR': wtr,
-            'PSK': psk,
-            'WDM': wdm,
-            'PRZ': prz,
-            'KZI': kzi,
-            'ZKL': zkl,
-            'SPT': spt,
-            'MAT': mat,
-            'TPY': tpy,
-            'MSP': msp,
-            'NOW': now,
-            'OPI': opi,
-            'WRK': wrk,
             'TTL': ttl,
-            'OFW': ofw,
-            'ZAM': zam,
-            'PRC': prc,
+            'NWI': nwi,
+            'PSK': psk,
+            'PRZ': prz,
+            'ZKL': zkl,
             'SUM': total,
             'FND': base,
             'PRK': premium,
@@ -244,7 +166,7 @@ def generate_premium_report(conn):
     report.append("─" * (len(header) + 2))
     
     # Показатели в нужном порядке
-    metrics = ['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC']
+    metrics = ['TTL', 'NWI', 'PSK', 'PRZ', 'ZKL']
     for metric in metrics:
         line = f"{metric:3} |"
         for manager in MANAGERS_KPI:
