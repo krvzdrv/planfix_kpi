@@ -117,7 +117,7 @@ def get_planfix_orders(page):
         os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_USER_TOKEN"))
+        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
     )
     response.raise_for_status()
     return response.text
@@ -246,13 +246,13 @@ def main():
     # Добавляем отладочный вывод
     logger.info("Environment variables:")
     logger.info(f"PLANFIX_API_KEY: {os.environ.get('PLANFIX_API_KEY')[:3]}..." if os.environ.get('PLANFIX_API_KEY') else "Not set")
-    logger.info(f"PLANFIX_USER_TOKEN: {os.environ.get('PLANFIX_USER_TOKEN')[:3]}..." if os.environ.get('PLANFIX_USER_TOKEN') else "Not set")
+    logger.info(f"PLANFIX_TOKEN: {os.environ.get('PLANFIX_TOKEN')[:3]}..." if os.environ.get('PLANFIX_TOKEN') else "Not set")
     logger.info(f"PLANFIX_ACCOUNT: {os.environ.get('PLANFIX_ACCOUNT')}")
     logger.info(f"PLANFIX_API_URL: {os.environ.get('PLANFIX_API_URL')}")
 
     required_env_vars = {
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_USER_TOKEN': planfix_utils.PLANFIX_USER_TOKEN,
+        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
         'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
         'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
