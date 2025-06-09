@@ -93,7 +93,7 @@ def get_active_kpi_metrics(conn, month, year):
     with conn.cursor() as cur:
         cur.execute("""
             SELECT 
-                manager,
+                menedzer,
                 metrics_for_calculation,
                 revenue_plan,
                 kpi_base
