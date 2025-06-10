@@ -91,45 +91,30 @@ def get_active_kpi_metrics(conn, month, year):
     """Получение активных KPI метрик для текущего месяца"""
     cur = conn.cursor()
     try:
-        # Подготавливаем списки имен и ID менеджеров
-        PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-        PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
-        
         cur.execute("""
             SELECT 
-                COALESCE(menedzher, menedzer_id) as manager,
                 metric_name,
                 planned_value
             FROM kpi_metrics
             WHERE EXTRACT(YEAR FROM month) = %s
             AND EXTRACT(MONTH FROM month) = %s
             AND is_active = true
-            AND (
-                menedzher IN %s 
-                OR menedzer_id IN %s
-            )
-            ORDER BY COALESCE(menedzher, menedzer_id), metric_name
-        """, (year, month, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
+            ORDER BY metric_name
+        """, (year, month))
         
         results = cur.fetchall()
         active_metrics = {}
         
-        for row in results:
-            manager = row[0]
-            metric_name = row[1]
-            planned_value = row[2]
-            
-            # Если manager - это ID, находим соответствующее имя
-            if manager in PLANFIX_USER_IDS:
-                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
-            
-            if manager not in active_metrics:
-                active_metrics[manager] = []
-            
-            active_metrics[manager].append({
-                'metric_name': metric_name,
-                'planned_value': planned_value
-            })
+        # Создаем одинаковые метрики для всех менеджеров
+        for manager in [m['planfix_user_name'] for m in MANAGERS_KPI]:
+            active_metrics[manager] = []
+            for row in results:
+                metric_name = row[0]
+                planned_value = row[1]
+                active_metrics[manager].append({
+                    'metric_name': metric_name,
+                    'planned_value': planned_value
+                })
         
         return active_metrics
     finally:
