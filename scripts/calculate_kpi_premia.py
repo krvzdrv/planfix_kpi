@@ -161,7 +161,7 @@ def get_actual_kpi_values(conn, month, year):
         # Запрос для получения статусов заказов
         order_query = """
             SELECT 
-                COALESCE(menedzher, menedzer_id) as manager,
+                menedzher as manager,
                 status,
                 COUNT(*) as count
             FROM planfix_orders
@@ -169,33 +169,27 @@ def get_actual_kpi_values(conn, month, year):
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
             AND status IN ('OFW', 'ZAM', 'PRC')
             AND is_deleted = false
-            AND (
-                menedzher IN %s 
-                OR menedzer_id IN %s
-            )
-            GROUP BY COALESCE(menedzher, menedzer_id), status
+            AND menedzher IN %s
+            GROUP BY menedzher, status
         """
         
-        cur.execute(order_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
+        cur.execute(order_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES))
         order_results = cur.fetchall()
         
         # Запрос для получения дополнительных премий
         premia_query = """
             SELECT 
-                COALESCE(menedzher, menedzer_id) as manager,
+                menedzher as manager,
                 COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
             FROM planfix_orders
             WHERE TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-            AND (
-                menedzher IN %s 
-                OR menedzer_id IN %s
-            )
+            AND menedzher IN %s
             AND is_deleted = false
-            GROUP BY COALESCE(menedzher, menedzer_id)
+            GROUP BY menedzher
         """
         
-        cur.execute(premia_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
+        cur.execute(premia_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES))
         premia_results = cur.fetchall()
         
         # Обработка результатов
@@ -204,10 +198,6 @@ def get_actual_kpi_values(conn, month, year):
             manager = row[0]
             status = row[1]
             count = row[2]
-            
-            # Если manager - это ID, находим соответствующее имя
-            if manager in PLANFIX_USER_IDS:
-                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
             
             if manager not in actual_values:
                 actual_values[manager] = {
@@ -223,10 +213,6 @@ def get_actual_kpi_values(conn, month, year):
         for row in premia_results:
             manager = row[0]
             premia = row[1]
-            
-            # Если manager - это ID, находим соответствующее имя
-            if manager in PLANFIX_USER_IDS:
-                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
             
             if manager not in actual_values:
                 actual_values[manager] = {
