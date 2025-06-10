@@ -151,29 +151,32 @@ def get_actual_kpi_values(conn, month, year):
         PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
         PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
         
-        # Получаем первый и последний день месяца
+        # Формируем даты для фильтрации
         first_day = datetime(year, month, 1)
         last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        first_day_str = first_day.strftime('%Y-%m-%d')
+        last_day_str = last_day.strftime('%Y-%m-%d')
         
-        first_day_str = first_day.strftime('%d-%m-%Y 00:00')
-        last_day_str = last_day.strftime('%d-%m-%Y 23:59')
-        
-        # Запрос для получения статусов заказов
+        # SQL запрос для получения данных по заказам
         order_query = """
             SELECT 
-                menedzher as manager,
-                status,
-                COUNT(*) as count
+                menedzher,
+                COUNT(*) as total_orders,
+                COUNT(CASE WHEN status = 'Zrealizowane' THEN 1 END) as completed_orders,
+                COUNT(CASE WHEN status = 'Anulowane' THEN 1 END) as cancelled_orders,
+                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NOT NULL THEN 1 END) as on_time_orders,
+                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NULL THEN 1 END) as late_orders,
+                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NOT NULL 
+                    AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s THEN 1 END) as on_time_orders_with_date
             FROM planfix_orders
-            WHERE TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
-            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-            AND status IN ('OFW', 'ZAM', 'PRC')
-            AND is_deleted = false
-            AND menedzher IN %s
-            GROUP BY menedzher, status
+            WHERE 
+                EXTRACT(YEAR FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s
+                AND EXTRACT(MONTH FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s
+                AND menedzher = ANY(%s)
+            GROUP BY menedzher
         """
         
-        cur.execute(order_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES))
+        cur.execute(order_query, (last_day_str, year, month, PLANFIX_USER_NAMES))
         order_results = cur.fetchall()
         
         # Запрос для получения дополнительных премий
@@ -196,8 +199,12 @@ def get_actual_kpi_values(conn, month, year):
         actual_values = {}
         for row in order_results:
             manager = row[0]
-            status = row[1]
-            count = row[2]
+            total_orders = row[1]
+            completed_orders = row[2]
+            cancelled_orders = row[3]
+            on_time_orders = row[4]
+            late_orders = row[5]
+            on_time_orders_with_date = row[6]
             
             if manager not in actual_values:
                 actual_values[manager] = {
@@ -207,7 +214,9 @@ def get_actual_kpi_values(conn, month, year):
                     'premia': 0
                 }
             
-            actual_values[manager][status] = count
+            actual_values[manager]['OFW'] = completed_orders
+            actual_values[manager]['ZAM'] = cancelled_orders
+            actual_values[manager]['PRC'] = completed_orders
         
         # Добавляем премии
         for row in premia_results:
