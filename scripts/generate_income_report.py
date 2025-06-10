@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import psycopg2
 import requests
 from dotenv import load_dotenv
@@ -43,104 +43,113 @@ def format_percent(val):
     # всегда 5 символов для числа: 3 для целой части, 1 для точки, 1 для дробной
     return f"({val:5.1f}%)"
 
-def get_income_data(conn, month, year):
-    """Получает данные о доходах из Supabase."""
-    try:
-        # Получаем первый и последний день месяца
-        first_day = datetime(year, month, 1)
-        if month == 12:
-            last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-
-        # Форматируем даты в нужный формат для PostgreSQL
-        first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
-        last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Получаем все заказы за указанный месяц
-        with conn.cursor() as cur:
-            # Проверяем всех менеджеров в базе
-            cur.execute("""
-                SELECT DISTINCT menedzher 
-                FROM planfix_orders 
-                WHERE is_deleted = false
-            """)
-            all_managers = [row[0] for row in cur.fetchall()]
-            logger.info(f"All managers in database: {all_managers}")
-
-            # Получаем все заказы с датой реализации в текущем месяце (fakt)
-            cur.execute("""
-                SELECT 
-                    menedzher,
-                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as fakt
-                FROM planfix_orders
-                WHERE 
-                    TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
-                    AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-                    AND is_deleted = false
-                GROUP BY menedzher
-            """, (first_day_str, last_day_str))
-            fakt_data = {row[0]: row[1] for row in cur.fetchall()}
-            logger.info(f"Fakt data: {fakt_data}")
-
-            # Получаем все заказы со статусом 140 (dlug)
-            cur.execute("""
-                SELECT 
-                    menedzher,
-                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as dlug
-                FROM planfix_orders
-                WHERE 
-                    status = 140
-                    AND is_deleted = false
-                GROUP BY menedzher
-            """)
-            dlug_data = {row[0]: row[1] for row in cur.fetchall()}
-            logger.info(f"Dlug data: {dlug_data}")
-
-            # Получаем все заказы (brak)
-            cur.execute("""
-                SELECT 
-                    menedzher,
-                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as brak
-                FROM planfix_orders
-                WHERE 
-                    is_deleted = false
-                GROUP BY menedzher
-            """)
-            brak_data = {row[0]: row[1] for row in cur.fetchall()}
-            logger.info(f"Brak data: {brak_data}")
-
-            # Получаем плановую выручку
-            cur.execute("""
-                SELECT 
-                    manager,
-                    revenue_plan
-                FROM kpi_metrics
-                WHERE 
-                    year = %s 
-                    AND month = %s
-            """, (year, month))
-            plan_data = {row[0]: row[1] for row in cur.fetchall()}
-            logger.info(f"Plan data: {plan_data}")
-
-        # Объединяем данные
-        income_data = {}
-        all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()) + list(brak_data.keys()))
-        logger.info(f"Combined managers: {all_managers}")
-        
-        for manager in all_managers:
-            income_data[manager] = {
-                'fakt': fakt_data.get(manager, 0),
-                'dlug': dlug_data.get(manager, 0),
-                'brak': brak_data.get(manager, 0),
-                'plan': plan_data.get(manager, 0)
+def get_revenue_data(conn, current_month, current_year):
+    """
+    Get revenue data from planfix_orders and kpi_metrics tables.
+    """
+    cursor = conn.cursor()
+    
+    # Debug query to check order A-10064
+    cursor.execute("""
+        SELECT 
+            title,
+            menedzher,
+            data_realizacji,
+            data_przekazania_do_weryfikacji,
+            wartosc_netto_pln,
+            TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') as parsed_realization_date,
+            TO_TIMESTAMP(data_przekazania_do_weryfikacji, 'DD-MM-YYYY HH24:MI') as parsed_verification_date,
+            CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS NUMERIC) as parsed_netto
+        FROM planfix_orders
+        WHERE title = 'A-10064'
+        LIMIT 1;
+    """)
+    debug_row = cursor.fetchone()
+    if debug_row:
+        logger.info("\nDebug - Order A-10064 details:")
+        logger.info(f"Title: {debug_row[0]}")
+        logger.info(f"Manager: {debug_row[1]}")
+        logger.info(f"Realization Date: {debug_row[2]}")
+        logger.info(f"Verification Date: {debug_row[3]}")
+        logger.info(f"Netto (raw): {debug_row[4]}")
+        logger.info(f"Parsed Realization Date: {debug_row[5]}")
+        logger.info(f"Parsed Verification Date: {debug_row[6]}")
+        logger.info(f"Parsed Netto: {debug_row[7]}")
+    else:
+        logger.info("Order A-10064 not found in the database.")
+    
+    # Get revenue plan (one value for all managers)
+    cursor.execute("""
+        SELECT revenue_plan
+        FROM kpi_metrics
+        WHERE month = %s AND year = %s
+        LIMIT 1
+    """, (str(current_month), str(current_year)))
+    plan_row = cursor.fetchone()
+    revenue_plan = float(plan_row[0]) if plan_row and plan_row[0] is not None else 40000.00
+    
+    # Get actual revenue data from planfix_orders
+    cursor.execute("""
+        WITH fakt_data AS (
+            SELECT 
+                menedzher,
+                SUM(CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS NUMERIC)) as total_fakt
+            FROM planfix_orders
+            WHERE is_deleted = false
+              AND data_realizacji IS NOT NULL
+              AND data_realizacji != ''
+              AND (
+                (EXTRACT(MONTH FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s AND EXTRACT(YEAR FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s)
+                OR
+                (EXTRACT(MONTH FROM TO_DATE(data_realizacji, 'DD-MM-YYYY')) = %s AND EXTRACT(YEAR FROM TO_DATE(data_realizacji, 'DD-MM-YYYY')) = %s)
+              )
+            GROUP BY menedzher
+        ),
+        dlug_data AS (
+            SELECT 
+                menedzher,
+                SUM(CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS NUMERIC)) as total_dlug
+            FROM planfix_orders
+            WHERE is_deleted = false
+              AND data_przekazania_do_weryfikacji IS NOT NULL
+              AND data_przekazania_do_weryfikacji != ''
+              AND (data_realizacji IS NULL OR data_realizacji = '')
+              AND (
+                (EXTRACT(MONTH FROM TO_TIMESTAMP(data_przekazania_do_weryfikacji, 'DD-MM-YYYY HH24:MI')) = %s AND EXTRACT(YEAR FROM TO_TIMESTAMP(data_przekazania_do_weryfikacji, 'DD-MM-YYYY HH24:MI')) = %s)
+                OR
+                (EXTRACT(MONTH FROM TO_DATE(data_przekazania_do_weryfikacji, 'DD-MM-YYYY')) = %s AND EXTRACT(YEAR FROM TO_DATE(data_przekazania_do_weryfikacji, 'DD-MM-YYYY')) = %s)
+              )
+            GROUP BY menedzher
+        )
+        SELECT 
+            f.menedzher,
+            f.total_fakt,
+            d.total_dlug
+        FROM fakt_data f
+        LEFT JOIN dlug_data d ON f.menedzher = d.menedzher
+        UNION ALL
+        SELECT 
+            d.menedzher,
+            0 as total_fakt,
+            d.total_dlug
+        FROM dlug_data d
+        LEFT JOIN fakt_data f ON d.menedzher = f.menedzher
+        WHERE f.menedzher IS NULL
+    """, (current_month, current_year, current_month, current_year, current_month, current_year, current_month, current_year))
+    
+    revenue_data = {}
+    for row in cursor.fetchall():
+        manager_id = str(row[0]) if row[0] is not None else None
+        total_fakt = float(row[1] or 0)
+        total_dlug = float(row[2] or 0)
+        if manager_id:
+            revenue_data[manager_id] = {
+                'plan': revenue_plan,
+                'fakt': total_fakt,
+                'dlug': total_dlug
             }
-            logger.info(f"Manager {manager} data: {income_data[manager]}")
-
-        return income_data
-    except Exception as e:
-        logger.error(f"Error getting income data: {e}")
-        return {}
+    
+    return revenue_data
 
 def generate_income_report(conn):
     """
@@ -150,23 +159,24 @@ def generate_income_report(conn):
     current_month = current_date.month
     current_year = current_date.year
     
-    revenue_data = get_income_data(conn, current_month, current_year)
+    revenue_data = get_revenue_data(conn, current_month, current_year)
     
     # Сначала собираем все значения для выравнивания
     all_lines = []
     for manager in MANAGERS_KPI:
         manager_id = manager['planfix_user_id']
         display_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_id, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
+        data = revenue_data.get(manager_id, {'plan': 40000.0, 'fakt': 0.0, 'dlug': 0.0})
+        plan = round(data['plan'])
         fakt = round(data['fakt'])
         dlug = round(data['dlug'])
-        brak = round(data['brak'])
-        total = fakt + dlug + brak
-        fakt_percent = (fakt / total) * 100 if total > 0 else 0
-        dlug_percent = (dlug / total) * 100 if total > 0 else 0
-        brak_percent = (brak / total) * 100 if total > 0 else 0
+        brak = plan - fakt - dlug
+        fakt_percent = (fakt / plan) * 100 if plan > 0 else 0
+        dlug_percent = (dlug / plan) * 100 if plan > 0 else 0
+        brak_percent = (brak / plan) * 100 if plan > 0 else 0
         all_lines.append({
             'manager': display_name,
+            'plan': plan,
             'fakt': fakt,
             'dlug': dlug,
             'brak': brak,
@@ -174,85 +184,23 @@ def generate_income_report(conn):
             'dlug_percent': dlug_percent,
             'brak_percent': brak_percent
         })
-    
-    # Находим максимальную длину суммы для выравнивания по PLN
+    # Находим максимальную длину суммы для выравнивания
     max_sum_len = 0
     for l in all_lines:
-        for key in ['fakt', 'dlug', 'brak']:
+        for key in ['fakt', 'dlug', 'brak', 'plan']:
             max_sum_len = max(max_sum_len, len(format_int_currency(l[key])))
-    
-    # Длина бара = 31 символ
-    bar_length = 31
-    
-    # Собираем все проценты в строковом виде для выравнивания
-    percent_strs = []
-    for l in all_lines:
-        percent_strs.append(f"({l['fakt_percent']:4.1f}%)")
-        percent_strs.append(f"({l['dlug_percent']:4.1f}%)")
-        percent_strs.append(f"({l['brak_percent']:4.1f}%)")
-    max_percent_len = max(len(s) for s in percent_strs)
-    
-    # Для выравнивания: после PLN добавляем столько пробелов, чтобы скобка с процентом начиналась на одной позиции
-    def line_with_percent(label, value, percent):
-        sum_str = format_int_currency(value).rjust(max_sum_len)
-        # Форматируем процент с выравниванием по символу '%'
-        percent_str = f"({percent:4.1f}%)"
-        # позиция, где должна начинаться скобка
-        after_pln_pos = max_sum_len + 8  # 8 = len(' PLN ') + 2 (дополнительные пробелы)
-        line = f" {label} {sum_str} PLN "
-        # Добавляем пробелы так, чтобы символ '%' был на одной позиции
-        spaces = ' ' * (after_pln_pos - len(line))
-        return f"{line}{spaces}{percent_str}"
-    
-    def generate_proportional_bar(fakt_percent, dlug_percent, brak_percent, total_length):
-        """
-        Generate a proportional progress bar showing fakt, dlug, brak.
-        """
-        # Убираем 2 символа для квадратных скобок
-        inner_length = total_length - 2
-        
-        fakt_blocks = int((fakt_percent / 100) * inner_length)
-        dlug_blocks = int((dlug_percent / 100) * inner_length)
-        # Остальное - brak
-        brak_blocks = inner_length - fakt_blocks - dlug_blocks
-        
-        # Корректируем если есть остаток из-за округления
-        if fakt_blocks + dlug_blocks + brak_blocks < inner_length:
-            if brak_percent > 0:
-                brak_blocks += inner_length - (fakt_blocks + dlug_blocks + brak_blocks)
-            elif dlug_percent > 0:
-                dlug_blocks += inner_length - (fakt_blocks + dlug_blocks + brak_blocks)
-            else:
-                fakt_blocks += inner_length - (fakt_blocks + dlug_blocks + brak_blocks)
-        
-        bar = '█' * fakt_blocks + '▒' * dlug_blocks + '░' * brak_blocks
-        return f"[{bar}]"
-    
     # Формируем отчет
     report = []
-    report.append(f"PRZYCHODY {current_month}/{current_year}")
-    report.append("")
-    
+    report.append(f"PRZYCHODY {current_month}/{current_year}\n")
     for l in all_lines:
         report.append(f"{l['manager']}:")
-        
-        # Генерируем пропорциональный бар
-        progress_bar = generate_proportional_bar(
-            l['fakt_percent'], 
-            l['dlug_percent'], 
-            l['brak_percent'], 
-            bar_length
-        )
-        report.append(progress_bar)
-        
-        report.append(line_with_percent('█  Fakt:', l['fakt'], l['fakt_percent']))
-        report.append(line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']))
-        report.append(line_with_percent('░  Brak:', l['brak'], l['brak_percent']))
-        plan_sum = format_int_currency(l['plan']).rjust(max_sum_len)
-        report.append(f"    Plan: {plan_sum} PLN")
-        report.append("")
-    
-    return "```\n" + "\n".join(report).rstrip() + "\n```"
+        progress_bar = generate_progress_bar(l['fakt_percent'])
+        report.append(f"[{progress_bar}]")
+        report.append(f" █  Fakt: {format_int_currency(l['fakt']).rjust(max_sum_len)} PLN  {format_percent(l['fakt_percent'])}")
+        report.append(f" ▒  Dług: {format_int_currency(l['dlug']).rjust(max_sum_len)} PLN  {format_percent(l['dlug_percent'])}")
+        report.append(f" ░  Brak: {format_int_currency(l['brak']).rjust(max_sum_len)} PLN {format_percent(l['brak_percent'])}")
+        report.append(f"    Plan: {format_int_currency(l['plan']).rjust(max_sum_len)} PLN")
+    return "```\n" + "\n".join(report) + "\n```"
 
 def send_to_telegram(message):
     """
@@ -266,20 +214,16 @@ def send_to_telegram(message):
         return False
     
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': message,
-        'parse_mode': 'Markdown'
+    data = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "HTML"
     }
     
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code != 200:
-            logger.error(f"Failed to send message to Telegram: {response.text}")
-            return False
-        else:
-            logger.info("Message sent successfully to Telegram")
-            return True
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        return True
     except Exception as e:
         logger.error(f"Failed to send message to Telegram: {e}")
         return False
