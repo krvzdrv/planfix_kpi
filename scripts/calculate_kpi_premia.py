@@ -248,10 +248,11 @@ def get_additional_premia(start_date_str: str, end_date_str: str) -> list:
             AND data_realizacji != ''
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
+            AND menedzher IN %s
             AND is_deleted = false
         GROUP BY menedzher;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str), "additional premia")
+    results = _execute_query(query, (start_date_str, end_date_str, tuple(m['planfix_user_id'] for m in MANAGERS_KPI)), "additional premia")
     logger.info(f"Additional premia results: {results}")
     return results
 
