@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import psycopg2
 import requests
 from dotenv import load_dotenv
-from scripts.config import MANAGERS_KPI
+from config import MANAGERS_KPI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -13,7 +13,7 @@ load_dotenv()
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.planfix_utils import (
+from planfix_utils import (
     check_required_env_vars,
     get_supabase_connection
 )
