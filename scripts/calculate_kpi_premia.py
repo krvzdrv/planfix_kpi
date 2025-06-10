@@ -162,11 +162,11 @@ def get_actual_kpi_values(conn, month, year):
             SELECT 
                 menedzher,
                 COUNT(*) as total_orders,
-                COUNT(CASE WHEN status = 'Zrealizowane' THEN 1 END) as completed_orders,
-                COUNT(CASE WHEN status = 'Anulowane' THEN 1 END) as cancelled_orders,
-                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NOT NULL THEN 1 END) as on_time_orders,
-                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NULL THEN 1 END) as late_orders,
-                COUNT(CASE WHEN status = 'Zrealizowane' AND data_realizacji IS NOT NULL 
+                COUNT(CASE WHEN status = 1 THEN 1 END) as completed_orders,
+                COUNT(CASE WHEN status = 2 THEN 1 END) as cancelled_orders,
+                COUNT(CASE WHEN status = 1 AND data_realizacji IS NOT NULL THEN 1 END) as on_time_orders,
+                COUNT(CASE WHEN status = 1 AND data_realizacji IS NULL THEN 1 END) as late_orders,
+                COUNT(CASE WHEN status = 1 AND data_realizacji IS NOT NULL 
                     AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s THEN 1 END) as on_time_orders_with_date
             FROM planfix_orders
             WHERE 
