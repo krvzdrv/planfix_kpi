@@ -88,233 +88,151 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
             conn.close()
 
 def get_active_kpi_metrics(conn, month, year):
-    """Получает список активных KPI показателей и их плановые значения."""
-    active_metrics = {}
-    
-    # Подготавливаем списки имен и ID менеджеров
-    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
-    
-    with conn.cursor() as cur:
+    """Получение активных KPI метрик для текущего месяца"""
+    cur = conn.cursor()
+    try:
+        # Подготавливаем списки имен и ID менеджеров
+        PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+        PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+        
         cur.execute("""
             SELECT 
-                COALESCE(menedzher, menedzer) as manager,
-                metrics_for_calculation,
-                revenue_plan,
-                kpi_base
-            FROM kpi_metrics 
-            WHERE year = %s AND month = %s
+                COALESCE(menedzer, menedzer_id) as manager,
+                metric_name,
+                planned_value
+            FROM kpi_metrics
+            WHERE EXTRACT(YEAR FROM month) = %s
+            AND EXTRACT(MONTH FROM month) = %s
+            AND is_active = true
             AND (
-                menedzher IN %s 
-                OR menedzer IN %s
+                menedzer IN %s 
+                OR menedzer_id IN %s
             )
-        """, (year, month, PLANFIX_USER_IDS, PLANFIX_USER_NAMES))
+            ORDER BY COALESCE(menedzer, menedzer_id), metric_name
+        """, (year, month, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
         
-        for row in cur.fetchall():
+        results = cur.fetchall()
+        active_metrics = {}
+        
+        for row in results:
             manager = row[0]
-            metrics = row[1].split(',') if row[1] else []
-            revenue_plan = row[2]
-            kpi_base = row[3]
+            metric_name = row[1]
+            planned_value = row[2]
             
             # Если manager - это ID, находим соответствующее имя
             if manager in PLANFIX_USER_IDS:
                 manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
             
-            active_metrics[manager] = {
-                'metrics': metrics,
-                'revenue_plan': revenue_plan,
-                'kpi_base': kpi_base
-            }
-    
-    return active_metrics
+            if manager not in active_metrics:
+                active_metrics[manager] = []
+            
+            active_metrics[manager].append({
+                'metric_name': metric_name,
+                'planned_value': planned_value
+            })
+        
+        return active_metrics
+    finally:
+        cur.close()
 
 def get_actual_kpi_values(conn, month, year):
-    """Получает фактические значения KPI показателей."""
-    actual_values = {}
-    
-    # Получаем первый и последний день месяца
-    first_day = datetime(year, month, 1)
-    if month == 12:
-        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-    else:
-        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-    
-    # Форматируем даты
-    first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
-    last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
-    
-    with conn.cursor() as cur:
-        # Получаем значения для клиентских статусов
-        client_query = """
-            WITH client_statuses AS (
-                SELECT menedzer AS manager, 'NWI' as status, COUNT(*) as count
-                FROM planfix_clients
-                WHERE data_dodania_do_nowi IS NOT NULL AND data_dodania_do_nowi != ''
-                    AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') >= %s::date
-                    AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') < %s::date
-                    AND menedzer IN %s
-                    AND is_deleted = false
-                GROUP BY menedzer
-                UNION ALL
-                SELECT menedzer AS manager, 'WTR' as status, COUNT(*) as count
-                FROM planfix_clients
-                WHERE data_dodania_do_w_trakcie IS NOT NULL AND data_dodania_do_w_trakcie != ''
-                    AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s::date
-                    AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s::date
-                    AND menedzer IN %s
-                    AND is_deleted = false
-                GROUP BY menedzer
-                UNION ALL
-                SELECT menedzer AS manager, 'PSK' as status, COUNT(*) as count
-                FROM planfix_clients
-                WHERE data_dodania_do_perspektywiczni IS NOT NULL AND data_dodania_do_perspektywiczni != ''
-                    AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s::date
-                    AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s::date
-                    AND menedzer IN %s
-                    AND is_deleted = false
-                GROUP BY menedzer
-            )
-            SELECT manager, status, count FROM client_statuses;
-        """
+    """Получение фактических значений KPI"""
+    cur = conn.cursor()
+    try:
+        # Подготавливаем списки имен и ID менеджеров
+        PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+        PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
         
-        # Получаем значения для задач
-        task_query = """
-            WITH task_counts AS (
-                SELECT
-                    owner_name AS manager,
-                    CASE 
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                        ELSE NULL
-                    END AS task_type,
-                    COUNT(*) AS task_count
-                FROM planfix_tasks
-                WHERE
-                    data_zakonczenia_zadania IS NOT NULL
-                    AND data_zakonczenia_zadania >= %s::timestamp
-                    AND data_zakonczenia_zadania < %s::timestamp
-                    AND owner_name IN %s
-                    AND is_deleted = false
-                GROUP BY owner_name, task_type
-            ),
-            kzi_counts AS (
-                SELECT
-                    owner_name AS manager,
-                    'KZI' AS task_type,
-                    COUNT(*) AS task_count
-                FROM planfix_tasks
-                WHERE
-                    data_zakonczenia_zadania IS NOT NULL
-                    AND data_zakonczenia_zadania >= %s::timestamp
-                    AND data_zakonczenia_zadania < %s::timestamp
-                    AND owner_name IN %s
-                    AND is_deleted = false
-                    AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
-                    AND wynik = 'Klient jest zainteresowany'
-                GROUP BY owner_name
-            ),
-            ttl_counts AS (
-                SELECT
-                    owner_name AS manager,
-                    'TTL' AS task_type,
-                    COUNT(*) AS task_count
-                FROM planfix_tasks
-                WHERE
-                    data_zakonczenia_zadania IS NOT NULL
-                    AND data_zakonczenia_zadania >= %s::timestamp
-                    AND data_zakonczenia_zadania < %s::timestamp
-                    AND owner_name IN %s
-                    AND is_deleted = false
-                    AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
-                        'Nawiązać pierwszy kontakt',
-                        'Przeprowadzić pierwszą rozmowę telefoniczną',
-                        'Zadzwonić do klienta',
-                        'Przeprowadzić spotkanie',
-                        'Wysłać materiały',
-                        'Odpowiedzieć na pytanie techniczne',
-                        'Zapisać na media społecznościowe',
-                        'Opowiedzieć o nowościach',
-                        'Zebrać opinie',
-                        'Przywrócić klienta'
-                    )
-                GROUP BY owner_name
-            )
-            SELECT 
-                manager,
-                task_type,
-                task_count
-            FROM (
-                SELECT * FROM task_counts
-                UNION ALL
-                SELECT * FROM kzi_counts
-                UNION ALL
-                SELECT * FROM ttl_counts
-            ) combined_results
-            WHERE task_type IS NOT NULL;
-        """
+        # Получаем первый и последний день месяца
+        first_day = datetime(year, month, 1)
+        last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
         
-        # Получаем значения для заказов
+        first_day_str = first_day.strftime('%d-%m-%Y 00:00')
+        last_day_str = last_day.strftime('%d-%m-%Y 23:59')
+        
+        # Запрос для получения статусов заказов
         order_query = """
             SELECT 
-                menedzher,
+                COALESCE(menedzer, menedzer_id) as manager,
                 status,
                 COUNT(*) as count
             FROM planfix_orders
-            WHERE 
-                TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
-                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-                AND status IN ('OFW', 'ZAM', 'PRC')
-                AND is_deleted = false
-            GROUP BY menedzher, status
+            WHERE TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
+            AND status IN ('OFW', 'ZAM', 'PRC')
+            AND is_deleted = false
+            AND (
+                menedzer IN %s 
+                OR menedzer_id IN %s
+            )
+            GROUP BY COALESCE(menedzer, menedzer_id), status
         """
         
-        # Выполняем запросы
-        PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+        cur.execute(order_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
+        order_results = cur.fetchall()
         
-        # Получаем значения клиентских статусов
-        cur.execute(client_query, (
-            first_day.date(), last_day.date(), PLANFIX_USER_NAMES,
-            first_day.date(), last_day.date(), PLANFIX_USER_NAMES,
-            first_day.date(), last_day.date(), PLANFIX_USER_NAMES
-        ))
+        # Запрос для получения дополнительных премий
+        premia_query = """
+            SELECT 
+                COALESCE(menedzer, menedzer_id) as manager,
+                COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
+            FROM planfix_orders
+            WHERE TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
+            AND (
+                menedzer IN %s 
+                OR menedzer_id IN %s
+            )
+            AND is_deleted = false
+            GROUP BY COALESCE(menedzer, menedzer_id)
+        """
         
-        for row in cur.fetchall():
-            manager, status, count = row
+        cur.execute(premia_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
+        premia_results = cur.fetchall()
+        
+        # Обработка результатов
+        actual_values = {}
+        for row in order_results:
+            manager = row[0]
+            status = row[1]
+            count = row[2]
+            
+            # Если manager - это ID, находим соответствующее имя
+            if manager in PLANFIX_USER_IDS:
+                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
+            
             if manager not in actual_values:
-                actual_values[manager] = {}
+                actual_values[manager] = {
+                    'OFW': 0,
+                    'ZAM': 0,
+                    'PRC': 0,
+                    'premia': 0
+                }
+            
             actual_values[manager][status] = count
         
-        # Получаем значения задач
-        cur.execute(task_query, (
-            first_day_str, last_day_str, PLANFIX_USER_NAMES,
-            first_day_str, last_day_str, PLANFIX_USER_NAMES,
-            first_day_str, last_day_str, PLANFIX_USER_NAMES
-        ))
-        
-        for row in cur.fetchall():
-            manager, task_type, count = row
+        # Добавляем премии
+        for row in premia_results:
+            manager = row[0]
+            premia = row[1]
+            
+            # Если manager - это ID, находим соответствующее имя
+            if manager in PLANFIX_USER_IDS:
+                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
+            
             if manager not in actual_values:
-                actual_values[manager] = {}
-            actual_values[manager][task_type] = count
+                actual_values[manager] = {
+                    'OFW': 0,
+                    'ZAM': 0,
+                    'PRC': 0,
+                    'premia': 0
+                }
+            
+            actual_values[manager]['premia'] = premia
         
-        # Получаем значения заказов
-        cur.execute(order_query, (first_day_str, last_day_str))
-        
-        for row in cur.fetchall():
-            manager, status, count = row
-            if manager not in actual_values:
-                actual_values[manager] = {}
-            actual_values[manager][status] = count
-    
-    return actual_values
+        return actual_values
+    finally:
+        cur.close()
 
 def get_additional_premia(conn, month, year):
     """Получает дополнительные премии (PRW) из таблицы planfix_orders."""
@@ -333,7 +251,7 @@ def get_additional_premia(conn, month, year):
     with conn.cursor() as cur:
         cur.execute("""
             SELECT 
-                menedzher,
+                menedzer,
                 COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
             FROM planfix_orders
             WHERE 
@@ -341,9 +259,9 @@ def get_additional_premia(conn, month, year):
                 AND data_realizacji != ''
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-                AND menedzher IN %s
+                AND menedzer IN %s
                 AND is_deleted = false
-            GROUP BY menedzher
+            GROUP BY menedzer
         """, (first_day_str, last_day_str, tuple(m['planfix_user_name'] for m in MANAGERS_KPI)))
         
         for row in cur.fetchall():
