@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 import psycopg2
 import requests
 from dotenv import load_dotenv
-from typing import List, Dict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -77,46 +76,15 @@ CUSTOM_MAP = {
 
 logger = logging.getLogger(__name__)
 
-def get_all_status_mapping():
-    """
-    Получает все доступные статусы из Planfix.
-    :return: Словарь {status_id: status_name}
-    """
-    try:
-        params = {
-            "account": os.environ.get("PLANFIX_ACCOUNT")
-        }
-
-        response_xml = planfix_utils.make_planfix_request("task.getPossibleStatusToChange", params)
-        root = ET.fromstring(response_xml)
-
-        status_mapping = {}
-        for status_elem in root.findall(".//statusList/status"):
-            value_elem = status_elem.find("value")
-            title_elem = status_elem.find("title")
-
-            if value_elem is not None and title_elem is not None:
-                status_mapping[value_elem.text] = title_elem.text.strip()
-                logger.info(f"Found status mapping: {value_elem.text} -> {title_elem.text.strip()}")
-
-        return status_mapping
-
-    except Exception as e:
-        logger.error(f"Error fetching all status names: {e}")
-        return {}
-
 def get_planfix_orders(page):
-    """
-    Получает список заказов из Planfix API
-    """
     headers = {
         'Content-Type': 'application/xml',
         'Accept': 'application/xml'
     }
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        '<request method="task.getList">'
-        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
+        f'<request method="task.getList">'
+        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<filters>'
@@ -130,40 +98,35 @@ def get_planfix_orders(page):
         '  <field>id</field>'
         '  <field>title</field>'
         '  <field>description</field>'
+        '  <field>importance</field>'
         '  <field>status</field>'
         '  <field>statusSet</field>'
-        '  <field>assigner</field>'
-        '  <field>owner</field>'
-        '  <field>dateCreate</field>'
-        '  <field>dateStart</field>'
-        '  <field>dateEnd</field>'
-        '  <field>dateComplete</field>'
-        '  <field>lastUpdateDate</field>'
+        '  <field>statusName</field>'
+        '  <field>checkResult</field>'
         '  <field>type</field>'
+        '  <field>owner</field>'
+        '  <field>parent</field>'
         '  <field>template</field>'
+        '  <field>project</field>'
+        '  <field>client</field>'
+        '  <field>beginDateTime</field>'
+        '  <field>general</field>'
+        '  <field>isOverdued</field>'
+        '  <field>isCloseToDeadline</field>'
+        '  <field>isNotAcceptedInTime</field>'
+        '  <field>isSummary</field>'
+        '  <field>starred</field>'
         '  <field>customData</field>'
         '</fields>'
         '</request>'
     )
     response = requests.post(
-        os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
+        planfix_utils.PLANFIX_API_URL,
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
+        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
     )
     response.raise_for_status()
-    
-    # Добавляем отладочный вывод XML-ответа только для заказа A-10051
-    if page == 1:
-        root = ET.fromstring(response.text)
-        for task in root.findall('.//task'):
-            title = task.findtext('title')
-            if title and 'A-10051' in title:
-                logger.info("XML Response for order A-10051:")
-                task_xml = ET.tostring(task, encoding='unicode')
-                logger.info(task_xml)
-                break
-    
     return response.text
 
 def parse_date(date_str):
@@ -176,181 +139,72 @@ def parse_date(date_str):
             continue
     return None
 
-def get_status_mapping():
-    """Получает маппинг статусов из Planfix API."""
-    try:
-        body = (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            '<request method="task.getPossibleStatusToChange">'
-            f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
-            '</request>'
-        )
-        
-        response = requests.post(
-            os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
-            data=body.encode('utf-8'),
-            headers={'Content-Type': 'application/xml'},
-            auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
-        )
-        response.raise_for_status()
-        
-        root = ET.fromstring(response.text)
-        if root.attrib.get("status") == "error":
-            code = root.findtext("code")
-            message = root.findtext("message")
-            logger.error(f"Planfix API error getting status list: code={code}, message={message}")
-            return {}
-            
-        status_mapping = {}
-        for status in root.findall(".//statusList/status"):
-            value = status.find("value")
-            title = status.find("title")
-            if value is not None and value.text and title is not None and title.text:
-                status_mapping[value.text] = title.text.strip()
-                logger.info(f"Found status mapping: {value.text} -> {title.text.strip()}")
-        
-        return status_mapping
-        
-    except Exception as e:
-        logger.error(f"Error getting status mapping: {str(e)}")
-        return {}
-
-def get_status_name(task_id: int, status_value: int) -> str:
-    """Получает название статуса из Planfix API."""
-    try:
-        # Получаем маппинг статусов, если он еще не получен
-        global STATUS_MAPPING
-        if not STATUS_MAPPING:
-            STATUS_MAPPING = get_status_mapping()
-        
-        # Получаем название статуса из маппинга
-        status_name = STATUS_MAPPING.get(str(status_value))
-        if status_name:
-            logger.info(f"Found status name for task {task_id}: {status_name} (value: {status_value})")
-            return status_name
-            
-        logger.warning(f"Status value {status_value} not found in mapping for task {task_id}")
-        return ""
-        
-    except Exception as e:
-        logger.error(f"Error getting status name for task {task_id}: {str(e)}")
-        return ""
-
-def parse_orders(xml_data: str) -> List[Dict]:
-    """Парсит XML с заказами и возвращает список словарей."""
-    try:
-        root = ET.fromstring(xml_data)
-        orders = []
-        
-        for task in root.findall('.//task'):
-            try:
-                # Получаем основные данные с проверкой на None
-                task_id_elem = task.find('id')
-                if task_id_elem is None or task_id_elem.text is None:
-                    logger.error(f"Task ID is missing or empty")
-                    continue
-                    
-                task_id = int(task_id_elem.text)
-                
-                status_elem = task.find('status')
-                if status_elem is None or status_elem.text is None:
-                    logger.error(f"Status is missing or empty for task {task_id}")
-                    continue
-                    
-                status_value = int(status_elem.text)
-                
-                # Получаем название статуса
-                status_name = get_status_name(task_id, status_value)
-                logger.info(f"Processing order {task_id}: status={status_value}, status_name={status_name}")
-                
-                # Получаем customData
-                custom_data = {}
-                custom_data_elem = task.find('customData')
-                if custom_data_elem is not None:
-                    for item in custom_data_elem.findall('customValue'):
-                        name_elem = item.find('name')
-                        value_elem = item.find('value')
-                        if name_elem is not None and name_elem.text is not None and value_elem is not None:
-                            name = name_elem.text
-                            value = value_elem.text if value_elem.text is not None else ""
-                            custom_data[name] = value
-                
-                # Формируем данные заказа
-                order_data = {
-                    "planfix_id": task_id,
-                    "status": status_value,
-                    "status_name": status_name,
-                    "title": task.findtext('title', ''),
-                    "description": task.findtext('description', ''),
-                    "date_create": parse_date(task.findtext('dateCreate')),
-                    "date_start": parse_date(task.findtext('dateStart')),
-                    "date_end": parse_date(task.findtext('dateEnd')),
-                    "date_complete": parse_date(task.findtext('dateComplete')),
-                    "last_update_date": parse_date(task.findtext('lastUpdateDate')),
-                    "type": task.findtext('type', ''),
-                    "template_id": task.findtext('template/id', ''),
-                    "assigner_id": task.findtext('assigner/id', ''),
-                    "assigner_name": task.findtext('assigner/name', ''),
-                    "owner_id": task.findtext('owner/id', ''),
-                    "owner_name": task.findtext('owner/name', '')
-                }
-                
-                # Добавляем custom поля
-                for custom_name, column_name in CUSTOM_MAP.items():
-                    order_data[column_name] = custom_data.get(custom_name, '')
-                
-                orders.append(order_data)
-                logger.info(f"Successfully processed task {task_id}")
-                
-            except Exception as e:
-                logger.error(f"Error processing task {task_id if 'task_id' in locals() else 'unknown'}: {str(e)}")
-                continue
-        
-        return orders
-        
-    except Exception as e:
-        logger.error(f"Error parsing orders XML: {str(e)}")
+def parse_orders(xml_text):
+    root = ET.fromstring(xml_text)
+    if root.attrib.get("status") == "error":
+        code = root.findtext("code")
+        message = root.findtext("message")
+        logger.error(f"Ошибка Planfix API: code={code}, message={message}")
         return []
+    orders = []
+    for task in root.findall('.//task'):
+        def get_text(tag):
+            el = task.find(tag)
+            return el.text if el is not None else None
+
+        # customData as dict
+        custom_fields = {v: None for v in CUSTOM_MAP.values()}
+        custom_data_root = task.find('customData')
+        if custom_data_root is not None:
+            for cv in custom_data_root.findall('customValue'):
+                field = cv.find('field/name')
+                value = cv.find('value')
+                if field is not None and field.text in CUSTOM_MAP:
+                    custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
+
+        orders.append({
+            "planfix_id": int(get_text('id')) if get_text('id') else None,
+            "title": get_text('title'),
+            "description": get_text('description'),
+            "importance": get_text('importance'),
+            "status": get_text('statusName') or get_text('status'),
+            "status_set": int(get_text('statusSet')) if get_text('statusSet') else None,
+            "check_result": int(get_text('checkResult')) if get_text('checkResult') else None,
+            "type": get_text('type'),
+            "owner_id": int(get_text('owner/id')) if get_text('owner/id') else None,
+            "owner_name": get_text('owner/name'),
+            "parent_id": int(get_text('parent/id')) if get_text('parent/id') else None,
+            "template_id": int(get_text('template/id')) if get_text('template/id') else None,
+            "project_id": int(get_text('project/id')) if get_text('project/id') else None,
+            "project_title": get_text('project/title'),
+            "client_id": int(get_text('client/id')) if get_text('client/id') else None,
+            "client_name": get_text('client/name'),
+            "begin_datetime": parse_date(get_text('beginDateTime')),
+            "general": int(get_text('general')) if get_text('general') else None,
+            "is_overdued": get_text('isOverdued') == "1",
+            "is_close_to_deadline": get_text('isCloseToDeadline') == "1",
+            "is_not_accepted_in_time": get_text('isNotAcceptedInTime') == "1",
+            "is_summary": get_text('isSummary') == "1",
+            "starred": get_text('starred') == "1",
+            **custom_fields,
+            "updated_at": datetime.now(),
+            "is_deleted": False
+        })
+    return orders
 
 def upsert_orders(orders, supabase_conn):
-    """Обновляет или добавляет заказы в Supabase."""
-    try:
-        logger.info(f"Starting upsert of {len(orders)} orders to Supabase")
-        
-        for order in orders:
-            try:
-                # Логируем данные перед отправкой
-                logger.info(f"Preparing to upsert order {order.get('planfix_id')}:")
-                logger.info(f"  Status ID: {order.get('status')}")
-                logger.info(f"  Status Name: {order.get('status_name')}")
-                logger.info(f"  Full order data: {json.dumps(order, ensure_ascii=False, indent=2)}")
-                
-                # Проверяем типы данных
-                if order.get('status_name') is not None:
-                    logger.info(f"  Status Name type: {type(order.get('status_name'))}")
-                    logger.info(f"  Status Name value: '{order.get('status_name')}'")
-                
-                # Выполняем upsert
-                result = supabase_conn.table('orders').upsert(order).execute()
-                
-                # Логируем результат
-                if result.data:
-                    logger.info(f"Successfully upserted order {order.get('planfix_id')}")
-                    logger.info(f"  Response data: {json.dumps(result.data, ensure_ascii=False)}")
-                else:
-                    logger.warning(f"No data returned for order {order.get('planfix_id')}")
-                    logger.warning(f"  Response: {result}")
-                
-            except Exception as e:
-                logger.error(f"Error upserting order {order.get('planfix_id')}: {str(e)}")
-                logger.error(f"  Order data: {json.dumps(order, ensure_ascii=False)}")
-                continue
-                
-        logger.info("Finished upserting orders to Supabase")
-        
-    except Exception as e:
-        logger.error(f"Error in upsert_orders: {str(e)}")
-        raise
+    if not orders:
+        return
+    first_item_keys = orders[0].keys()
+    all_column_names = list(first_item_keys)
+    planfix_utils.upsert_data_to_supabase(
+        supabase_conn,
+        ORDERS_TABLE_NAME,
+        ORDERS_PK_COLUMN,
+        all_column_names,
+        orders
+    )
+    logger.info(f"Upserted {len(orders)} orders.")
 
 def main():
     logging.basicConfig(
@@ -359,13 +213,6 @@ def main():
         handlers=[logging.StreamHandler()]
     )
     logger.info("Starting Planfix orders to Supabase synchronization...")
-
-    # Добавляем отладочный вывод
-    logger.info("Environment variables:")
-    logger.info(f"PLANFIX_API_KEY: {os.environ.get('PLANFIX_API_KEY')[:3]}..." if os.environ.get('PLANFIX_API_KEY') else "Not set")
-    logger.info(f"PLANFIX_TOKEN: {os.environ.get('PLANFIX_TOKEN')[:3]}..." if os.environ.get('PLANFIX_TOKEN') else "Not set")
-    logger.info(f"PLANFIX_ACCOUNT: {os.environ.get('PLANFIX_ACCOUNT')}")
-    logger.info(f"PLANFIX_API_URL: {os.environ.get('PLANFIX_API_URL')}")
 
     required_env_vars = {
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
@@ -386,14 +233,6 @@ def main():
 
     supabase_conn = None
     try:
-        # Загружаем маппинг статусов при запуске
-        status_mapping = get_all_status_mapping()
-        if not status_mapping:
-            logger.error("Failed to load status mapping. Will continue without status names.")
-        else:
-            logger.info(f"Successfully loaded {len(status_mapping)} status mappings")
-
-        # Получаем соединение с Supabase
         supabase_conn = planfix_utils.get_supabase_connection()
         all_orders = []
         all_ids = []
