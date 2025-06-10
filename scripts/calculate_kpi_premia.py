@@ -256,58 +256,54 @@ def get_additional_premia(start_date_str: str, end_date_str: str) -> list:
     return results
 
 def calculate_kpi_premia(conn):
-    """Рассчитывает премии на основе KPI показателей."""
-    # Получаем текущий месяц и год
-    now = datetime.now()
-    month = now.month
-    year = now.year
+    """Расчет премий по KPI"""
+    # Получаем текущую дату
+    today = datetime.now()
+    month = today.month
+    year = today.year
     
-    # Получаем активные KPI показатели
-    active_metrics = get_active_kpi_metrics(conn, month, year)
+    # Формируем строки дат для SQL запросов
+    first_day = datetime(year, month, 1)
+    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
     
-    # Получаем фактические значения
+    first_day_str = first_day.strftime('%d-%m-%Y %H:%M')
+    last_day_str = last_day.strftime('%d-%m-%Y %H:%M')
+    
+    logger.info(f"Calculating KPI premiums for period: {first_day_str} to {last_day_str}")
+    
+    # Получаем метрики KPI
+    kpi_metrics = get_active_kpi_metrics(conn, month, year)
+    
+    # Получаем фактические значения KPI
     actual_values = get_actual_kpi_values(conn, month, year)
     
     # Получаем дополнительные премии
     additional_premia = get_additional_premia(first_day_str, last_day_str)
     
     # Рассчитываем премии
-    premium_data = {}
+    premium_data = []
     
-    for manager, data in active_metrics.items():
-        metrics = data['metrics']
-        if not metrics:
-            continue
-            
-        # Вычисляем вес каждого показателя
-        weight = 1.0 / len(metrics)
+    for manager in MANAGERS_KPI:
+        manager_name = manager['planfix_user_name']
+        manager_metrics = kpi_metrics.get(manager_name, {})
+        manager_actual = actual_values.get(manager_name, {})
         
-        # Рассчитываем KPI для каждого показателя
-        kpi_values = {}
-        total_kpi = 0
+        # Рассчитываем премию по KPI
+        kpi_premium = 0
+        for metric_name, planned_value in manager_metrics.items():
+            actual_value = manager_actual.get(metric_name, 0)
+            if actual_value >= planned_value:
+                kpi_premium += 1000  # Базовая премия за достижение плана
         
-        for metric in metrics:
-            actual = actual_values.get(manager, {}).get(metric, 0)
-            plan = data.get('revenue_plan', 0)
-            
-            if plan > 0:
-                kpi = (actual / plan) * weight
-                kpi = math.floor(kpi * 100 + 0.5) / 100  # Математическое округление до 2 знаков
-                kpi_values[metric] = kpi
-                total_kpi += kpi
+        # Получаем дополнительную премию
+        additional = additional_premia.get(manager_name, 0)
         
-        # Рассчитываем премию
-        base = data.get('kpi_base', 2000)  # По умолчанию 2000
-        premium = round(total_kpi * base, 0)
-        
-        premium_data[manager] = {
-            **kpi_values,
-            'SUM': math.floor(total_kpi * 100 + 0.5) / 100,  # Математическое округление до 2 знаков
-            'FND': base,
-            'PRK': premium,
-            'PRW': additional_premia.get(manager, 0),
-            'TOT': premium + additional_premia.get(manager, 0)
-        }
+        premium_data.append({
+            'manager': manager_name,
+            'kpi_premium': kpi_premium,
+            'additional_premium': additional,
+            'total_premium': kpi_premium + additional
+        })
     
     return premium_data
 
@@ -320,7 +316,7 @@ def generate_premium_report(premium_data, month, year):
     # Заголовок с именами менеджеров
     header = "KPI |"
     for manager in MANAGERS_KPI:
-        header += f" {manager:>8} |"
+        header += f" {manager['planfix_user_name']:>8} |"
     report.append(header)
     report.append("─" * (len(header) + 2))
     
