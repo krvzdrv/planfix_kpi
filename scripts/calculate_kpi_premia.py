@@ -33,6 +33,12 @@ CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
 
+# Список всех возможных показателей KPI
+KPI_INDICATORS = [
+    'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 
+    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+]
+
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
@@ -79,15 +85,7 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
             month,
             year,
             premia_kpi,
-            nwi,
-            wtr,
-            psk,
-            wdm,
-            prz,
-            zkl,
-            spt,
-            ofw,
-            ttl
+            nwi, wtr, psk, wdm, prz, kzi, zkl, spt, mat, tpy, msp, now, opi, wrk, ttl, ofw, zam, prc
         FROM kpi_metrics
         WHERE month = %s AND year = %s
     """
@@ -101,17 +99,9 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     row = results[0]
     
     # Create a dictionary of KPI codes and their plans
-    metrics = {
-        'NWI': {'plan': row[3], 'weight': 0},  # nwi
-        'WTR': {'plan': row[4], 'weight': 0},  # wtr
-        'PSK': {'plan': row[5], 'weight': 0},  # psk
-        'WDM': {'plan': row[6], 'weight': 0},  # wdm
-        'PRZ': {'plan': row[7], 'weight': 0},  # prz
-        'ZKL': {'plan': row[8], 'weight': 0},  # zkl
-        'SPT': {'plan': row[9], 'weight': 0},  # spt
-        'OFW': {'plan': row[10], 'weight': 0}, # ofw
-        'TTL': {'plan': row[11], 'weight': 0}  # ttl
-    }
+    metrics = {}
+    for i, indicator in enumerate(KPI_INDICATORS, start=3):  # Start from index 3 as first 3 columns are month, year, premia_kpi
+        metrics[indicator] = {'plan': row[i], 'weight': 0}
     
     # Calculate weight based on number of active KPIs (non-null plans)
     active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
@@ -251,181 +241,146 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES
-    ), "task counts")
+    ), "Task counts")
     
     client_results = _execute_query(client_query, (
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES,
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES,
-        start_date.split(' ')[0], end_date.split(' ')[0], PLANFIX_USER_NAMES
-    ), "client statuses")
+        start_date, end_date, PLANFIX_USER_NAMES,
+        start_date, end_date, PLANFIX_USER_NAMES,
+        start_date, end_date, PLANFIX_USER_NAMES
+    ), "Client status counts")
     
-    # Combine results into a single dictionary
-    actual_values = {
-        'Kozik Andrzej': {},
-        'Stukalo Nazarii': {}
-    }
+    # Combine results into a dictionary
+    actual_values = {}
+    for manager in PLANFIX_USER_NAMES:
+        actual_values[manager] = {indicator: 0 for indicator in KPI_INDICATORS}
     
+    # Process task results
     for row in task_results:
-        manager, metric, value = row
-        actual_values[manager][metric] = value
+        manager, task_type, count = row
+        if task_type in KPI_INDICATORS:
+            actual_values[manager][task_type] = count
     
+    # Process client results
     for row in client_results:
-        manager, metric, value = row
-        actual_values[manager][metric] = value
+        manager, status, count = row
+        if status in KPI_INDICATORS:
+            actual_values[manager][status] = count
     
     return actual_values
 
 def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     """Calculate KPI coefficients for each manager."""
-    results = {
-        'Kozik Andrzej': {'coefficients': {}, 'total': 0, 'premia': 0},
-        'Stukalo Nazarii': {'coefficients': {}, 'total': 0, 'premia': 0}
-    }
+    coefficients = {}
     
-    # Set premia value for both managers
-    premia = metrics.get('premia', 0)
-    results['Kozik Andrzej']['premia'] = premia
-    results['Stukalo Nazarii']['premia'] = premia
-    
-    # Calculate coefficients for each KPI
-    for kpi_code, metric_data in metrics.items():
-        if kpi_code == 'premia':
-            continue
-            
-        plan = metric_data['plan']
-        weight = metric_data['weight']
+    for manager, values in actual_values.items():
+        manager_coefficients = {}
+        sum_coefficient = 0
         
-        if plan is None or weight == 0:
-            continue
-            
-        for manager in results.keys():
-            actual = actual_values[manager].get(kpi_code, 0)
-            
-            # Calculate coefficient
-            coefficient = min(1.0, actual / plan)
-            
-            # Store coefficient and weighted value
-            results[manager]['coefficients'][kpi_code] = {
-                'actual': actual,
-                'plan': plan,
-                'coefficient': coefficient,
-                'weight': weight,
-                'weighted': float(coefficient) * float(weight)
-            }
-            
-            # Update total
-            results[manager]['total'] += float(coefficient) * float(weight)
+        # Calculate coefficient for each KPI indicator
+        for indicator in KPI_INDICATORS:
+            if indicator in metrics and metrics[indicator]['plan'] is not None:
+                actual = values.get(indicator, 0)
+                plan = metrics[indicator]['plan']
+                weight = metrics[indicator]['weight']
+                
+                if plan > 0:
+                    coefficient = round((actual / plan) * weight, 2)
+                else:
+                    coefficient = 0
+                
+                manager_coefficients[indicator] = coefficient
+                sum_coefficient += coefficient
+        
+        # Add SUM coefficient
+        manager_coefficients['SUM'] = round(sum_coefficient, 2)
+        
+        # Calculate PRK (FND * SUM)
+        if 'premia' in metrics and metrics['premia'] is not None:
+            manager_coefficients['PRK'] = round(metrics['premia'] * sum_coefficient, 2)
+        else:
+            manager_coefficients['PRK'] = 0
+        
+        coefficients[manager] = manager_coefficients
     
-    return results
+    return coefficients
 
 def get_additional_premia(start_date: str, end_date: str) -> dict:
-    """Get additional premia (PRW) from planfix_orders table."""
+    """Get additional premia values for the period."""
     query = """
         SELECT 
-            menedzher,
-            COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
-        FROM planfix_orders
-        WHERE 
-            data_realizacji IS NOT NULL 
-            AND data_realizacji != ''
-            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
-            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
-            AND menedzher IN %s
+            owner_name,
+            SUM(CASE WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zamknąć zamówienie' THEN 1 ELSE 0 END) as zam_count,
+            SUM(CASE WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przygotować cenę' THEN 1 ELSE 0 END) as prc_count
+        FROM planfix_tasks
+        WHERE
+            data_zakonczenia_zadania IS NOT NULL
+            AND data_zakonczenia_zadania >= %s::timestamp
+            AND data_zakonczenia_zadania < %s::timestamp
+            AND owner_name IN %s
             AND is_deleted = false
-        GROUP BY menedzher
+        GROUP BY owner_name;
     """
     
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
-    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_IDS), "additional premia")
+    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_NAMES), "Additional premia")
     
-    # Initialize with zeros
-    additional_premia = {
-        'Kozik Andrzej': 0,
-        'Stukalo Nazarii': 0
-    }
-    
-    # Map results to manager names
+    additional_premia = {}
     for row in results:
-        manager_id = row[0]
-        premia = float(row[1]) if row[1] is not None else 0
-        
-        # Find manager name by ID
-        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
-        if manager:
-            additional_premia[manager] = premia
+        manager, zam_count, prc_count = row
+        additional_premia[manager] = {
+            'ZAM': zam_count,
+            'PRC': prc_count
+        }
     
     return additional_premia
 
 def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
     """Format the premia report for Telegram."""
-    message = "```\n"
-    message += f"PREMIA {current_month:02d}.{current_year}\n"
-    message += "═══════════════════════\n"
-    message += "KPI |   Kozik | Stukalo\n"
-    message += "───────────────────────\n"
+    month_names = {
+        1: 'январь', 2: 'февраль', 3: 'март', 4: 'апрель',
+        5: 'май', 6: 'июнь', 7: 'июль', 8: 'август',
+        9: 'сентябрь', 10: 'октябрь', 11: 'ноябрь', 12: 'декабрь'
+    }
     
-    # Определяем порядок показателей
-    kpi_order = [
-        'TTL', 'KZI', 'KZP', 'KZN', 'KZK', 'KZT', 'KZR', 'KZS',
-        'NWI', 'WTR', 'PSK',
-        'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
-        'OFW', 'ZAM', 'PRC'
-    ]
+    report = f"📊 *Отчет по премиям за {month_names[current_month]} {current_year}*\n\n"
     
-    # Display coefficients
-    for kpi_code in kpi_order:
-        kozik_coef = coefficients['Kozik Andrzej']['coefficients'].get(kpi_code, {}).get('weighted', 0)
-        stukalo_coef = coefficients['Stukalo Nazarii']['coefficients'].get(kpi_code, {}).get('weighted', 0)
+    for manager in coefficients:
+        report += f"*{manager}*\n"
+        manager_data = coefficients[manager]
         
-        if kozik_coef > 0 or stukalo_coef > 0:
-            message += f"{kpi_code:3} | {kozik_coef:6.2f} | {stukalo_coef:6.2f}\n"
+        # Add all KPI indicators
+        for indicator in KPI_INDICATORS:
+            if indicator in manager_data:
+                report += f"{indicator}: {manager_data[indicator]}\n"
+        
+        # Add SUM and PRK
+        report += f"SUM: {manager_data['SUM']}\n"
+        report += f"PRK: {manager_data['PRK']}\n"
+        
+        # Add additional premia if available
+        if manager in additional_premia:
+            for indicator, value in additional_premia[manager].items():
+                report += f"{indicator}: {value}\n"
+        
+        report += "\n"
     
-    # Display totals
-    message += "───────────────────────\n"
-    # Используем точные значения без округления
-    kozik_sum = coefficients['Kozik Andrzej']['total']
-    stukalo_sum = coefficients['Stukalo Nazarii']['total']
-    message += f"SUM | {kozik_sum:6.2f} | {stukalo_sum:6.2f}\n"
-    
-    # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
-    fnd = float(coefficients['Kozik Andrzej']['premia'])  # Значение из таблицы (2000)
-    message += f"FND | {fnd:6.0f} | {fnd:6.0f}\n"
-    message += "───────────────────────\n"
-    
-    # Calculate and display premia (PRK = SUM * FND)
-    kozik_premia = int(kozik_sum * fnd)
-    stukalo_premia = int(stukalo_sum * fnd)
-    
-    message += f"PRK | {kozik_premia:6.0f} | {stukalo_premia:6.0f}\n"
-    
-    # Display additional premia (PRW)
-    message += f"PRW | {additional_premia['Kozik Andrzej']:6.0f} | {additional_premia['Stukalo Nazarii']:6.0f}\n"
-    
-    # Calculate and display total (TOT = PRK + PRW)
-    message += f"TOT | {kozik_premia + additional_premia['Kozik Andrzej']:6.0f} | {stukalo_premia + additional_premia['Stukalo Nazarii']:6.0f}\n"
-    message += "═══════════════════════\n"
-    message += "```"
-    
-    return message
+    return report
 
 def send_to_telegram(message: str):
-    """Send the premia report to Telegram."""
+    """Send message to Telegram."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = {
+        "chat_id": CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            'chat_id': CHAT_ID,
-            'text': message,
-            'parse_mode': 'Markdown'
-        }
-        
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code != 200:
-            logger.error(f"Failed to send message to Telegram: {response.text}")
-        else:
-            logger.info("Message sent successfully to Telegram")
-            
-    except Exception as e:
-        logger.error(f"Error sending to Telegram: {str(e)}")
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        logger.info("Message sent successfully to Telegram")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send message to Telegram: {e}")
         raise
 
 def main():
@@ -434,18 +389,18 @@ def main():
         _check_env_vars()
         
         # Get current month and year
-        today = date.today()
-        current_month = today.month
-        current_year = today.year
+        current_date = date.today()
+        current_month = current_date.month
+        current_year = current_date.year
         
         # Get start and end dates for the current month
-        start_date = datetime(current_year, current_month, 1).strftime('%Y-%m-%d %H:%M:%S')
+        start_date = f"{current_year}-{current_month:02d}-01"
         if current_month == 12:
-            end_date = datetime(current_year + 1, 1, 1).strftime('%Y-%m-%d %H:%M:%S')
+            end_date = f"{current_year + 1}-01-01"
         else:
-            end_date = datetime(current_year, current_month + 1, 1).strftime('%Y-%m-%d %H:%M:%S')
+            end_date = f"{current_year}-{current_month + 1:02d}-01"
         
-        # Get KPI metrics and their weights
+        # Get KPI metrics
         metrics = get_kpi_metrics(current_month, current_year)
         if not metrics:
             logger.error("No KPI metrics found for the current month")
@@ -454,20 +409,18 @@ def main():
         # Get actual KPI values
         actual_values = get_actual_kpi_values(start_date, end_date)
         
-        # Calculate KPI coefficients
+        # Calculate coefficients
         coefficients = calculate_kpi_coefficients(metrics, actual_values)
         
-        # Get additional premia (PRW)
+        # Get additional premia
         additional_premia = get_additional_premia(start_date, end_date)
         
         # Format and send report
-        message = format_premia_report(coefficients, current_month, current_year, additional_premia)
-        send_to_telegram(message)
-        
-        logger.info("KPI premia report sent successfully")
+        report = format_premia_report(coefficients, current_month, current_year, additional_premia)
+        send_to_telegram(report)
         
     except Exception as e:
-        logger.error(f"Error in KPI premia calculation: {str(e)}")
+        logger.error(f"Error in main function: {e}")
         raise
 
 if __name__ == "__main__":
