@@ -93,13 +93,13 @@ def get_active_kpi_metrics(conn, month, year):
     try:
         cur.execute("""
             SELECT 
-                metric_name,
+                metrics_for_calculation,
                 planned_value
             FROM kpi_metrics
             WHERE EXTRACT(YEAR FROM month) = %s
             AND EXTRACT(MONTH FROM month) = %s
             AND is_active = true
-            ORDER BY metric_name
+            ORDER BY metrics_for_calculation
         """, (year, month))
         
         results = cur.fetchall()
@@ -109,12 +109,13 @@ def get_active_kpi_metrics(conn, month, year):
         for manager in [m['planfix_user_name'] for m in MANAGERS_KPI]:
             active_metrics[manager] = []
             for row in results:
-                metric_name = row[0]
+                metrics = row[0].split(',') if row[0] else []  # Разбиваем строку метрик на список
                 planned_value = row[1]
-                active_metrics[manager].append({
-                    'metric_name': metric_name,
-                    'planned_value': planned_value
-                })
+                for metric in metrics:
+                    active_metrics[manager].append({
+                        'metric_name': metric.strip(),  # Убираем лишние пробелы
+                        'planned_value': planned_value
+                    })
         
         return active_metrics
     finally:
