@@ -237,42 +237,23 @@ def get_actual_kpi_values(conn, month, year):
     finally:
         cur.close()
 
-def get_additional_premia(conn, month, year):
-    """Получает дополнительные премии (PRW) из таблицы planfix_orders."""
-    # Получаем первый и последний день месяца
-    first_day = datetime(year, month, 1)
-    if month == 12:
-        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
-    else:
-        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
-    
-    # Форматируем даты
-    first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
-    last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
-    
-    additional_premia = {}
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT 
-                menedzer,
-                COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
-            FROM planfix_orders
-            WHERE 
-                data_realizacji IS NOT NULL 
-                AND data_realizacji != ''
-                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
-                AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
-                AND menedzer IN %s
-                AND is_deleted = false
-            GROUP BY menedzer
-        """, (first_day_str, last_day_str, tuple(m['planfix_user_name'] for m in MANAGERS_KPI)))
-        
-        for row in cur.fetchall():
-            manager = row[0]
-            premia = float(row[1]) if row[1] is not None else 0
-            additional_premia[manager] = round(premia, 0)
-    
-    return additional_premia
+def get_additional_premia(start_date_str: str, end_date_str: str) -> list:
+    """Получает данные о дополнительных премиях за период."""
+    query = """
+        SELECT 
+            menedzher,
+            COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
+        FROM planfix_orders
+        WHERE data_realizacji IS NOT NULL 
+            AND data_realizacji != ''
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
+            AND is_deleted = false
+        GROUP BY menedzher;
+    """
+    results = _execute_kpi_query(query, (start_date_str, end_date_str), "additional premia")
+    logger.info(f"Additional premia results: {results}")
+    return results
 
 def calculate_kpi_premia(conn):
     """Рассчитывает премии на основе KPI показателей."""
@@ -288,7 +269,7 @@ def calculate_kpi_premia(conn):
     actual_values = get_actual_kpi_values(conn, month, year)
     
     # Получаем дополнительные премии
-    additional_premia = get_additional_premia(conn, month, year)
+    additional_premia = get_additional_premia(first_day_str, last_day_str)
     
     # Рассчитываем премии
     premium_data = {}
