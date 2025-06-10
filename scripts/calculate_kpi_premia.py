@@ -172,7 +172,7 @@ def get_actual_kpi_values(conn, month, year):
             WHERE 
                 EXTRACT(YEAR FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s
                 AND EXTRACT(MONTH FROM TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI')) = %s
-                AND menedzher = ANY(ARRAY[%s])
+                AND menedzher IN %s
             GROUP BY menedzher
         """
         
