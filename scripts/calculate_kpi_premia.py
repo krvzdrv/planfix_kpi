@@ -218,8 +218,26 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         )
         SELECT manager, status, count FROM client_statuses;
     """
+
+    # Get offer counts (OFW)
+    offer_query = """
+        SELECT
+            menedzher AS manager,
+            'OFW' as metric,
+            COUNT(*) as count
+        FROM planfix_orders
+        WHERE
+            data_wyslania_oferty IS NOT NULL
+            AND data_wyslania_oferty != ''
+            AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+            AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') < %s::timestamp
+            AND menedzher IN %s
+            AND is_deleted = false
+        GROUP BY menedzher;
+    """
     
     PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
     
     task_results = _execute_query(task_query, (
         start_date, end_date, PLANFIX_USER_NAMES,
@@ -231,6 +249,10 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES
     ), "Client status counts")
+
+    offer_results = _execute_query(offer_query, (
+        start_date, end_date, PLANFIX_USER_IDS
+    ), "Offer counts")
     
     # Combine results into a dictionary
     actual_values = {}
@@ -251,6 +273,15 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         manager, status, count = row
         if status in actual_values[manager]:
             actual_values[manager][status] = count
+
+    # Process offer results
+    for row in offer_results:
+        manager_id = row[0]
+        count = row[2]
+        # Find manager name by ID
+        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+        if manager in actual_values:
+            actual_values[manager]['OFW'] = count
     
     return actual_values
 
