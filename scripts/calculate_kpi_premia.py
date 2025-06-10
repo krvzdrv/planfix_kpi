@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import psycopg2
 from dotenv import load_dotenv
 import math
