@@ -6,6 +6,7 @@ import logging
 from dotenv import load_dotenv
 from config import MANAGERS_KPI
 import planfix_utils
+from decimal import Decimal
 
 # Load environment variables from .env file
 load_dotenv()
@@ -259,19 +260,19 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     
     for manager, values in actual_values.items():
         manager_coefficients = {}
-        sum_coefficient = 0
+        sum_coefficient = Decimal('0')
         
         # Calculate coefficient for each KPI indicator
         for indicator in KPI_INDICATORS:
             if indicator in metrics and metrics[indicator]['plan'] is not None:
-                actual = values.get(indicator, 0)
-                plan = metrics[indicator]['plan']
-                weight = metrics[indicator]['weight']
+                actual = Decimal(str(values.get(indicator, 0)))
+                plan = Decimal(str(metrics[indicator]['plan']))
+                weight = Decimal(str(metrics[indicator]['weight']))
                 
                 if plan > 0:
                     coefficient = round((actual / plan) * weight, 2)
                 else:
-                    coefficient = 0
+                    coefficient = Decimal('0')
                 
                 manager_coefficients[indicator] = coefficient
                 sum_coefficient += coefficient
@@ -281,9 +282,10 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
         
         # Calculate PRK (FND * SUM)
         if 'premia' in metrics and metrics['premia'] is not None:
-            manager_coefficients['PRK'] = round(metrics['premia'] * sum_coefficient, 2)
+            premia = Decimal(str(metrics['premia']))
+            manager_coefficients['PRK'] = round(premia * sum_coefficient, 2)
         else:
-            manager_coefficients['PRK'] = 0
+            manager_coefficients['PRK'] = Decimal('0')
         
         coefficients[manager] = manager_coefficients
     
