@@ -110,6 +110,19 @@ def get_income_data(conn, month, year):
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
             logger.info(f"Brak data: {brak_data}")
 
+            # Получаем плановую выручку
+            cur.execute("""
+                SELECT 
+                    manager,
+                    revenue_plan
+                FROM kpi_metrics
+                WHERE 
+                    year = %s 
+                    AND month = %s
+            """, (year, month))
+            plan_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Plan data: {plan_data}")
+
         # Объединяем данные
         income_data = {}
         all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()) + list(brak_data.keys()))
@@ -119,7 +132,8 @@ def get_income_data(conn, month, year):
             income_data[manager] = {
                 'fakt': fakt_data.get(manager, 0),
                 'dlug': dlug_data.get(manager, 0),
-                'brak': brak_data.get(manager, 0)
+                'brak': brak_data.get(manager, 0),
+                'plan': plan_data.get(manager, 0)
             }
             logger.info(f"Manager {manager} data: {income_data[manager]}")
 
@@ -234,8 +248,8 @@ def generate_income_report(conn):
         report.append(line_with_percent('█  Fakt:', l['fakt'], l['fakt_percent']))
         report.append(line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']))
         report.append(line_with_percent('░  Brak:', l['brak'], l['brak_percent']))
-        fakt_sum = format_int_currency(l['fakt']).rjust(max_sum_len)
-        report.append(f"    Fakt: {fakt_sum} PLN")
+        plan_sum = format_int_currency(l['plan']).rjust(max_sum_len)
+        report.append(f"    Plan: {plan_sum} PLN")
         report.append("")
     
     return "```\n" + "\n".join(report).rstrip() + "\n```"
