@@ -85,7 +85,7 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
             month,
             year,
             premia_kpi,
-            nwi, wtr, psk, wdm, prz, kzi, zkl, spt, mat, tpy, msp, now, opi, wrk, ttl, ofw, zam, prc
+            nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl
         FROM kpi_metrics
         WHERE month = %s AND year = %s
     """
@@ -100,8 +100,21 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     
     # Create a dictionary of KPI codes and their plans
     metrics = {}
-    for i, indicator in enumerate(KPI_INDICATORS, start=3):  # Start from index 3 as first 3 columns are month, year, premia_kpi
-        metrics[indicator] = {'plan': row[i], 'weight': 0}
+    # Map existing columns to KPI indicators
+    column_mapping = {
+        'NWI': 3,  # nwi
+        'WTR': 4,  # wtr
+        'PSK': 5,  # psk
+        'WDM': 6,  # wdm
+        'PRZ': 7,  # prz
+        'ZKL': 8,  # zkl
+        'SPT': 9,  # spt
+        'OFW': 10, # ofw
+        'TTL': 11  # ttl
+    }
+    
+    for indicator, col_index in column_mapping.items():
+        metrics[indicator] = {'plan': row[col_index], 'weight': 0}
     
     # Calculate weight based on number of active KPIs (non-null plans)
     active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
@@ -128,12 +141,6 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
                     ELSE NULL
                 END AS task_type,
                 COUNT(*) AS task_count
@@ -145,22 +152,6 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                 AND owner_name IN %s
                 AND is_deleted = false
             GROUP BY owner_name, task_type
-        ),
-        kzi_counts AS (
-            SELECT
-                owner_name AS manager,
-                'KZI' AS task_type,
-                COUNT(*) AS task_count
-            FROM planfix_tasks
-            WHERE
-                data_zakonczenia_zadania IS NOT NULL
-                AND data_zakonczenia_zadania >= %s::timestamp
-                AND data_zakonczenia_zadania < %s::timestamp
-                AND owner_name IN %s
-                AND is_deleted = false
-                AND TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną'
-                AND wynik = 'Klient jest zainteresowany'
-            GROUP BY owner_name
         ),
         ttl_counts AS (
             SELECT
@@ -178,13 +169,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                     'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
                     'Zadzwonić do klienta',
-                    'Przeprowadzić spotkanie',
-                    'Wysłać materiały',
-                    'Odpowiedzieć na pytanie techniczne',
-                    'Zapisać na media społecznościowe',
-                    'Opowiedzieć o nowościach',
-                    'Zebrać opinie',
-                    'Przywrócić klienta'
+                    'Przeprowadzić spotkanie'
                 )
             GROUP BY owner_name
         )
@@ -194,8 +179,6 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
             task_count
         FROM (
             SELECT * FROM task_counts
-            UNION ALL
-            SELECT * FROM kzi_counts
             UNION ALL
             SELECT * FROM ttl_counts
         ) combined_results
@@ -239,7 +222,6 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     
     task_results = _execute_query(task_query, (
         start_date, end_date, PLANFIX_USER_NAMES,
-        start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES
     ), "Task counts")
     
@@ -252,18 +234,21 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     # Combine results into a dictionary
     actual_values = {}
     for manager in PLANFIX_USER_NAMES:
-        actual_values[manager] = {indicator: 0 for indicator in KPI_INDICATORS}
+        actual_values[manager] = {
+            'NWI': 0, 'WTR': 0, 'PSK': 0, 'WDM': 0, 'PRZ': 0,
+            'ZKL': 0, 'SPT': 0, 'OFW': 0, 'TTL': 0
+        }
     
     # Process task results
     for row in task_results:
         manager, task_type, count = row
-        if task_type in KPI_INDICATORS:
+        if task_type in actual_values[manager]:
             actual_values[manager][task_type] = count
     
     # Process client results
     for row in client_results:
         manager, status, count = row
-        if status in KPI_INDICATORS:
+        if status in actual_values[manager]:
             actual_values[manager][status] = count
     
     return actual_values
