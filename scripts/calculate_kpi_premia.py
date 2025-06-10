@@ -90,6 +90,11 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
 def get_active_kpi_metrics(conn, month, year):
     """Получает список активных KPI показателей и их плановые значения."""
     active_metrics = {}
+    
+    # Подготавливаем списки имен и ID менеджеров
+    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    
     with conn.cursor() as cur:
         cur.execute("""
             SELECT 
@@ -99,13 +104,21 @@ def get_active_kpi_metrics(conn, month, year):
                 kpi_base
             FROM kpi_metrics 
             WHERE year = %s AND month = %s
-        """, (year, month))
+            AND (
+                menedzher IN %s 
+                OR menedzer IN %s
+            )
+        """, (year, month, PLANFIX_USER_IDS, PLANFIX_USER_NAMES))
         
         for row in cur.fetchall():
             manager = row[0]
             metrics = row[1].split(',') if row[1] else []
             revenue_plan = row[2]
             kpi_base = row[3]
+            
+            # Если manager - это ID, находим соответствующее имя
+            if manager in PLANFIX_USER_IDS:
+                manager = next(m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager)
             
             active_metrics[manager] = {
                 'metrics': metrics,
