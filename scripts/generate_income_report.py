@@ -69,7 +69,7 @@ def get_income_data(conn, month, year):
             """, (first_day, last_day))
             fakt_data = {row[0]: row[1] for row in cur.fetchall()}
 
-            # Получаем все заказы со статусом "Weryfikacja" (dlug)
+            # Получаем все заказы со статусом "Weryfikacja" (dlug) за текущий месяц
             cur.execute("""
                 SELECT 
                     menedzher,
@@ -77,21 +77,25 @@ def get_income_data(conn, month, year):
                 FROM planfix_orders
                 WHERE 
                     status_name = 'Weryfikacja'
+                    AND data_realizacji >= %s 
+                    AND data_realizacji <= %s
                     AND is_deleted = false
                 GROUP BY menedzher
-            """)
+            """, (first_day, last_day))
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
 
-            # Получаем все заказы (brak)
+            # Получаем все заказы (brak) за текущий месяц
             cur.execute("""
                 SELECT 
                     menedzher,
                     SUM(CAST(wartosc_netto_pln AS DECIMAL)) as brak
                 FROM planfix_orders
                 WHERE 
-                    is_deleted = false
+                    data_realizacji >= %s 
+                    AND data_realizacji <= %s
+                    AND is_deleted = false
                 GROUP BY menedzher
-            """)
+            """, (first_day, last_day))
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
 
         # Объединяем данные
@@ -123,9 +127,8 @@ def generate_income_report(conn):
     # Сначала собираем все значения для выравнивания
     all_lines = []
     for manager in MANAGERS_KPI:
-        manager_id = manager['planfix_user_id']
-        display_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_id, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
+        manager_name = manager['planfix_user_name']
+        data = revenue_data.get(manager_name, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
         fakt = round(data['fakt'])
         dlug = round(data['dlug'])
         brak = round(data['brak'])
@@ -133,7 +136,7 @@ def generate_income_report(conn):
         dlug_percent = (dlug / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
         brak_percent = (brak / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
         all_lines.append({
-            'manager': display_name,
+            'manager': manager_name,
             'fakt': fakt,
             'dlug': dlug,
             'brak': brak,
