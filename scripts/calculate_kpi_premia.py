@@ -97,7 +97,7 @@ def get_active_kpi_metrics(conn, month, year):
         
         cur.execute("""
             SELECT 
-                COALESCE(menedzer, menedzer_id) as manager,
+                COALESCE(menedzher, menedzer_id) as manager,
                 metric_name,
                 planned_value
             FROM kpi_metrics
@@ -105,10 +105,10 @@ def get_active_kpi_metrics(conn, month, year):
             AND EXTRACT(MONTH FROM month) = %s
             AND is_active = true
             AND (
-                menedzer IN %s 
+                menedzher IN %s 
                 OR menedzer_id IN %s
             )
-            ORDER BY COALESCE(menedzer, menedzer_id), metric_name
+            ORDER BY COALESCE(menedzher, menedzer_id), metric_name
         """, (year, month, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
         
         results = cur.fetchall()
@@ -153,7 +153,7 @@ def get_actual_kpi_values(conn, month, year):
         # Запрос для получения статусов заказов
         order_query = """
             SELECT 
-                COALESCE(menedzer, menedzer_id) as manager,
+                COALESCE(menedzher, menedzer_id) as manager,
                 status,
                 COUNT(*) as count
             FROM planfix_orders
@@ -162,10 +162,10 @@ def get_actual_kpi_values(conn, month, year):
             AND status IN ('OFW', 'ZAM', 'PRC')
             AND is_deleted = false
             AND (
-                menedzer IN %s 
+                menedzher IN %s 
                 OR menedzer_id IN %s
             )
-            GROUP BY COALESCE(menedzer, menedzer_id), status
+            GROUP BY COALESCE(menedzher, menedzer_id), status
         """
         
         cur.execute(order_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
@@ -174,17 +174,17 @@ def get_actual_kpi_values(conn, month, year):
         # Запрос для получения дополнительных премий
         premia_query = """
             SELECT 
-                COALESCE(menedzer, menedzer_id) as manager,
+                COALESCE(menedzher, menedzer_id) as manager,
                 COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) as total_premia
             FROM planfix_orders
             WHERE TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
             AND (
-                menedzer IN %s 
+                menedzher IN %s 
                 OR menedzer_id IN %s
             )
             AND is_deleted = false
-            GROUP BY COALESCE(menedzer, menedzer_id)
+            GROUP BY COALESCE(menedzher, menedzer_id)
         """
         
         cur.execute(premia_query, (first_day_str, last_day_str, PLANFIX_USER_NAMES, PLANFIX_USER_IDS))
