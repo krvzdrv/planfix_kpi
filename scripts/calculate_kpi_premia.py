@@ -331,8 +331,10 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     
     # Определяем порядок показателей
     kpi_order = [
-        'TTL', 'NWI', 'WTR', 'PSK',
-        'WDM', 'PRZ', 'ZKL', 'SPT', 'OFW'
+        'TTL', 'KZI', 'KZP', 'KZN', 'KZK', 'KZT', 'KZR', 'KZS',
+        'NWI', 'WTR', 'PSK',
+        'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
+        'OFW', 'ZAM', 'PRC'
     ]
     
     # Display coefficients
