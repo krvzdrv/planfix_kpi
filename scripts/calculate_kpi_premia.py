@@ -93,13 +93,12 @@ def get_active_kpi_metrics(conn, month, year):
     try:
         cur.execute("""
             SELECT 
-                metrics_for_calculation,
-                planned_value
+                nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl,
+                revenue_plan
             FROM kpi_metrics
-            WHERE EXTRACT(YEAR FROM month) = %s
-            AND EXTRACT(MONTH FROM month) = %s
-            AND is_active = true
-            ORDER BY metrics_for_calculation
+            WHERE year = %s
+            AND month = %s
+            ORDER BY id
         """, (year, month))
         
         results = cur.fetchall()
@@ -109,12 +108,32 @@ def get_active_kpi_metrics(conn, month, year):
         for manager in [m['planfix_user_name'] for m in MANAGERS_KPI]:
             active_metrics[manager] = []
             for row in results:
-                metrics = row[0].split(',') if row[0] else []  # Разбиваем строку метрик на список
-                planned_value = row[1]
-                for metric in metrics:
+                # Добавляем все метрики из строки
+                metrics = {
+                    'NWI': row[0],  # nwi
+                    'WTR': row[1],  # wtr
+                    'PSK': row[2],  # psk
+                    'WDM': row[3],  # wdm
+                    'PRZ': row[4],  # prz
+                    'ZKL': row[5],  # zkl
+                    'SPT': row[6],  # spt
+                    'OFW': row[7],  # ofw
+                    'TTL': row[8],  # ttl
+                }
+                
+                # Добавляем каждую метрику в список
+                for metric_name, planned_value in metrics.items():
+                    if planned_value is not None:  # Добавляем только если значение не NULL
+                        active_metrics[manager].append({
+                            'metric_name': metric_name,
+                            'planned_value': planned_value
+                        })
+                
+                # Добавляем план по выручке
+                if row[9] is not None:  # revenue_plan
                     active_metrics[manager].append({
-                        'metric_name': metric.strip(),  # Убираем лишние пробелы
-                        'planned_value': planned_value
+                        'metric_name': 'REVENUE',
+                        'planned_value': row[9]
                     })
         
         return active_metrics
