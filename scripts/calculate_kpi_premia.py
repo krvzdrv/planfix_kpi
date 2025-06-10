@@ -91,6 +91,9 @@ def get_active_kpi_metrics(conn, month, year):
     """Получение активных KPI метрик для текущего месяца"""
     cur = conn.cursor()
     try:
+        # Преобразуем месяц в строку с ведущим нулем
+        month_str = f"{month:02d}"
+        
         cur.execute("""
             SELECT 
                 nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl,
@@ -99,7 +102,7 @@ def get_active_kpi_metrics(conn, month, year):
             WHERE year = %s
             AND month = %s
             ORDER BY id
-        """, (year, month))
+        """, (year, month_str))
         
         results = cur.fetchall()
         active_metrics = {}
