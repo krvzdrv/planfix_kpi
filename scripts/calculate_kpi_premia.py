@@ -323,55 +323,35 @@ def get_additional_premia(start_date: str, end_date: str) -> dict:
 
 def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
     """Format the premia report for Telegram."""
-    message = "```\n"
-    message += f"PREMIA {current_month:02d}.{current_year}\n"
-    message += "═══════════════════════\n"
-    message += "KPI |   Kozik | Stukalo\n"
-    message += "───────────────────────\n"
+    month_names = {
+        1: 'январь', 2: 'февраль', 3: 'март', 4: 'апрель',
+        5: 'май', 6: 'июнь', 7: 'июль', 8: 'август',
+        9: 'сентябрь', 10: 'октябрь', 11: 'ноябрь', 12: 'декабрь'
+    }
     
-    # Определяем порядок показателей
-    kpi_order = [
-        'TTL', 'KZI', 'KZP', 'KZN', 'KZK', 'KZT', 'KZR', 'KZS',
-        'NWI', 'WTR', 'PSK',
-        'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
-        'OFW', 'ZAM', 'PRC'
-    ]
+    report = f"📊 *Отчет по премиям за {month_names[current_month]} {current_year}*\n\n"
     
-    # Display coefficients
-    for kpi_code in kpi_order:
-        kozik_coef = coefficients['Kozik Andrzej'].get(kpi_code, 0)
-        stukalo_coef = coefficients['Stukalo Nazarii'].get(kpi_code, 0)
+    for manager in coefficients:
+        report += f"*{manager}*\n"
+        manager_data = coefficients[manager]
         
-        if kozik_coef > 0 or stukalo_coef > 0:
-            message += f"{kpi_code:3} | {kozik_coef:6.2f} | {stukalo_coef:6.2f}\n"
+        # Add all KPI indicators
+        for indicator in KPI_INDICATORS:
+            if indicator in manager_data:
+                report += f"{indicator}: {manager_data[indicator]}\n"
+        
+        # Add SUM and PRK
+        report += f"SUM: {manager_data['SUM']}\n"
+        report += f"PRK: {manager_data['PRK']}\n"
+        
+        # Add additional premia if available
+        if manager in additional_premia:
+            for indicator, value in additional_premia[manager].items():
+                report += f"{indicator}: {value}\n"
+        
+        report += "\n"
     
-    # Display totals
-    message += "───────────────────────\n"
-    kozik_sum = coefficients['Kozik Andrzej']['SUM']
-    stukalo_sum = coefficients['Stukalo Nazarii']['SUM']
-    message += f"SUM | {kozik_sum:6.2f} | {stukalo_sum:6.2f}\n"
-    
-    # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
-    fnd = float(coefficients['Kozik Andrzej']['PRK']) / float(kozik_sum) if kozik_sum > 0 else 0
-    message += f"FND | {fnd:6.0f} | {fnd:6.0f}\n"
-    message += "───────────────────────\n"
-    
-    # Calculate and display premia (PRK)
-    kozik_premia = float(coefficients['Kozik Andrzej']['PRK'])
-    stukalo_premia = float(coefficients['Stukalo Nazarii']['PRK'])
-    message += f"PRK | {kozik_premia:6.0f} | {stukalo_premia:6.0f}\n"
-    
-    # Display additional premia (PRW)
-    kozik_prw = additional_premia.get('Kozik Andrzej', {}).get('ZAM', 0) + additional_premia.get('Kozik Andrzej', {}).get('PRC', 0)
-    stukalo_prw = additional_premia.get('Stukalo Nazarii', {}).get('ZAM', 0) + additional_premia.get('Stukalo Nazarii', {}).get('PRC', 0)
-    message += f"PRW | {kozik_prw:6.0f} | {stukalo_prw:6.0f}\n"
-    
-    # Calculate and display total (TOT = PRK + PRW)
-    message += f"TOT | {kozik_premia + kozik_prw:6.0f} | {stukalo_premia + stukalo_prw:6.0f}\n"
-    message += "═══════════════════════\n"
-    message += "```"
-    
-    return message
+    return report
 
 def send_to_telegram(message: str):
     """Send message to Telegram."""
