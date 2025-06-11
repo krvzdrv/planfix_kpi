@@ -362,7 +362,7 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     top_line = '══════════════════════'
     mid_line = '──────────────────────'
     message = '```'
-    message += f'PREMIA | {current_month:02d}.{current_year}\n'
+    message += f'PREMIA_{current_month:02d}.{current_year}\n'
     message += f'{top_line}\n'
     message += 'KPI | Kozik  | Stukalo\n'
     message += f'{mid_line}\n'
