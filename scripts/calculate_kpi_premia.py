@@ -353,54 +353,53 @@ def get_additional_premia(start_date: str, end_date: str) -> dict:
     return additional_premia
 
 def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
-    """Format the premia report for Telegram."""
-    # Определяем порядок показателей
+    """Format the premia report for Telegram (строгое оформление по ТЗ)."""
+    # Порядок KPI
     kpi_order = [
         'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT',
         'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
     ]
-    
-    # Формируем шапку таблицы
-    message = "```\n"
-    message += f"PREMIA {current_month:02d}.{current_year}\n"
-    message += "═══════════════════════\n"
-    message += "KPI |   Kozik| Stukalo\n"
-    message += "───────────────────────\n"
-    
-    # Display coefficients
-    for kpi_code in kpi_order:
-        kozik_coef = coefficients['Kozik Andrzej'].get(kpi_code, 0)
-        stukalo_coef = coefficients['Stukalo Nazarii'].get(kpi_code, 0)
-        
-        if kozik_coef > 0 or stukalo_coef > 0:
-            message += f"{kpi_code:3} | {kozik_coef:5.2f} | {stukalo_coef:5.2f}\n"
-    
-    # Display totals
-    message += "───────────────────────\n"
-    kozik_sum = coefficients['Kozik Andrzej']['SUM']
-    stukalo_sum = coefficients['Stukalo Nazarii']['SUM']
-    message += f"SUM | {kozik_sum:5.2f} | {stukalo_sum:5.2f}\n"
-    
-    # FND берется из таблицы kpi_metrics и одинаково для обоих продавцов
-    fnd = float(coefficients['Kozik Andrzej']['PRK']) / float(kozik_sum) if kozik_sum > 0 else 0
-    message += f"FND | {fnd:5.0f} | {fnd:5.0f}\n"
-    message += "───────────────────────\n"
-    
-    # Calculate and display premia (PRK)
-    kozik_premia = float(coefficients['Kozik Andrzej']['PRK'])
-    stukalo_premia = float(coefficients['Stukalo Nazarii']['PRK'])
-    message += f"PRK | {kozik_premia:5.0f} | {stukalo_premia:5.0f}\n"
-    
-    # Display additional premia (PRW)
-    kozik_prw = additional_premia.get('Kozik Andrzej', {}).get('ZAM', 0) + additional_premia.get('Kozik Andrzej', {}).get('PRC', 0)
-    stukalo_prw = additional_premia.get('Stukalo Nazarii', {}).get('ZAM', 0) + additional_premia.get('Stukalo Nazarii', {}).get('PRC', 0)
-    message += f"PRW | {kozik_prw:5.0f} | {stukalo_prw:5.0f}\n"
-    
-    # Calculate and display total (TOT = PRK + PRW)
-    message += f"TOT | {kozik_premia + kozik_prw:5.0f} | {stukalo_premia + stukalo_prw:5.0f}\n"
-    message += "═══════════════════════\n"
-    message += "```"
-    
+    # Фиксированные имена
+    managers = ['Kozik Andrzej', 'Stukalo Nazarii']
+    # Фиксированные разделители
+    top_line = '══════════════════════'
+    mid_line = '──────────────────────'
+    # Формируем шапку
+    message = '```'
+    message += f'PREMIA {current_month:02d}.{current_year}\n'
+    message += f'{top_line}\n'
+    message += 'KPI |     Kozik |   Stukalo\n'
+    message += f'{mid_line}\n'
+    # KPI строки
+    for kpi in kpi_order:
+        v1 = coefficients[managers[0]].get(kpi, 0)
+        v2 = coefficients[managers[1]].get(kpi, 0)
+        if v1 == 0 and v2 == 0:
+            continue
+        message += f'{kpi:<3} | {v1:7.2f} | {v2:7.2f}\n'
+    message += f'{mid_line}\n'
+    # SUM
+    sum1 = coefficients[managers[0]].get('SUM', 0)
+    sum2 = coefficients[managers[1]].get('SUM', 0)
+    message += f'SUM | {sum1:7.2f} | {sum2:7.2f}\n'
+    # FND
+    fnd1 = int(coefficients[managers[0]].get('PRK', 0) / sum1) if sum1 else 0
+    fnd2 = int(coefficients[managers[1]].get('PRK', 0) / sum2) if sum2 else 0
+    message += f'FND | {fnd1:7d} | {fnd2:7d}\n'
+    message += f'{mid_line}\n'
+    # PRK
+    prk1 = int(coefficients[managers[0]].get('PRK', 0))
+    prk2 = int(coefficients[managers[1]].get('PRK', 0))
+    message += f'PRK | {prk1:7d} | {prk2:7d}\n'
+    # PRW
+    prw1 = int(additional_premia.get(managers[0], {}).get('ZAM', 0) + additional_premia.get(managers[0], {}).get('PRC', 0))
+    prw2 = int(additional_premia.get(managers[1], {}).get('ZAM', 0) + additional_premia.get(managers[1], {}).get('PRC', 0))
+    message += f'PRW | {prw1:7d} | {prw2:7d}\n'
+    # TOT
+    tot1 = prk1 + prw1
+    tot2 = prk2 + prw2
+    message += f'TOT | {tot1:7d} | {tot2:7d}\n'
+    message += f'{top_line}\n```'
     return message
 
 def send_to_telegram(message: str):
