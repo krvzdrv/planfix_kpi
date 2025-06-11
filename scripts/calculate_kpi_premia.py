@@ -323,11 +323,11 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     return coefficients
 
 def get_additional_premia(start_date: str, end_date: str) -> dict:
-    """Get additional premia values for the period (PRW: сумма wartosc_netto_pln по менеджерам)."""
+    """Get additional premia values for the period (PRW: сумма laczna_prowizja_pln по менеджерам)."""
     query = """
         SELECT 
             menedzher,
-            COALESCE(SUM(CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL)), 0) as prw
+            COALESCE(SUM(CAST(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.') AS DECIMAL)), 0) as prw
         FROM planfix_orders
         WHERE data_realizacji IS NOT NULL AND data_realizacji != ''
             AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
