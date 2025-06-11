@@ -208,10 +208,10 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
 
 def format_activity_report(activity: dict, current_date: date) -> str:
     message = "```\n"
-    message += f"AKTYWNOŚĆ {current_date.strftime('%d.%m.%Y')}\n"
-    message += "═══════════════════════\n"
-    message += "GDZ   | Kozik | Stukalo\n"
-    message += "───────────────────────\n"
+    message += f"AKTYWNOŚĆ_{current_date.strftime('%d.%m.%Y')}\n"
+    message += "════════════════════════\n"
+    message += "GDZ   | Kozik  | Stukalo\n"
+    message += "────────────────────────\n"
     
     total = {m['planfix_user_name']: 0 for m in MANAGERS_KPI}
     
@@ -235,11 +235,11 @@ def format_activity_report(activity: dict, current_date: date) -> str:
         stukalo = sum(activity[h][metric]['Stukalo Nazarii'] for metric in activity[h] if metric != 'KZI')
         total['Kozik Andrzej'] += kozik
         total['Stukalo Nazarii'] += stukalo
-        message += f"{godz} | {kozik:6d} | {stukalo:6d}\n"
+        message += f"{godz} |{kozik:7d} |{stukalo:7d}\n"
     
-    message += "───────────────────────\n"
-    message += f"Suma  | {total['Kozik Andrzej']:6d} | {total['Stukalo Nazarii']:6d}\n"
-    message += "═══════════════════════\n"
+    message += "────────────────────────\n"
+    message += f"Suma  |{total['Kozik Andrzej']:7d} |{total['Stukalo Nazarii']:7d}\n"
+    message += "════════════════════════\n"
     message += "```"
     return message
 
