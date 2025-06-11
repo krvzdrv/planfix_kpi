@@ -421,8 +421,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         mid_line = '──────────────────────'
         # --- DAILY REPORT ---
         if report_type == 'daily':
-            message = '```
-'
+            message = '```\n'
             message += f'RAPORT_{today.strftime("%d.%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
@@ -459,12 +458,10 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n```
-'
+            message += f'{top_line}\n```'
         # --- MONTHLY REPORT ---
         else:
-            message = '```
-'
+            message = '```\n'
             message += f'RAPORT_{today.strftime("%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
@@ -501,8 +498,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n```
-'
+            message += f'{top_line}\n```'
         
         # Send to Telegram
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
