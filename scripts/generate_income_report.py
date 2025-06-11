@@ -53,54 +53,67 @@ def get_income_data(conn, month, year):
         else:
             last_day = datetime(year, month + 1, 1) - timedelta(days=1)
 
+        # Форматируем даты в нужный формат для PostgreSQL
+        first_day_str = first_day.strftime('%Y-%m-%d %H:%M:%S')
+        last_day_str = last_day.strftime('%Y-%m-%d %H:%M:%S')
+
         # Получаем все заказы за указанный месяц
         with conn.cursor() as cur:
+            # Проверяем всех менеджеров в базе
+            cur.execute("""
+                SELECT DISTINCT menedzher 
+                FROM planfix_orders 
+                WHERE is_deleted = false
+            """)
+            all_managers = [row[0] for row in cur.fetchall()]
+            logger.info(f"All managers in database: {all_managers}")
+
             # Получаем все заказы с датой реализации в текущем месяце (fakt)
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as fakt
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as fakt
                 FROM planfix_orders
                 WHERE 
-                    data_realizacji >= %s 
-                    AND data_realizacji <= %s
+                    TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp 
+                    AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') <= %s::timestamp
                     AND is_deleted = false
                 GROUP BY menedzher
-            """, (first_day, last_day))
+            """, (first_day_str, last_day_str))
             fakt_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Fakt data: {fakt_data}")
 
-            # Получаем все заказы со статусом "Weryfikacja" (dlug) за текущий месяц
+            # Получаем все заказы со статусом 140 (dlug)
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as dlug
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as dlug
                 FROM planfix_orders
                 WHERE 
-                    status_name = 'Weryfikacja'
-                    AND data_realizacji >= %s 
-                    AND data_realizacji <= %s
+                    status = 140
                     AND is_deleted = false
                 GROUP BY menedzher
-            """, (first_day, last_day))
+            """)
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Dlug data: {dlug_data}")
 
-            # Получаем все заказы (brak) за текущий месяц
+            # Получаем все заказы (brak)
             cur.execute("""
                 SELECT 
                     menedzher,
-                    SUM(CAST(wartosc_netto_pln AS DECIMAL)) as brak
+                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as brak
                 FROM planfix_orders
                 WHERE 
-                    data_realizacji >= %s 
-                    AND data_realizacji <= %s
-                    AND is_deleted = false
+                    is_deleted = false
                 GROUP BY menedzher
-            """, (first_day, last_day))
+            """)
             brak_data = {row[0]: row[1] for row in cur.fetchall()}
+            logger.info(f"Brak data: {brak_data}")
 
         # Объединяем данные
         income_data = {}
         all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()) + list(brak_data.keys()))
+        logger.info(f"Combined managers: {all_managers}")
         
         for manager in all_managers:
             income_data[manager] = {
@@ -108,6 +121,7 @@ def get_income_data(conn, month, year):
                 'dlug': dlug_data.get(manager, 0),
                 'brak': brak_data.get(manager, 0)
             }
+            logger.info(f"Manager {manager} data: {income_data[manager]}")
 
         return income_data
     except Exception as e:
@@ -127,16 +141,18 @@ def generate_income_report(conn):
     # Сначала собираем все значения для выравнивания
     all_lines = []
     for manager in MANAGERS_KPI:
-        manager_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_name, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
+        manager_id = manager['planfix_user_id']
+        display_name = manager['planfix_user_name']
+        data = revenue_data.get(manager_id, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
         fakt = round(data['fakt'])
         dlug = round(data['dlug'])
         brak = round(data['brak'])
-        fakt_percent = (fakt / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
-        dlug_percent = (dlug / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
-        brak_percent = (brak / (fakt + dlug + brak)) * 100 if (fakt + dlug + brak) > 0 else 0
+        total = fakt + dlug + brak
+        fakt_percent = (fakt / total) * 100 if total > 0 else 0
+        dlug_percent = (dlug / total) * 100 if total > 0 else 0
+        brak_percent = (brak / total) * 100 if total > 0 else 0
         all_lines.append({
-            'manager': manager_name,
+            'manager': display_name,
             'fakt': fakt,
             'dlug': dlug,
             'brak': brak,
