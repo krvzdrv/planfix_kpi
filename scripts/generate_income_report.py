@@ -46,6 +46,17 @@ def format_percent(val):
 def get_income_data(conn, month, year):
     """Получает данные о доходах из Supabase."""
     try:
+        # Получаем плановое значение выручки (общее для всех менеджеров)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT revenue_plan
+                FROM kpi_metrics
+                WHERE month = %s AND year = %s
+                LIMIT 1
+            """, (str(month), str(year)))
+            result = cur.fetchone()
+            revenue_plan = float(result[0]) if result and result[0] is not None else 0.0
+
         # Получаем первый и последний день месяца
         first_day = datetime(year, month, 1)
         if month == 12:
@@ -116,10 +127,15 @@ def get_income_data(conn, month, year):
         logger.info(f"Combined managers: {all_managers}")
         
         for manager in all_managers:
+            fakt = fakt_data.get(manager, 0)
+            dlug = dlug_data.get(manager, 0)
+            brak = max(0, revenue_plan - fakt)  # Brak = Plan - Fakt (если положительное)
+            
             income_data[manager] = {
-                'fakt': fakt_data.get(manager, 0),
-                'dlug': dlug_data.get(manager, 0),
-                'brak': brak_data.get(manager, 0)
+                'fakt': fakt,
+                'dlug': dlug,
+                'brak': brak,
+                'plan': revenue_plan
             }
             logger.info(f"Manager {manager} data: {income_data[manager]}")
 
@@ -234,8 +250,8 @@ def generate_income_report(conn):
         report.append(line_with_percent('█  Fakt:', l['fakt'], l['fakt_percent']))
         report.append(line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']))
         report.append(line_with_percent('░  Brak:', l['brak'], l['brak_percent']))
-        fakt_sum = format_int_currency(l['fakt']).rjust(max_sum_len)
-        report.append(f"    Fakt: {fakt_sum} PLN")
+        plan_sum = format_int_currency(l['plan']).rjust(max_sum_len)
+        report.append(f"    Plan: {plan_sum} PLN")
         report.append("")
     
     return "```\n" + "\n".join(report).rstrip() + "\n```"
