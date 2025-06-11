@@ -11,13 +11,16 @@ from config import MANAGERS_KPI
 # Load environment variables from .env file
 load_dotenv()
 
-# Add the parent directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# --- Database Settings ---
+PG_HOST = os.environ.get('SUPABASE_HOST')
+PG_DB = os.environ.get('SUPABASE_DB')
+PG_USER = os.environ.get('SUPABASE_USER')
+PG_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
+PG_PORT = os.environ.get('SUPABASE_PORT')
 
-from planfix_utils import (
-    check_required_env_vars,
-    get_supabase_connection
-)
+# --- Telegram Settings ---
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
@@ -261,8 +264,8 @@ def send_to_telegram(message):
     """
     Send message to Telegram.
     """
-    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    bot_token = TELEGRAM_TOKEN
+    chat_id = CHAT_ID
     
     if not bot_token or not chat_id:
         logger.error("Missing Telegram configuration")
@@ -291,57 +294,26 @@ def main():
     """
     Main function to generate and send income report.
     """
+    try:
+        # Подключение к базе напрямую через psycopg2
+        conn = psycopg2.connect(
+            host=PG_HOST,
+            dbname=PG_DB,
+            user=PG_USER,
+            password=PG_PASSWORD,
+            port=PG_PORT
+        )
+        report = generate_income_report(conn)
+        send_to_telegram(report)
+        conn.close()
+    except Exception as e:
+        logger.critical(f"An unexpected error occurred: {e}")
+
+if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
     logger.info("Starting income report generation...")
-
-    required_env_vars = {
-        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
-        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
-        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
-        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
-        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
-        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT'),
-        'TELEGRAM_BOT_TOKEN': os.environ.get('TELEGRAM_BOT_TOKEN'),
-        'TELEGRAM_CHAT_ID': os.environ.get('TELEGRAM_CHAT_ID')
-    }
-    
-    try:
-        check_required_env_vars(required_env_vars)
-    except ValueError as e:
-        logger.critical(f"Stopping script due to missing environment variables: {e}")
-        return
-
-    supabase_conn = None
-    try:
-        supabase_conn = get_supabase_connection()
-        report = generate_income_report(supabase_conn)
-        
-        # Save report to file
-        with open('income_report.txt', 'w', encoding='utf-8') as f:
-            f.write(report)
-        
-        # Send report to Telegram
-        if send_to_telegram(report):
-            logger.info("Report sent to Telegram successfully")
-        else:
-            logger.error("Failed to send report to Telegram")
-        
-        # Print report to console
-        print(report)
-        
-    except psycopg2.Error as e:
-        logger.critical(f"Supabase connection error: {e}")
-    except Exception as e:
-        logger.critical(f"An unexpected error occurred: {e}")
-    finally:
-        if supabase_conn:
-            supabase_conn.close()
-            logger.info("Supabase connection closed.")
-        logger.info("Income report generation finished.")
-
-if __name__ == "__main__":
     main() 
