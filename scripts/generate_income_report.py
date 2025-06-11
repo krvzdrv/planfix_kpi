@@ -243,7 +243,7 @@ def generate_income_report(conn):
     
     # Формируем отчет
     report = []
-    report.append(f"PRZYCHODY {current_month}/{current_year}")
+    report.append(f"PRZYCHODY {current_month}/{current_year}\n")
     for l in all_lines:
         report.append(f"{l['manager']}:")
         
