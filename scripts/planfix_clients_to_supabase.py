@@ -7,18 +7,6 @@ import xml.etree.ElementTree as ET
 import psycopg2
 import requests
 from dotenv import load_dotenv
-from planfix.planfix_utils import (
-    PLANFIX_API_URL,
-    PLANFIX_API_KEY,
-    PLANFIX_TOKEN,
-    PLANFIX_ACCOUNT,
-    SUPABASE_CONNECTION_STRING,
-    SUPABASE_HOST,
-    SUPABASE_DB,
-    SUPABASE_USER,
-    SUPABASE_PASSWORD,
-    SUPABASE_PORT
-)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -85,7 +73,7 @@ def get_planfix_companies(page):
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<request method="contact.getList">'
-        f'<account>{PLANFIX_ACCOUNT}</account>'
+        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<target>company</target>'
@@ -101,10 +89,10 @@ def get_planfix_companies(page):
         '</request>'
     )
     response = requests.post(
-        PLANFIX_API_URL,
+        planfix_utils.PLANFIX_API_URL,
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(PLANFIX_API_KEY, PLANFIX_TOKEN)
+        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
     )
     response.raise_for_status()
     return response.text
@@ -227,15 +215,15 @@ def main():
     logger.info("Starting Planfix clients to Supabase synchronization...")
 
     required_env_vars = {
-        'PLANFIX_API_KEY': PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': PLANFIX_TOKEN,
-        'PLANFIX_ACCOUNT': PLANFIX_ACCOUNT,
-        'SUPABASE_CONNECTION_STRING': SUPABASE_CONNECTION_STRING,
-        'SUPABASE_HOST': SUPABASE_HOST,
-        'SUPABASE_DB': SUPABASE_DB,
-        'SUPABASE_USER': SUPABASE_USER,
-        'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
-        'SUPABASE_PORT': SUPABASE_PORT
+        'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
+        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
+        'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
+        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
+        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
+        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
+        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
+        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
+        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT
     }
     try:
         planfix_utils.check_required_env_vars(required_env_vars)

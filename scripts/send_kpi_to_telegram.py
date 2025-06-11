@@ -5,7 +5,7 @@ import os
 import logging # Added logging
 from dotenv import load_dotenv
 from config import MANAGERS_KPI 
-import planfix.planfix_utils as planfix_utils
+import planfix_utils
 
 # Load environment variables from .env file
 load_dotenv()
@@ -288,7 +288,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     query = f"""
         WITH order_metrics AS (
             SELECT
-                menedzher AS manager_id, COUNT(*) AS order_count, 0 AS total_amount, 0 AS prw
+                menedzher AS manager_id, COUNT(*) AS order_count, 0 AS total_amount
             FROM planfix_orders
             WHERE data_potwierdzenia_zamowienia IS NOT NULL AND data_potwierdzenia_zamowienia != ''
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
@@ -299,8 +299,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
             UNION ALL
             SELECT
                 menedzher AS manager_id, 0 AS order_count,
-                COALESCE(SUM(NULLIF(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) AS total_amount,
-                COALESCE(SUM(NULLIF(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) AS prw
+                COALESCE(SUM(NULLIF(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) AS total_amount
             FROM planfix_orders
             WHERE data_realizacji IS NOT NULL AND data_realizacji != ''
                 AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
@@ -309,7 +308,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND is_deleted = false
             GROUP BY menedzher
         )
-        SELECT manager_id, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount, SUM(prw) AS prw
+        SELECT manager_id, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount
         FROM order_metrics
         GROUP BY manager_id;
     """
@@ -366,13 +365,13 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
                 'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
-                'OFW': 0, 'ZAM': 0, 'PRC': 0, 'PRW': 0
+                'OFW': 0, 'ZAM': 0, 'PRC': 0
             },
             'Stukalo Nazarii': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
                 'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
-                'OFW': 0, 'ZAM': 0, 'PRC': 0, 'PRW': 0
+                'OFW': 0, 'ZAM': 0, 'PRC': 0
             }
         }
         
@@ -399,14 +398,12 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             manager_id = row[0]
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
-            prw = float(row[3]) if row[3] is not None else 0.0
             
             # Find manager name by ID
             manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
             if manager in data:
                 data[manager]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager]['PRC'] = round(amount)  # Округляем PRC до целых
-                data[manager]['PRW'] = round(prw)  # Округляем PRW до целых
 
         # Process offer results
         for row in offer_results:
@@ -451,7 +448,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 message += f'TTL |{kozik_total:7d} |{stukalo_total:7d}\n'
             message += f'{mid_line}\n'
             message += 'zamówienia\n'
-            order_order = ['OFW', 'ZAM', 'PRC', 'PRW']
+            order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]
@@ -487,7 +484,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 message += f'TTL |{kozik_total:7d} |{stukalo_total:7d}\n'
             message += f'{mid_line}\n'
             message += 'zamówienia\n'
-            order_order = ['OFW', 'ZAM', 'PRC', 'PRW']
+            order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
                 kozik_count = data['Kozik Andrzej'][order_type]
                 stukalo_count = data['Stukalo Nazarii'][order_type]

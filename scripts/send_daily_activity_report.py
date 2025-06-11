@@ -5,7 +5,6 @@ import os
 import logging
 from dotenv import load_dotenv
 from config import MANAGERS_KPI
-import planfix.planfix_utils as planfix_utils
 
 # Load environment variables from .env file
 load_dotenv()
