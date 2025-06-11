@@ -241,11 +241,14 @@ def generate_income_report(conn):
         bar = '█' * fakt_blocks + '▒' * dlug_blocks + '░' * brak_blocks
         return f"[{bar}]"
     
-    # Формируем отчет
+    # Формируем отчет - КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ЗДЕСЬ
     report = []
-    report.append(f"PRZYCHODY {current_month}/{current_year}\n")
+    # Начинаем с блока кода, а заголовок помещаем ВНУТРИ
+    message = '```'
+    message += f'PRZYCHODY {current_month}/{current_year}\n'
+    
     for l in all_lines:
-        report.append(f"{l['manager']}:")
+        message += f"{l['manager']}:\n"
         
         # Генерируем пропорциональный бар
         progress_bar = generate_proportional_bar(
@@ -254,16 +257,17 @@ def generate_income_report(conn):
             l['brak_percent'], 
             bar_length
         )
-        report.append(progress_bar)
+        message += progress_bar + '\n'
         
-        report.append(line_with_percent('█  Fakt:', l['fakt'], l['fakt_percent']))
-        report.append(line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']))
-        report.append(line_with_percent('░  Brak:', l['brak'], l['brak_percent']))
+        message += line_with_percent('█  Fakt:', l['fakt'], l['fakt_percent']) + '\n'
+        message += line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']) + '\n'
+        message += line_with_percent('░  Brak:', l['brak'], l['brak_percent']) + '\n'
         plan_sum = format_int_currency(l['plan']).rjust(max_sum_len)
-        report.append(f"    Plan: {plan_sum} PLN")
-        report.append("")
+        message += f"    Plan: {plan_sum} PLN\n"
+        message += '\n'
     
-    return "```\n" + "\n".join(report).rstrip() + "\n```";
+    message += '```'
+    return message
 
 def send_to_telegram(message):
     """
