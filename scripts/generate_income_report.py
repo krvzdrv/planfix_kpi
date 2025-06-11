@@ -243,6 +243,7 @@ def generate_income_report(conn):
     
     # Формируем отчет
     report = []
+    report.append(f"PRZYCHODY {current_month}/{current_year}")
     for l in all_lines:
         report.append(f"{l['manager']}:")
         
@@ -262,8 +263,7 @@ def generate_income_report(conn):
         report.append(f"    Plan: {plan_sum} PLN")
         report.append("")
     
-    header = f"PRZYCHODY {current_month}/{current_year}\n"
-    return header + "```\n" + "\n".join(report).rstrip() + "\n```";
+    return "```\n" + "\n".join(report).rstrip() + "\n```";
 
 def send_to_telegram(message):
     """
