@@ -161,18 +161,20 @@ def generate_income_report(conn):
     # Сначала собираем все значения для выравнивания
     all_lines = []
     for manager in MANAGERS_KPI:
-        manager_id = manager['planfix_user_id']
-        display_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_id, {'fakt': 0.0, 'dlug': 0.0, 'brak': 0.0})
+        manager_name = manager['planfix_user_name']
+        data = revenue_data.get(manager_name)
+        if not data or 'plan' not in data:
+            continue
         fakt = round(data['fakt'])
         dlug = round(data['dlug'])
         brak = round(data['brak'])
+        plan = round(data['plan'])
         total = fakt + dlug + brak
         fakt_percent = (fakt / total) * 100 if total > 0 else 0
         dlug_percent = (dlug / total) * 100 if total > 0 else 0
         brak_percent = (brak / total) * 100 if total > 0 else 0
         all_lines.append({
-            'manager': display_name,
+            'manager': manager_name,
             'fakt': fakt,
             'dlug': dlug,
             'brak': brak,
