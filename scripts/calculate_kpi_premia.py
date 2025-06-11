@@ -323,33 +323,25 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     return coefficients
 
 def get_additional_premia(start_date: str, end_date: str) -> dict:
-    """Get additional premia values for the period."""
+    """Get additional premia values for the period (PRW: сумма laczna_prowizja_pln по менеджерам)."""
     query = """
         SELECT 
-            owner_name,
-            SUM(CASE WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zamknąć zamówienie' THEN 1 ELSE 0 END) as zam_count,
-            SUM(CASE WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przygotować cenę' THEN 1 ELSE 0 END) as prc_count
-        FROM planfix_tasks
-        WHERE
-            data_zakonczenia_zadania IS NOT NULL
-            AND data_zakonczenia_zadania >= %s::timestamp
-            AND data_zakonczenia_zadania < %s::timestamp
-            AND owner_name IN %s
+            menedzher,
+            COALESCE(SUM(CAST(REPLACE(REPLACE(laczna_prowizja_pln, ' ', ''), ',', '.') AS DECIMAL)), 0) as prw
+        FROM planfix_orders
+        WHERE data_realizacji IS NOT NULL AND data_realizacji != ''
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
+            AND TO_TIMESTAMP(data_realizacji, 'DD-MM-YYYY HH24:MI') < %s::timestamp
+            AND menedzher IN %s
             AND is_deleted = false
-        GROUP BY owner_name;
+        GROUP BY menedzher;
     """
-    
     PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_NAMES), "Additional premia")
-    
+    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_NAMES), "Additional premia (PRW)")
     additional_premia = {}
     for row in results:
-        manager, zam_count, prc_count = row
-        additional_premia[manager] = {
-            'ZAM': zam_count,
-            'PRC': prc_count
-        }
-    
+        manager, prw = row
+        additional_premia[manager] = {'PRW': prw}
     return additional_premia
 
 def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
@@ -383,8 +375,8 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     prk1 = int(coefficients[managers[0]].get('PRK', 0))
     prk2 = int(coefficients[managers[1]].get('PRK', 0))
     message += f'PRK |{prk1:7d} |{prk2:7d}\n'
-    prw1 = int(additional_premia.get(managers[0], {}).get('ZAM', 0) + additional_premia.get(managers[0], {}).get('PRC', 0))
-    prw2 = int(additional_premia.get(managers[1], {}).get('ZAM', 0) + additional_premia.get(managers[1], {}).get('PRC', 0))
+    prw1 = int(additional_premia.get(managers[0], {}).get('PRW', 0))
+    prw2 = int(additional_premia.get(managers[1], {}).get('PRW', 0))
     message += f'PRW |{prw1:7d} |{prw2:7d}\n'
     tot1 = prk1 + prw1
     tot2 = prk2 + prw2
