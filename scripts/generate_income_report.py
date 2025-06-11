@@ -161,8 +161,9 @@ def generate_income_report(conn):
     # Сначала собираем все значения для выравнивания
     all_lines = []
     for manager in MANAGERS_KPI:
+        manager_id = manager['planfix_user_id']
         manager_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_name)
+        data = revenue_data.get(manager_id)
         if not data or 'plan' not in data:
             continue
         fakt = round(data['fakt'])
