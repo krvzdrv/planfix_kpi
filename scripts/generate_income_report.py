@@ -178,10 +178,14 @@ def generate_income_report(conn):
             'fakt': fakt,
             'dlug': dlug,
             'brak': brak,
+            'plan': plan,
             'fakt_percent': fakt_percent,
             'dlug_percent': dlug_percent,
             'brak_percent': brak_percent
         })
+
+    if not all_lines:
+        return "Нет данных для отчёта"
     
     # Находим максимальную длину суммы для выравнивания по PLN
     max_sum_len = 0
