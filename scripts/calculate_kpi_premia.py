@@ -342,6 +342,7 @@ def get_additional_premia(start_date: str, end_date: str) -> dict:
     for row in results:
         manager, prw = row
         additional_premia[manager] = {'PRW': prw}
+    logger.info(f"PRW calculation results: {additional_premia}")
     return additional_premia
 
 def format_premia_report(coefficients: dict, current_month: int, current_year: int, additional_premia: dict) -> str:
