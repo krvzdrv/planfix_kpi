@@ -3,6 +3,7 @@ import sys
 import logging
 from datetime import datetime, timedelta
 import psycopg2
+from decimal import Decimal
 import requests
 from dotenv import load_dotenv
 from config import MANAGERS_KPI
@@ -55,7 +56,7 @@ def get_income_data(conn, month, year):
                 LIMIT 1
             """, (str(month), str(year)))
             result = cur.fetchone()
-            revenue_plan = float(result[0]) if result and result[0] is not None else 0.0
+            revenue_plan = Decimal(str(result[0])) if result and result[0] is not None else Decimal('0')
 
         # Получаем первый и последний день месяца
         first_day = datetime(year, month, 1)
@@ -123,13 +124,13 @@ def get_income_data(conn, month, year):
 
         # Объединяем данные
         income_data = {}
-        all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()) + list(brak_data.keys()))
+        all_managers = set(list(fakt_data.keys()) + list(dlug_data.keys()))
         logger.info(f"Combined managers: {all_managers}")
         
         for manager in all_managers:
-            fakt = fakt_data.get(manager, 0)
-            dlug = dlug_data.get(manager, 0)
-            brak = max(0, revenue_plan - fakt)  # Brak = Plan - Fakt (если положительное)
+            fakt = fakt_data.get(manager, Decimal('0'))
+            dlug = dlug_data.get(manager, Decimal('0'))
+            brak = max(Decimal('0'), revenue_plan - fakt)  # Brak = Plan - Fakt (если положительное)
             
             income_data[manager] = {
                 'fakt': fakt,
