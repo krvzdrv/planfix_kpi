@@ -14,7 +14,7 @@ load_dotenv()
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planfix_utils import (
+from planfix.planfix_utils import (
     check_required_env_vars,
     make_planfix_request,
     get_supabase_connection,

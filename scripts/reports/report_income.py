@@ -7,6 +7,7 @@ from decimal import Decimal
 import requests
 from dotenv import load_dotenv
 from config import MANAGERS_KPI
+import planfix.planfix_utils as planfix_utils
 
 # Load environment variables from .env file
 load_dotenv()
@@ -148,7 +149,7 @@ def get_income_data(conn, month, year):
         logger.error(f"Error getting income data: {e}")
         return {}
 
-def generate_income_report(conn):
+def report_income(conn):
     """
     Generate income report for all managers in MANAGERS_KPI in Polish, code block, always show all managers.
     """
@@ -311,7 +312,7 @@ def main():
             password=PG_PASSWORD,
             port=PG_PORT
         )
-        report = generate_income_report(conn)
+        report = report_income(conn)
         send_to_telegram(report)
         conn.close()
     except Exception as e:

@@ -7,6 +7,18 @@ import xml.etree.ElementTree as ET
 import psycopg2
 import requests
 from dotenv import load_dotenv
+from planfix.planfix_utils import (
+    PLANFIX_API_URL,
+    PLANFIX_API_KEY,
+    PLANFIX_TOKEN,
+    PLANFIX_ACCOUNT,
+    SUPABASE_CONNECTION_STRING,
+    SUPABASE_HOST,
+    SUPABASE_DB,
+    SUPABASE_USER,
+    SUPABASE_PASSWORD,
+    SUPABASE_PORT
+)
 
 # Load environment variables from .env file
 load_dotenv()
