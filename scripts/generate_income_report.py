@@ -57,7 +57,7 @@ def get_income_data(conn, month, year):
                 FROM kpi_metrics
                 WHERE month = %s AND year = %s
                 LIMIT 1
-            """, (str(month), str(year)))
+            """, (f"{month:02d}", year))
             result = cur.fetchone()
             revenue_plan = Decimal(str(result[0])) if result and result[0] is not None else Decimal('0')
 
