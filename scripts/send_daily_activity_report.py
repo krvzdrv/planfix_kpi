@@ -207,8 +207,8 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
     return activity
 
 def format_activity_report(activity: dict, current_date: date) -> str:
+    header = f"AKTYWNOŚĆ_{current_date.strftime('%d.%m.%Y')}\n"
     message = "```\n"
-    message += f"AKTYWNOŚĆ_{current_date.strftime('%d.%m.%Y')}\n"
     message += "════════════════════════\n"
     message += "GDZ   | Kozik  | Stukalo\n"
     message += "────────────────────────\n"
@@ -241,7 +241,7 @@ def format_activity_report(activity: dict, current_date: date) -> str:
     message += f"Suma  |{total['Kozik Andrzej']:7d} |{total['Stukalo Nazarii']:7d}\n"
     message += "════════════════════════\n"
     message += "```"
-    return message
+    return header + message
 
 def send_to_telegram(message: str):
     try:
