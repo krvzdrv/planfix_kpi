@@ -421,12 +421,11 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         mid_line = '──────────────────────'
         # --- DAILY REPORT ---
         if report_type == 'daily':
-            message = '```\n'
+            message = '```'
             message += f'RAPORT_{today.strftime("%d.%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
             message += f'{mid_line}\n'
-            # Add clients section first
             message += 'klienci\n'
             client_order = ['NWI', 'WTR', 'PSK']
             for status in client_order:
@@ -435,7 +434,6 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{status:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
             message += f'{mid_line}\n'
-            # Add tasks section second
             message += 'zadania\n'
             task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
             for task_type in task_order:
@@ -443,14 +441,12 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][task_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{task_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            # Add task totals
             kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order if t != 'KZI')
             stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order if t != 'KZI')
             if kozik_total > 0 or stukalo_total > 0:
                 message += f'{mid_line}\n'
                 message += f'TTL |{kozik_total:7d} |{stukalo_total:7d}\n'
             message += f'{mid_line}\n'
-            # Add orders section last
             message += 'zamówienia\n'
             order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
@@ -458,15 +454,14 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n```'
+            message += f'{top_line}\n''```'
         # --- MONTHLY REPORT ---
         else:
-            message = '```\n'
+            message = '```'
             message += f'RAPORT_{today.strftime("%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
             message += f'{mid_line}\n'
-            # Add clients section first
             message += 'klienci\n'
             client_order = ['NWI', 'WTR', 'PSK']
             for status in client_order:
@@ -475,7 +470,6 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{status:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
             message += f'{mid_line}\n'
-            # Add tasks section second
             message += 'zadania\n'
             task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
             for task_type in task_order:
@@ -483,14 +477,12 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][task_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{task_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            # Add task totals
             kozik_total = sum(data['Kozik Andrzej'][t] for t in task_order if t != 'KZI')
             stukalo_total = sum(data['Stukalo Nazarii'][t] for t in task_order if t != 'KZI')
             if kozik_total > 0 or stukalo_total > 0:
                 message += f'{mid_line}\n'
                 message += f'TTL |{kozik_total:7d} |{stukalo_total:7d}\n'
             message += f'{mid_line}\n'
-            # Add orders section last
             message += 'zamówienia\n'
             order_order = ['OFW', 'ZAM', 'PRC']
             for order_type in order_order:
@@ -498,7 +490,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n```'
+            message += f'{top_line}\n''```'
         
         # Send to Telegram
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')

@@ -207,27 +207,20 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
     return activity
 
 def format_activity_report(activity: dict, current_date: date) -> str:
-    header = f"AKTYWNOŚĆ_{current_date.strftime('%d.%m.%Y')}\n"
-    message = "```\n"
-    message += "════════════════════════\n"
-    message += "GDZ   | Kozik  | Stukalo\n"
-    message += "────────────────────────\n"
-    
+    message = '```'
+    message += f'AKTYWNOŚĆ_{current_date.strftime("%d.%m.%Y")}\n'
+    message += '════════════════════════\n'
+    message += 'GDZ   | Kozik  | Stukalo\n'
+    message += '────────────────────────\n'
     total = {m['planfix_user_name']: 0 for m in MANAGERS_KPI}
-    
-    # Сначала собираем все часы, где есть активность
     active_hours = set()
     for h in activity.keys():
         kozik = sum(activity[h][metric]['Kozik Andrzej'] for metric in activity[h] if metric != 'KZI')
         stukalo = sum(activity[h][metric]['Stukalo Nazarii'] for metric in activity[h] if metric != 'KZI')
         if kozik > 0 or stukalo > 0:
             active_hours.add(h)
-    
-    # Добавляем обязательные часы (9-17)
     for h in range(9, 17):
         active_hours.add(h)
-    
-    # Сортируем часы
     for h in sorted(active_hours):
         h_next = h + 1
         godz = f"{h:02d}–{h_next:02d}"
@@ -236,12 +229,11 @@ def format_activity_report(activity: dict, current_date: date) -> str:
         total['Kozik Andrzej'] += kozik
         total['Stukalo Nazarii'] += stukalo
         message += f"{godz} |{kozik:7d} |{stukalo:7d}\n"
-    
-    message += "────────────────────────\n"
+    message += '────────────────────────\n'
     message += f"Suma  |{total['Kozik Andrzej']:7d} |{total['Stukalo Nazarii']:7d}\n"
-    message += "════════════════════════\n"
-    message += "```"
-    return header + message
+    message += '════════════════════════\n'
+    message += '```'
+    return message
 
 def send_to_telegram(message: str):
     try:
