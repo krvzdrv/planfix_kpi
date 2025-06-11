@@ -13,7 +13,7 @@ load_dotenv()
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from planfix_utils import (
+from scripts.planfix_utils import (
     check_required_env_vars,
     get_supabase_connection
 )
@@ -49,12 +49,11 @@ def get_income_data(conn, month, year):
         # Получаем плановое значение выручки
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT revenue_plan
+                SELECT menedzher, revenue_plan
                 FROM kpi_metrics
                 WHERE month = %s AND year = %s
-            """, (month, year))
-            result = cur.fetchone()
-            revenue_plan = float(result[0]) if result else 0.0
+            """, (str(month), str(year)))
+            revenue_plans = {row[0]: float(row[1]) for row in cur.fetchall()}
 
         # Получаем первый и последний день месяца
         first_day = datetime(year, month, 1)
@@ -101,6 +100,7 @@ def get_income_data(conn, month, year):
         for manager in all_managers:
             fakt = fakt_data.get(manager, 0)
             dlug = dlug_data.get(manager, 0)
+            revenue_plan = revenue_plans.get(manager, 0)
             brak = max(0, revenue_plan - fakt)  # Brak = Plan - Fakt (если положительное)
             
             income_data[manager] = {
