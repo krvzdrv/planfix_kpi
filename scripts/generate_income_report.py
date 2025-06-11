@@ -242,10 +242,9 @@ def generate_income_report(conn):
         return f"[{bar}]"
     
     # Формируем отчет - КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ЗДЕСЬ
-    report = []
     # Начинаем с блока кода, а заголовок помещаем ВНУТРИ
     message = '```'
-    message += f'PRZYCHODY {current_month}/{current_year}\n'
+    message += f'PRZYCHODY_{current_month:02d}.{current_year}\n'
     
     for l in all_lines:
         message += f"{l['manager']}:\n"
