@@ -336,12 +336,16 @@ def get_additional_premia(start_date: str, end_date: str) -> dict:
             AND is_deleted = false
         GROUP BY menedzher;
     """
-    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_NAMES), "Additional premia (PRW)")
+    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_IDS), "Additional premia (PRW)")
     additional_premia = {}
     for row in results:
-        manager, prw = row
-        additional_premia[manager] = {'PRW': prw}
+        manager_id = row[0]
+        prw = row[1]
+        # Find manager name by ID
+        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+        if manager:
+            additional_premia[manager] = {'PRW': prw}
     logger.info(f"PRW calculation results: {additional_premia}")
     return additional_premia
 
