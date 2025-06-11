@@ -44,12 +44,12 @@ def format_percent(val):
     return f"({val:5.1f}%)"
 
 def get_revenue_plan(conn, month, year):
-    """Получает плановое значение выручки из таблицы revenue_plans."""
+    """Получает плановое значение выручки из таблицы kpi_metrics."""
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT revenue_plan
-                FROM revenue_plans
+                FROM kpi_metrics
                 WHERE month = %s AND year = %s
             """, (month, year))
             result = cur.fetchone()
