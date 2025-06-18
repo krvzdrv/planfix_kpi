@@ -13,18 +13,18 @@
 │       ├── report_bonus.yml        # Ручной запуск отчёта по премиям (report_bonus.py)
 │       └── report_income.yml       # Ручной запуск отчёта по доходу (report_income.py)
 ├── scripts/
-│   ├── config.py                  # Конфигурация менеджеров
-│   ├── planfix_export_clients.py  # Синхронизация клиентов
-│   ├── planfix_export_orders.py   # Синхронизация заказов
-│   ├── planfix_export_tasks.py    # Синхронизация задач
-│   ├── planfix_utils.py           # Утилиты для работы с Planfix API
-│   ├── report_kpi.py              # Генерация и отправка KPI отчетов
-│   ├── report_activity.py         # Генерация и отправка ежедневного отчёта
-│   ├── report_bonus.py            # Генерация и отправка отчёта по премиям
-│   └── report_income.py           # Генерация и отправка отчёта по доходу
-├── requirements.txt               # Зависимости Python
-├── requirements-dev.txt           # Dev-зависимости (линтеры, тесты)
-└── README.md                      # Документация
+│   ├── config.py                   # Конфигурация менеджеров
+│   ├── planfix_export_clients.py   # Синхронизация клиентов
+│   ├── planfix_export_orders.py    # Синхронизация заказов
+│   ├── planfix_export_tasks.py     # Синхронизация задач
+│   ├── planfix_utils.py            # Утилиты для работы с Planfix API
+│   ├── report_kpi.py               # Генерация и отправка KPI отчетов
+│   ├── report_activity.py          # Генерация и отправка ежедневного отчёта
+│   ├── report_bonus.py             # Генерация и отправка отчёта по премиям
+│   └── report_income.py            # Генерация и отправка отчёта по доходу
+├── requirements.txt                # Зависимости Python
+├── requirements-dev.txt            # Dev-зависимости (линтеры, тесты)
+└── README.md                       # Документация
 ```
 
 ## Установка
