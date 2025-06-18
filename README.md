@@ -133,3 +133,40 @@ python scripts/report_kpi.py
 ## Лицензия
 
 MIT
+
+## Зависимости
+
+- Основные зависимости перечислены в файле `requirements.txt`.
+- Для установки зависимостей выполните:
+```bash
+pip install -r requirements.txt
+```
+
+### Dev-зависимости (рекомендуется для разработки)
+
+Создайте файл `requirements-dev.txt` и добавьте туда:
+```
+flake8
+black
+pytest
+```
+Установите:
+```bash
+pip install -r requirements-dev.txt
+```
+
+## Проверка кода и тесты
+
+- Для проверки стиля кода:
+```bash
+flake8 scripts/
+black --check scripts/
+```
+- Для автоформатирования:
+```bash
+black scripts/
+```
+- Для запуска тестов (если появятся):
+```bash
+pytest
+```
