@@ -176,7 +176,7 @@ jobs:
             exit 1
           fi
 
-      - name: Calculate KPI Bonus
+      - name: Generate KPI Bonus Report
         id: send-premia
         if: steps.send-kpi.outcome == 'success'
         env:
