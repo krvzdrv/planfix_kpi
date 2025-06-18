@@ -8,16 +8,23 @@
 .
 ├── .github/
 │   └── workflows/
-│       └── send_kpi_to_telegram.yml   # GitHub Actions workflow
+│       ├── send_all_reports.yml    # Полный автоматический запуск всех скриптов по расписанию и вручную
+│       ├── report_activity.yml     # Ручной запуск отчёта по активности (и/или KPI премии)
+│       ├── report_bonus.yml        # Ручной запуск отчёта по премиям (report_bonus.py)
+│       └── report_income.yml       # Ручной запуск отчёта по доходу (report_income.py)
 ├── scripts/
-│   ├── config.py                      # Конфигурация менеджеров
-│   ├── planfix_export_clients.py      # Синхронизация клиентов
-│   ├── planfix_export_orders.py       # Синхронизация заказов
-│   ├── planfix_export_tasks.py        # Синхронизация задач
-│   ├── planfix_utils.py               # Утилиты для работы с Planfix API
-│   └── report_kpi.py                  # Генерация и отправка KPI отчетов
-├── requirements.txt                   # Зависимости Python
-└── README.md                          # Документация
+│   ├── config.py                  # Конфигурация менеджеров
+│   ├── planfix_export_clients.py  # Синхронизация клиентов
+│   ├── planfix_export_orders.py   # Синхронизация заказов
+│   ├── planfix_export_tasks.py    # Синхронизация задач
+│   ├── planfix_utils.py           # Утилиты для работы с Planfix API
+│   ├── report_kpi.py              # Генерация и отправка KPI отчетов
+│   ├── report_activity.py         # Генерация и отправка ежедневного отчёта
+│   ├── report_bonus.py            # Генерация и отправка отчёта по премиям
+│   └── report_income.py           # Генерация и отправка отчёта по доходу
+├── requirements.txt               # Зависимости Python
+├── requirements-dev.txt           # Dev-зависимости (линтеры, тесты)
+└── README.md                      # Документация
 ```
 
 ## Установка
@@ -82,12 +89,31 @@ MANAGERS_KPI = [
 - `planfix_user_id`: ID пользователя Planfix (для фильтрации заказов)
 - `telegram_alias`: Короткий псевдоним для отображения в отчете
 
-## Автоматизация
+## Автоматизация и GitHub Actions
 
-Скрипты настроены на автоматический запуск через GitHub Actions каждый будний день в 16:00 по варшавскому времени (CET/CEST в зависимости от сезона):
+- **send_all_reports.yml** — основной workflow, который автоматически (по расписанию и вручную) запускает полный цикл:
+  - Синхронизация клиентов, заказов, задач
+  - Генерация и отправка ежедневного отчёта (report_activity.py)
+  - Генерация и отправка KPI-отчёта (report_kpi.py)
+  - Генерация и отправка отчёта по премиям (report_bonus.py)
+  - Генерация и отправка отчёта по доходу (report_income.py)
+- **report_activity.yml** — ручной запуск отчёта по активности (и/или KPI премии)
+- **report_bonus.yml** — ручной запуск отчёта по премиям
+- **report_income.yml** — ручной запуск отчёта по доходу
 
-- Летнее время (март-октябрь): 14:00 UTC = 16:00 CEST
-- Зимнее время (октябрь-март): 15:00 UTC = 16:00 CET
+### Расписание автоматического запуска
+
+Workflow `Send All Reports` настроен на автоматический запуск каждый будний день в 19:00 по варшавскому времени (CET/CEST):
+- Летнее время (март-октябрь): 17:00 UTC = 19:00 CEST
+- Зимнее время (октябрь-март): 18:00 UTC = 19:00 CET
+
+### Ручной запуск отчётов через GitHub Actions
+
+В разделе Actions на GitHub вы можете вручную запустить любой из следующих workflow:
+- **Send All Reports** — полный цикл (все скрипты)
+- **Report Activity** — только ежедневный отчёт (и/или KPI премии)
+- **Report Bonus** — только отчёт по премиям
+- **Report Income** — только отчёт по доходу
 
 ## Ручной запуск
 
