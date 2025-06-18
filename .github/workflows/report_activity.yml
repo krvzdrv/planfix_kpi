@@ -30,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run KPI Premia Report
+      - name: Calculate KPI Bonus
         if: ${{ github.event.inputs.run_type == 'both' || github.event.inputs.run_type == 'kpi' }}
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
@@ -58,7 +58,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run Daily Activity Report
+      - name: Generate Daily Activity Report
         if: ${{ github.event.inputs.run_type == 'both' || github.event.inputs.run_type == 'activity' }}
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}

@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Update clients in Supabase
+      - name: Sync Planfix clients to Supabase
         id: update-clients
         run: |
           echo "[SYNC] Starting clients synchronization..."
@@ -56,7 +56,7 @@ jobs:
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
 
-      - name: Update orders in Supabase
+      - name: Sync Planfix orders to Supabase
         id: update-orders
         if: steps.update-clients.outcome == 'success'
         run: |
@@ -77,7 +77,7 @@ jobs:
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
 
-      - name: Update tasks in Supabase
+      - name: Sync Planfix tasks to Supabase
         id: update-tasks
         if: steps.update-orders.outcome == 'success'
         run: |
@@ -98,7 +98,7 @@ jobs:
           SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
           SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
 
-      - name: Send Daily Activity Report
+      - name: Generate Daily Activity Report
         id: send-activity
         if: steps.update-tasks.outcome == 'success'
         env:
@@ -134,7 +134,7 @@ jobs:
             exit 1
           fi
 
-      - name: Send KPI to Telegram
+      - name: Generate KPI Report
         id: send-kpi
         if: steps.send-activity.outcome == 'success'
         env:
@@ -176,7 +176,7 @@ jobs:
             exit 1
           fi
 
-      - name: Calculate and Send KPI Premia
+      - name: Calculate KPI Bonus
         id: send-premia
         if: steps.send-kpi.outcome == 'success'
         env:
@@ -212,7 +212,7 @@ jobs:
             exit 1
           fi
 
-      - name: Send Income Report
+      - name: Generate Income Report
         id: send-income
         if: steps.send-premia.outcome == 'success'
         env:
