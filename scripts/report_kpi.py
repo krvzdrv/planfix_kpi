@@ -265,6 +265,9 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') < %s::timestamp
             AND menedzher IN %s
+            AND wartosc_netto_pln IS NOT NULL
+            AND TRIM(wartosc_netto_pln) != ''
+            AND wartosc_netto_pln != '0,00'
         GROUP BY
             menedzher;
     """

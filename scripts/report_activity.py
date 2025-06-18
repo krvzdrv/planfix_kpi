@@ -149,6 +149,7 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         AND o.menedzher = ANY(%s)
         AND o.wartosc_netto_pln IS NOT NULL
         AND TRIM(o.wartosc_netto_pln) != ''
+        AND o.wartosc_netto_pln != '0,00'
         AND COALESCE(NULLIF(CAST(REPLACE(REPLACE(REGEXP_REPLACE(o.wartosc_netto_pln, '[^0-9,.-]', '', 'g'), ',', '.'), ' ', '') AS DECIMAL), 0), 0) != 0
         GROUP BY hour, o.menedzher
 
@@ -166,6 +167,7 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         AND o.menedzher = ANY(%s)
         AND o.wartosc_netto_pln IS NOT NULL
         AND TRIM(o.wartosc_netto_pln) != ''
+        AND o.wartosc_netto_pln != '0,00'
         AND COALESCE(NULLIF(CAST(REPLACE(REPLACE(REGEXP_REPLACE(o.wartosc_netto_pln, '[^0-9,.-]', '', 'g'), ',', '.'), ' ', '') AS DECIMAL), 0), 0) != 0
         GROUP BY hour, o.menedzher
     )
