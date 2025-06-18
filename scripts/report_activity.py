@@ -225,13 +225,6 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         count = row[3]
         activity[hour][metric][manager] = count
     
-    # После получения данных из БД фильтруем по нулю, если есть wartosc_netto_pln
-    # (если данные приходят с суммой)
-    for h in range(24):
-        for metric in activity[h]:
-            if metric != 'KZI':
-                activity[h][metric] = {manager: count for manager, count in activity[h][metric].items() if _parse_netto_pln(activity[h][metric][manager]) != 0.0}
-    
     return activity
 
 def format_activity_report(activity: dict, current_date: date) -> str:
