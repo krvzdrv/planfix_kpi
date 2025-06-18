@@ -11,11 +11,11 @@
 │       └── send_kpi_to_telegram.yml   # GitHub Actions workflow
 ├── scripts/
 │   ├── config.py                      # Конфигурация менеджеров
-│   ├── planfix_export_clients.py # Синхронизация клиентов
-│   ├── planfix_export_orders.py  # Синхронизация заказов
-│   ├── planfix_export_tasks.py   # Синхронизация задач
+│   ├── planfix_export_clients.py      # Синхронизация клиентов
+│   ├── planfix_export_orders.py       # Синхронизация заказов
+│   ├── planfix_export_tasks.py        # Синхронизация задач
 │   ├── planfix_utils.py               # Утилиты для работы с Planfix API
-│   └── report_kpi.py        # Генерация и отправка KPI отчетов
+│   └── report_kpi.py                  # Генерация и отправка KPI отчетов
 ├── requirements.txt                   # Зависимости Python
 └── README.md                          # Документация
 ```
