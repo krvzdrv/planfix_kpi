@@ -428,7 +428,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         # --- DAILY REPORT ---
         if report_type == 'daily':
             message = '```'
-            message += f'RAPORT_{today.strftime("%d.%m.%Y")}\n'
+            message += f'KPI_{today.strftime("%d.%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
             message += f'{mid_line}\n'
@@ -464,7 +464,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         # --- MONTHLY REPORT ---
         else:
             message = '```'
-            message += f'RAPORT_{today.strftime("%m.%Y")}\n'
+            message += f'KPI_{today.strftime("%m.%Y")}\n'
             message += f'{top_line}\n'
             message += 'KPI | Kozik  | Stukalo\n'
             message += f'{mid_line}\n'
