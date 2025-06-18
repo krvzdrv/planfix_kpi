@@ -237,8 +237,8 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
             AND menedzher IN %s
             AND is_deleted = false
             AND wartosc_netto_pln IS NOT NULL
-            AND wartosc_netto_pln != ''
-            AND CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
+            AND TRIM(wartosc_netto_pln) != ''
+            AND COALESCE(NULLIF(CAST(REPLACE(REPLACE(REGEXP_REPLACE(wartosc_netto_pln, '[^0-9,.-]', '', 'g'), ',', '.'), ' ', '') AS DECIMAL), 0), 0) != 0
         GROUP BY menedzher;
     """
     

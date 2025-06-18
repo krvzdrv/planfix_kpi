@@ -299,8 +299,8 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND menedzher IN %s
                 AND is_deleted = false
                 AND wartosc_netto_pln IS NOT NULL
-                AND wartosc_netto_pln != ''
-                AND CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
+                AND TRIM(wartosc_netto_pln) != ''
+                AND COALESCE(NULLIF(CAST(REPLACE(REPLACE(REGEXP_REPLACE(wartosc_netto_pln, '[^0-9,.-]', '', 'g'), ',', '.'), ' ', '') AS DECIMAL), 0), 0) != 0
             GROUP BY menedzher
             UNION ALL
             SELECT
