@@ -61,7 +61,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/generate_income_report.py; then
+          if ! python -u scripts/report_income.py; then
             echo "::error::Failed to generate income report"
             exit 1
           fi 

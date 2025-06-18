@@ -53,7 +53,7 @@ jobs:
           echo "TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:+set}"
           echo "TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:+set}"
           
-          if ! python -u scripts/calculate_kpi_premia.py; then
+          if ! python -u scripts/report_bonus.py; then
             echo "::error::Failed to generate KPI premia report"
             exit 1
           fi
@@ -81,7 +81,7 @@ jobs:
           echo "TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:+set}"
           echo "TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:+set}"
           
-          if ! python -u scripts/send_daily_activity_report.py; then
+          if ! python -u scripts/report_activity.py; then
             echo "::error::Failed to send daily activity report"
             exit 1
           fi 

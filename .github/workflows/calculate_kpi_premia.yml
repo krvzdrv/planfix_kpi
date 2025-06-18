@@ -61,7 +61,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/calculate_kpi_premia.py; then
+          if ! python -u scripts/report_bonus.py; then
             echo "::error::Failed to calculate KPI premia"
             exit 1
           fi 

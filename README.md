@@ -11,11 +11,11 @@
 │       └── send_kpi_to_telegram.yml   # GitHub Actions workflow
 ├── scripts/
 │   ├── config.py                      # Конфигурация менеджеров
-│   ├── planfix_clients_to_supabase.py # Синхронизация клиентов
-│   ├── planfix_orders_to_supabase.py  # Синхронизация заказов
-│   ├── planfix_tasks_to_supabase.py   # Синхронизация задач
+│   ├── planfix_export_clients.py # Синхронизация клиентов
+│   ├── planfix_export_orders.py  # Синхронизация заказов
+│   ├── planfix_export_tasks.py   # Синхронизация задач
 │   ├── planfix_utils.py               # Утилиты для работы с Planfix API
-│   └── send_kpi_to_telegram.py        # Генерация и отправка KPI отчетов
+│   └── report_kpi.py        # Генерация и отправка KPI отчетов
 ├── requirements.txt                   # Зависимости Python
 └── README.md                          # Документация
 ```
@@ -41,10 +41,10 @@ pip install -r requirements.txt
 - `PLANFIX_ACCOUNT` - аккаунт Planfix
 
 ### 2. Supabase Database
-Для скриптов синхронизации (`planfix_clients_to_supabase.py`, `planfix_orders_to_supabase.py`, `planfix_tasks_to_supabase.py`):
+Для скриптов синхронизации (`planfix_export_clients.py`, `planfix_export_orders.py`, `planfix_export_tasks.py`):
 - `SUPABASE_CONNECTION_STRING` - полная строка подключения к Supabase (например, `postgresql://user:password@host:port/database`)
 
-Для скрипта отправки KPI (`send_kpi_to_telegram.py`):
+Для скрипта отправки KPI (`report_kpi.py`):
 - `SUPABASE_HOST` - хост Supabase
 - `SUPABASE_DB` - имя базы данных
 - `SUPABASE_USER` - пользователь
@@ -95,12 +95,12 @@ MANAGERS_KPI = [
 
 ```bash
 # Синхронизация данных
-python scripts/planfix_clients_to_supabase.py
-python scripts/planfix_orders_to_supabase.py
-python scripts/planfix_tasks_to_supabase.py
+python scripts/planfix_export_clients.py
+python scripts/planfix_export_orders.py
+python scripts/planfix_export_tasks.py
 
 # Отправка KPI отчета
-python scripts/send_kpi_to_telegram.py
+python scripts/report_kpi.py
 ```
 
 ## Формат KPI отчета

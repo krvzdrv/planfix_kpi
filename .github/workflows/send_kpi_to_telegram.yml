@@ -41,7 +41,7 @@ jobs:
         run: |
           echo "Starting clients update..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
-          if ! python scripts/planfix_clients_to_supabase.py; then
+          if ! python scripts/planfix_export_clients.py; then
             echo "::error::Failed to update clients"
             exit 1
           fi
@@ -62,7 +62,7 @@ jobs:
         run: |
           echo "Starting orders update..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
-          if ! python scripts/planfix_orders_to_supabase.py; then
+          if ! python scripts/planfix_export_orders.py; then
             echo "::error::Failed to update orders"
             exit 1
           fi
@@ -83,7 +83,7 @@ jobs:
         run: |
           echo "Starting tasks update..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
-          if ! python scripts/planfix_tasks_to_supabase.py; then
+          if ! python scripts/planfix_export_tasks.py; then
             echo "::error::Failed to update tasks"
             exit 1
           fi
@@ -129,7 +129,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/send_daily_activity_report.py; then
+          if ! python -u scripts/report_activity.py; then
             echo "::error::Failed to send daily activity report"
             exit 1
           fi
@@ -171,7 +171,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/send_kpi_to_telegram.py; then
+          if ! python -u scripts/report_kpi.py; then
             echo "::error::Failed to send KPI report"
             exit 1
           fi
@@ -207,7 +207,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/calculate_kpi_premia.py; then
+          if ! python -u scripts/report_bonus.py; then
             echo "::error::Failed to calculate and send KPI premia"
             exit 1
           fi
@@ -243,7 +243,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/generate_income_report.py; then
+          if ! python -u scripts/report_income.py; then
             echo "::error::Failed to generate and send income report"
             exit 1
           fi
