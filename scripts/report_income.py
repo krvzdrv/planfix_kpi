@@ -6,10 +6,12 @@ import psycopg2
 from decimal import Decimal
 import requests
 from dotenv import load_dotenv
-from scripts.config import MANAGERS_KPI
+from config import MANAGERS_KPI
 
 # Load environment variables from .env file
 load_dotenv()
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 # --- Database Settings ---
 PG_HOST = os.environ.get('SUPABASE_HOST')

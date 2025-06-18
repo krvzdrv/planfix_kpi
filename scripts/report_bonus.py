@@ -4,9 +4,10 @@ from datetime import datetime, date
 import os
 import logging
 from dotenv import load_dotenv
-from scripts.config import MANAGERS_KPI
+from config import MANAGERS_KPI
 import planfix_utils
 from decimal import Decimal
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,6 +40,8 @@ KPI_INDICATORS = [
     'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 
     'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
 ]
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""

@@ -4,7 +4,9 @@ from datetime import datetime, date, timedelta
 import os
 import logging
 from dotenv import load_dotenv
-from scripts.config import MANAGERS_KPI
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from config import MANAGERS_KPI
 
 # Load environment variables from .env file
 load_dotenv()
