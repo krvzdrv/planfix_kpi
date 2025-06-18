@@ -1,10 +1,10 @@
-name: Generate Income Report
+name: Report Bonus
 
 on:
   workflow_dispatch:  # Только для ручного запуска
 
 jobs:
-  generate-report:
+  calculate-premia:
     runs-on: ubuntu-latest
     env:
       TZ: Europe/Warsaw
@@ -31,8 +31,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate Income Report
-        id: generate-report
+      - name: Calculate KPI Premia
+        id: calculate-premia
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
@@ -43,7 +43,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting income report generation..."
+          echo "Starting KPI premia calculation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
@@ -61,7 +61,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/report_income.py; then
-            echo "::error::Failed to generate income report"
+          if ! python -u scripts/report_bonus.py; then
+            echo "::error::Failed to calculate KPI premia"
             exit 1
           fi 

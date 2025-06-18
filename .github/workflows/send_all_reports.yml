@@ -1,4 +1,4 @@
-name: Send KPI to Telegram
+name: Send All Reports
 
 on:
   schedule:
