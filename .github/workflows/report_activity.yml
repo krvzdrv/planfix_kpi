@@ -42,7 +42,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting KPI premia report generation..."
+          echo "[REPORT] Starting bonus (premia) report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
@@ -70,7 +70,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting daily activity report generation..."
+          echo "[REPORT] Starting daily activity report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"

@@ -39,7 +39,7 @@ jobs:
       - name: Update clients in Supabase
         id: update-clients
         run: |
-          echo "Starting clients update..."
+          echo "[SYNC] Starting clients synchronization..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_export_clients.py; then
             echo "::error::Failed to update clients"
@@ -60,7 +60,7 @@ jobs:
         id: update-orders
         if: steps.update-clients.outcome == 'success'
         run: |
-          echo "Starting orders update..."
+          echo "[SYNC] Starting orders synchronization..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_export_orders.py; then
             echo "::error::Failed to update orders"
@@ -81,7 +81,7 @@ jobs:
         id: update-tasks
         if: steps.update-orders.outcome == 'success'
         run: |
-          echo "Starting tasks update..."
+          echo "[SYNC] Starting tasks synchronization..."
           python -c "import os; print('Environment variables:', {k: v[:3] + '...' if v else None for k, v in os.environ.items() if k.startswith(('PLANFIX_', 'SUPABASE_'))})"
           if ! python scripts/planfix_export_tasks.py; then
             echo "::error::Failed to update tasks"
@@ -111,7 +111,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting daily activity report generation..."
+          echo "[REPORT] Starting daily activity report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
@@ -150,7 +150,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting KPI report generation..."
+          echo "[REPORT] Starting KPI report generation..."
           echo "Environment variables:"
           echo "PLANFIX_API_KEY: ${PLANFIX_API_KEY:+set}"
           echo "PLANFIX_TOKEN: ${PLANFIX_TOKEN:+set}"
@@ -189,7 +189,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting KPI premia calculation..."
+          echo "[REPORT] Starting bonus (premia) report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
@@ -225,7 +225,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          echo "Starting income report generation..."
+          echo "[REPORT] Starting income report generation..."
           echo "Environment variables:"
           echo "SUPABASE_CONNECTION_STRING: ${SUPABASE_CONNECTION_STRING:+set}"
           echo "SUPABASE_HOST: ${SUPABASE_HOST:+set}"
