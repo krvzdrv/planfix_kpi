@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta # Added timedelta
 import os
 import logging # Added logging
 from dotenv import load_dotenv
-from config import MANAGERS_KPI 
+from scripts.config import MANAGERS_KPI 
 import planfix_utils
 
 # Load environment variables from .env file

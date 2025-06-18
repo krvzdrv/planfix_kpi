@@ -6,7 +6,7 @@ import psycopg2
 from decimal import Decimal
 import requests
 from dotenv import load_dotenv
-from config import MANAGERS_KPI
+from scripts.config import MANAGERS_KPI
 
 # Load environment variables from .env file
 load_dotenv()

@@ -4,7 +4,7 @@ from datetime import datetime, date
 import os
 import logging
 from dotenv import load_dotenv
-from config import MANAGERS_KPI
+from scripts.config import MANAGERS_KPI
 import planfix_utils
 from decimal import Decimal
 
