@@ -46,6 +46,17 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
         if conn:
             conn.close()
 
+def _parse_netto_pln(value):
+    """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""
+    if value is None:
+        return 0.0
+    try:
+        import re
+        cleaned = re.sub(r'[^0-9,.-]', '', str(value)).replace(',', '.').replace(' ', '')
+        return float(cleaned)
+    except Exception:
+        return 0.0
+
 def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tuple) -> dict:
     query = """
     WITH task_counts AS (
@@ -211,6 +222,13 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         metric = row[2]
         count = row[3]
         activity[hour][metric][manager] = count
+    
+    # После получения данных из БД фильтруем по нулю, если есть wartosc_netto_pln
+    # (если данные приходят с суммой)
+    for h in range(24):
+        for metric in activity[h]:
+            if metric != 'KZI':
+                activity[h][metric] = {manager: count for manager, count in activity[h][metric].items() if _parse_netto_pln(activity[h][metric][manager]) != 0.0}
     
     return activity
 

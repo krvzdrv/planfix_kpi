@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from config import MANAGERS_KPI 
 import planfix_utils
 import sys
+import re
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -84,6 +85,16 @@ def _execute_kpi_query(query: str, params: tuple, description: str) -> list:
         if conn:
             conn.close()
 
+def _parse_netto_pln(value):
+    """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""
+    if value is None:
+        return 0.0
+    try:
+        # Удаляем все нечисловые символы, кроме точки, запятой и минуса
+        cleaned = re.sub(r'[^0-9,.-]', '', str(value)).replace(',', '.').replace(' ', '')
+        return float(cleaned)
+    except Exception:
+        return 0.0
 
 def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     if not PLANFIX_USER_NAMES: return []
@@ -280,13 +291,18 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         FROM planfix_orders
         WHERE menedzher IN %s
         AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
-        LIMIT 5;
+        LIMIT 100;
     """
     debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
     logger.info("\nDebug - Sample order data:")
+    filtered_debug = []
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}")
+        netto = _parse_netto_pln(row[3])
+        logger.info(f"Manager: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}, Parsed: {netto}")
         logger.info(f"Parsed dates - Confirmation: {row[4]}, Realization: {row[5]}")
+        if netto != 0:
+            filtered_debug.append(row)
+    logger.info(f"Filtered debug orders (netto != 0): {len(filtered_debug)} из {len(debug_results)}")
     
     query = f"""
         WITH order_metrics AS (

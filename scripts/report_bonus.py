@@ -133,6 +133,17 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     
     return metrics
 
+def _parse_netto_pln(value):
+    """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""
+    if value is None:
+        return 0.0
+    try:
+        import re
+        cleaned = re.sub(r'[^0-9,.-]', '', str(value)).replace(',', '.').replace(' ', '')
+        return float(cleaned)
+    except Exception:
+        return 0.0
+
 def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     """Get actual KPI values for the period."""
     # Get task counts
@@ -259,6 +270,21 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     offer_results = _execute_query(offer_query, (
         start_date, end_date, PLANFIX_USER_IDS
     ), "Offer counts")
+    
+    # Фильтрация на Python-уровне: исключаем заказы с нулевой суммой
+    filtered_offer_results = []
+    for row in offer_results:
+        # row: (manager_id, 'OFW', count)
+        # Получаем сумму по этому заказу, если есть (если count — это количество, то фильтруем по id, если есть сумма — по сумме)
+        # Если в выборке нет суммы, то фильтрация уже на SQL, иначе — фильтруем здесь
+        # Для универсальности: если есть поле wartosc_netto_pln, фильтруем по нему
+        if len(row) > 3:
+            netto = _parse_netto_pln(row[3])
+            if netto != 0:
+                filtered_offer_results.append(row)
+        else:
+            filtered_offer_results.append(row)  # если суммы нет, оставляем как есть
+    offer_results = filtered_offer_results
     
     # Combine results into a dictionary
     actual_values = {}
