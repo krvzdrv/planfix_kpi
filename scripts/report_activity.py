@@ -136,6 +136,9 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         AND TO_TIMESTAMP(o.data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s 
         AND TO_TIMESTAMP(o.data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') < %s
         AND o.menedzher = ANY(%s)
+        AND o.wartosc_netto_pln IS NOT NULL
+        AND o.wartosc_netto_pln != ''
+        AND CAST(REPLACE(REPLACE(o.wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
         GROUP BY hour, o.menedzher
 
         UNION ALL
@@ -150,6 +153,9 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         AND TO_TIMESTAMP(o.data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s 
         AND TO_TIMESTAMP(o.data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') < %s
         AND o.menedzher = ANY(%s)
+        AND o.wartosc_netto_pln IS NOT NULL
+        AND o.wartosc_netto_pln != ''
+        AND CAST(REPLACE(REPLACE(o.wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
         GROUP BY hour, o.menedzher
     )
     SELECT 

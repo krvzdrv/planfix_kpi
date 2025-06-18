@@ -236,6 +236,9 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') < %s::timestamp
             AND menedzher IN %s
             AND is_deleted = false
+            AND wartosc_netto_pln IS NOT NULL
+            AND wartosc_netto_pln != ''
+            AND CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
         GROUP BY menedzher;
     """
     

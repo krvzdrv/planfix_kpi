@@ -298,6 +298,9 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') < %s::timestamp
                 AND menedzher IN %s
                 AND is_deleted = false
+                AND wartosc_netto_pln IS NOT NULL
+                AND wartosc_netto_pln != ''
+                AND CAST(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.') AS DECIMAL) != 0
             GROUP BY menedzher
             UNION ALL
             SELECT
