@@ -32,5 +32,8 @@ jobs:
         SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID_CLIENTS: '-1001866680518'
+        PYTHONUNBUFFERED: "1"  # Это обеспечит немедленный вывод логов
       run: |
-        python scripts/report_clients_status.py 
+        echo "Starting report generation..."
+        python -u scripts/report_clients_status.py
+        echo "Report generation finished." 

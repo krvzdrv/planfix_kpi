@@ -216,13 +216,18 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
 def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
     try:
+        logger.info(f"Attempting to send message to Telegram chat {CHAT_ID}")
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {
             'chat_id': CHAT_ID,
             'text': f"```\n{message}\n```",
             'parse_mode': 'Markdown'
         }
+        logger.info(f"Sending request to Telegram API...")
         response = requests.post(url, json=payload, timeout=10)
+        logger.info(f"Telegram API response status code: {response.status_code}")
+        logger.info(f"Telegram API response text: {response.text}")
+        
         if response.status_code != 200:
             logger.error(f"Failed to send message to Telegram: {response.text}")
         else:
@@ -234,15 +239,22 @@ def send_to_telegram(message: str):
 def main():
     """Основная функция для генерации и отправки отчёта."""
     today = date.today()
+    logger.info(f"Starting client status report generation for date: {today}")
     
     for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
         try:
+            logger.info(f"Processing report for manager: {manager}")
             status_changes = get_client_status_changes(manager, today)
+            logger.info(f"Got status changes for {manager}: {status_changes}")
             report = format_client_status_report(manager, status_changes)
+            logger.info(f"Formatted report for {manager}:\n{report}")
             send_to_telegram(report)
             logger.info(f"Client status report for {manager} sent successfully")
         except Exception as e:
-            logger.error(f"Error processing report for {manager}: {e}")
+            logger.error(f"Error processing report for {manager}: {str(e)}")
+            logger.exception("Full traceback:")  # Это выведет полный traceback ошибки
 
 if __name__ == "__main__":
-    main() 
+    logger.info("Client status report script started")
+    main()
+    logger.info("Client status report script finished") 
