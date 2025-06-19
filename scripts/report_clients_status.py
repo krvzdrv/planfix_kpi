@@ -24,7 +24,7 @@ PG_USER = os.environ.get('SUPABASE_USER')
 PG_PASSWORD = os.environ.get('SUPABASE_PASSWORD')
 PG_PORT = os.environ.get('SUPABASE_PORT')
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID_CLIENTS', '-1001866680518')  # Специальный чат для отчёта по клиентам
 
 logger = logging.getLogger(__name__)
 
