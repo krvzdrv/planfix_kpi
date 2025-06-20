@@ -64,6 +64,9 @@ CUSTOM_MAP = {
     "Status współpracy": "status_wspolpracy"
 }
 
+# Поля-справочники, для которых нужно брать текстовое значение (text), а не ID (value)
+TEXT_VALUE_FIELDS = ["Menedżer", "Status współpracy"]
+
 logger = logging.getLogger(__name__)
 
 def get_planfix_companies(page):
@@ -137,8 +140,8 @@ def company_to_dict(contact):
             value = cv.find('value')
             text = cv.find('text')
             if field is not None and field.text in CUSTOM_MAP:
-                # Для поля "Menedżer" сохраняем text (имя), а не value (ID)
-                if field.text == "Menedżer":
+                # Для полей-справочников сохраняем text (имя), а не value (ID)
+                if field.text in TEXT_VALUE_FIELDS:
                     custom_fields[CUSTOM_MAP[field.text]] = text.text if text is not None else None
                 else:
                     custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
