@@ -181,34 +181,24 @@ def get_supabase_connection() -> psycopg2.extensions.connection:
     """
     try:
         logger.info("Attempting to connect to Supabase...")
-        if SUPABASE_CONNECTION_STRING:
-            conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
-        else:
-            # Check if all required parameters are present
-            required_params = {
-                'SUPABASE_HOST': SUPABASE_HOST,
-                'SUPABASE_DB': SUPABASE_DB,
-                'SUPABASE_USER': SUPABASE_USER,
-                'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
-                'SUPABASE_PORT': SUPABASE_PORT
-            }
-            missing_params = [name for name, value in required_params.items() if not value]
-            if missing_params:
-                error_message = f"Missing required Supabase connection parameters: {', '.join(missing_params)}"
-                logger.error(error_message)
-                raise ValueError(error_message)
-            
-            conn = psycopg2.connect(
-                host=SUPABASE_HOST,
-                dbname=SUPABASE_DB,
-                user=SUPABASE_USER,
-                password=SUPABASE_PASSWORD,
-                port=SUPABASE_PORT
-            )
+        conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
         logger.info("Successfully connected to Supabase.")
         return conn
+    except psycopg2.OperationalError as e:
+        logger.critical(f"Could not connect to Supabase: {e}")
+        raise
+
+def create_table_if_not_exists(conn, create_sql):
+    """Executes a CREATE TABLE IF NOT EXISTS statement."""
+    try:
+        with conn.cursor() as cur:
+            logger.info(f"Executing CREATE TABLE statement...")
+            cur.execute(create_sql)
+            conn.commit()
+            logger.info("Table statement executed successfully.")
     except psycopg2.Error as e:
-        logger.error(f"Failed to connect to Supabase: {e}")
+        logger.error(f"Error executing CREATE TABLE statement: {e}")
+        conn.rollback()
         raise
 
 def upsert_data_to_supabase(conn: psycopg2.extensions.connection, table_name: str, primary_key_column: str, column_names: list[str], data_list: list[dict]) -> None:
