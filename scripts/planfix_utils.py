@@ -174,17 +174,28 @@ def get_planfix_status_name(status_id: str) -> str | None:
         return None
 
 
-def get_supabase_connection() -> psycopg2.extensions.connection:
-    """
-    Establishes and returns a Supabase connection.
-    Logs an error and raises ValueError if connection parameters are missing.
-    """
+def get_supabase_connection():
+    """Establishes a connection to the Supabase database."""
     try:
         logger.info("Attempting to connect to Supabase...")
-        conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
+        if SUPABASE_CONNECTION_STRING:
+            conn = psycopg2.connect(SUPABASE_CONNECTION_STRING)
+        else:
+            # Fallback to individual parameters if connection string is not provided
+            required_params = {
+                'SUPABASE_HOST': SUPABASE_HOST, 'SUPABASE_DB': SUPABASE_DB,
+                'SUPABASE_USER': SUPABASE_USER, 'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
+                'SUPABASE_PORT': SUPABASE_PORT
+            }
+            if any(not v for v in required_params.values()):
+                raise ValueError(f"Missing one or more Supabase connection parameters: {', '.join(k for k, v in required_params.items() if not v)}")
+            conn = psycopg2.connect(
+                host=SUPABASE_HOST, dbname=SUPABASE_DB,
+                user=SUPABASE_USER, password=SUPABASE_PASSWORD, port=SUPABASE_PORT
+            )
         logger.info("Successfully connected to Supabase.")
         return conn
-    except psycopg2.OperationalError as e:
+    except (psycopg2.OperationalError, ValueError) as e:
         logger.critical(f"Could not connect to Supabase: {e}")
         raise
 
