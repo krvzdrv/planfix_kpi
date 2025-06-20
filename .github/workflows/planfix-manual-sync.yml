@@ -1,0 +1,57 @@
+name: Manual Planfix Data Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Which script to run?'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - clients
+          - orders
+          - tasks
+
+jobs:
+  run-sync-scripts:
+    runs-on: ubuntu-latest
+
+    env:
+      PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
+      PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+      PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+      SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+      SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+      SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
+      SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
+      SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+      SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Run Clients Export
+        if: github.event.inputs.script == 'all' || github.event.inputs.script == 'clients'
+        run: python scripts/planfix_export_clients.py
+
+      - name: Run Orders Export
+        if: github.event.inputs.script == 'all' || github.event.inputs.script == 'orders'
+        run: python scripts/planfix_export_orders.py
+
+      - name: Run Tasks Export
+        if: github.event.inputs.script == 'all' || github.event.inputs.script == 'tasks'
+        run: python scripts/planfix_export_tasks.py 
