@@ -134,6 +134,11 @@ def company_to_dict(contact):
     # custom fields
     custom_fields = {v: None for v in CUSTOM_MAP.values()}
     custom_data_root = contact.find('customData')
+    
+    # DEBUG: Log the entire customData block to see what we're getting
+    if custom_data_root is not None:
+        logger.info(f"DEBUG: Custom data for contact ID {get_text('id')}: {ET.tostring(custom_data_root, encoding='unicode')}")
+
     if custom_data_root is not None:
         for cv in custom_data_root.findall('customValue'):
             field = cv.find('field/name')
