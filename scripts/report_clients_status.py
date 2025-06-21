@@ -138,6 +138,8 @@ def get_client_status_changes(manager: str, current_date: date) -> dict:
 
 def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
     """Форматировать прогресс-бар из символов █."""
+    if max_value == 0:
+        return ' ' * width
     filled = int(round(width * value / max_value)) if max_value > 0 else 0
     return '█' * filled + ' ' * (width - filled)
 
@@ -188,7 +190,6 @@ def send_to_telegram(message: str):
         logger.info(f"Sending request to Telegram API...")
         response = requests.post(url, json=payload, timeout=10)
         logger.info(f"Telegram API response status code: {response.status_code}")
-        logger.info(f"Telegram API response text: {response.text}")
         
         if response.status_code != 200:
             logger.error(f"Failed to send message to Telegram: {response.text}")
@@ -210,26 +211,23 @@ def main():
     max_counts = get_max_counts_by_status(managers_data)
     logger.info(f"Max counts by status: {max_counts}")
     
-    # Генерируем отчёты для каждого менеджера
-    all_reports = []
-    
+    # Генерируем и отправляем отчёты для каждого менеджера
     for manager in managers_data.keys():
         try:
             logger.info(f"Processing report for manager: {manager}")
             status_changes = get_client_status_changes(manager, today)
             logger.info(f"Got status changes for {manager}: {status_changes}")
             report = format_client_status_report(manager, status_changes, max_counts)
-            all_reports.append(report)
             logger.info(f"Formatted report for {manager}")
+            
+            # Отправляем отчёт сразу после формирования
+            logger.info(f"Sending report for {manager} to Telegram")
+            send_to_telegram(report)
+            logger.info(f"Report for {manager} sent successfully")
+            
         except Exception as e:
             logger.error(f"Error processing report for {manager}: {str(e)}")
             logger.exception("Full traceback:")
-    
-    # Отправляем отчёты по отдельности
-    for report in all_reports:
-        logger.info(f"Sending report to Telegram")
-        send_to_telegram(report)
-        logger.info("Report sent successfully")
 
 if __name__ == "__main__":
     logger.info("Client status report script started")
