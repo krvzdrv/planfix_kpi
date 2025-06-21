@@ -169,10 +169,6 @@ def company_to_dict(contact):
     # custom fields
     custom_fields = {v: None for v in CUSTOM_MAP.values()}
     custom_data_root = contact.find('customData')
-    
-    # DEBUG: Log the entire customData block to see what we're getting
-    if custom_data_root is not None:
-        logger.info(f"DEBUG: Custom data for contact ID {get_text('id')}: {ET.tostring(custom_data_root, encoding='unicode')}")
 
     if custom_data_root is not None:
         for cv in custom_data_root.findall('customValue'):
@@ -182,17 +178,9 @@ def company_to_dict(contact):
             if field is not None and field.text in CUSTOM_MAP:
                 # Для полей-справочников сохраняем text (имя), а не value (ID)
                 if field.text in TEXT_VALUE_FIELDS:
-                    field_value = text.text if text is not None else None
-                    logger.info(f"DEBUG: Processing TEXT_VALUE_FIELD '{field.text}' -> '{field_value}'")
+                    custom_fields[CUSTOM_MAP[field.text]] = text.text if text is not None else None
                 else:
-                    field_value = value.text if value is not None else None
-                    logger.info(f"DEBUG: Processing regular field '{field.text}' -> '{field_value}'")
-                
-                custom_fields[CUSTOM_MAP[field.text]] = field_value
-                logger.info(f"DEBUG: Set custom field '{CUSTOM_MAP[field.text]}' = '{field_value}'")
-
-    # Log the final custom_fields for debugging
-    logger.info(f"DEBUG: Final custom_fields for contact {get_text('id')}: {custom_fields}")
+                    custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
 
     # responsible user
     responsible_user_id = None

@@ -247,10 +247,6 @@ def upsert_data_to_supabase(conn: psycopg2.extensions.connection, table_name: st
             records_to_insert.append(tuple(record_values))
 
         if records_to_insert:
-            # Log first record for debugging
-            logger.info(f"DEBUG: First record to upsert - columns: {column_names}")
-            logger.info(f"DEBUG: First record to upsert - values: {records_to_insert[0]}")
-            
             # logger.debug(f"Upsert query: {upsert_query}")
             # logger.debug(f"First record to upsert (sample): {records_to_insert[0]}")
             psycopg2.extras.execute_batch(cursor, upsert_query, records_to_insert)
@@ -287,12 +283,7 @@ def add_missing_columns(conn, table_name, expected_columns_map):
 
             missing_columns = [col for col in expected_columns_map if col not in existing_columns]
 
-            logger.info(f"DEBUG: Existing columns in {table_name}: {sorted(existing_columns)}")
-            logger.info(f"DEBUG: Expected columns: {sorted(expected_columns_map.keys())}")
-            logger.info(f"DEBUG: Missing columns: {missing_columns}")
-
             if not missing_columns:
-                # logger.info(f"All expected columns are present in table '{table_name}'.")
                 return
 
             logger.info(f"Found missing columns in '{table_name}': {missing_columns}. Adding them.")

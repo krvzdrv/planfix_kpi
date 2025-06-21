@@ -29,7 +29,7 @@ CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID_CLIENTS', '-1001866680518')  # Спе
 logger = logging.getLogger(__name__)
 
 # Статусы клиентов и их порядок в отчёте
-CLIENT_STATUSES = ['NWI', 'WTR', 'PSK', 'PIR', 'STL', 'NAK', 'REZ']
+CLIENT_STATUSES = ['Nowi', 'W trakcie', 'Perspektywiczni', 'Rezygnacja']
 
 def _execute_query(query: str, params: tuple, description: str) -> list:
     conn = None
@@ -51,108 +51,35 @@ def _execute_query(query: str, params: tuple, description: str) -> list:
 def get_client_statuses(manager: str, current_date: date) -> dict:
     """Получить текущие статусы клиентов для менеджера."""
     query = """
-    WITH status_counts AS (
-        SELECT
-            'NWI' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_nowi IS NOT NULL
-            AND data_dodania_do_nowi != ''
-            AND TO_DATE(data_dodania_do_nowi, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'WTR' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_w_trakcie IS NOT NULL
-            AND data_dodania_do_w_trakcie != ''
-            AND TO_DATE(data_dodania_do_w_trakcie, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'PSK' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_perspektywiczni IS NOT NULL
-            AND data_dodania_do_perspektywiczni != ''
-            AND TO_DATE(data_dodania_do_perspektywiczni, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'PIR' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_pir IS NOT NULL
-            AND data_dodania_do_pir != ''
-            AND TO_DATE(data_dodania_do_pir, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'STL' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_stali IS NOT NULL
-            AND data_dodania_do_stali != ''
-            AND TO_DATE(data_dodania_do_stali, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'NAK' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_nakladka IS NOT NULL
-            AND data_dodania_do_nakladka != ''
-            AND TO_DATE(data_dodania_do_nakladka, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-        
-        UNION ALL
-        
-        SELECT
-            'REZ' as status,
-            COUNT(*) as count
-        FROM planfix_clients
-        WHERE menedzer = %s
-            AND data_dodania_do_rezygnacja IS NOT NULL
-            AND data_dodania_do_rezygnacja != ''
-            AND TO_DATE(data_dodania_do_rezygnacja, 'DD-MM-YYYY') <= %s
-            AND is_deleted = false
-        GROUP BY menedzer
-    )
-    SELECT status, COALESCE(count, 0) as count
-    FROM (
-        SELECT unnest(ARRAY['NWI', 'WTR', 'PSK', 'PIR', 'STL', 'NAK', 'REZ']) as status
-    ) s
-    LEFT JOIN status_counts sc USING (status)
-    ORDER BY array_position(ARRAY['NWI', 'WTR', 'PSK', 'PIR', 'STL', 'NAK', 'REZ'], status);
+    SELECT 
+        status_wspolpracy as status,
+        COUNT(*) as count
+    FROM planfix_clients
+    WHERE menedzer = %s
+        AND status_wspolpracy IS NOT NULL
+        AND status_wspolpracy != ''
+        AND is_deleted = false
+    GROUP BY status_wspolpracy
+    ORDER BY status_wspolpracy;
     """
     
-    params = tuple([manager, current_date] * 7)  # Для каждого статуса
+    params = (manager,)
     results = _execute_query(query, params, f"client statuses for {manager}")
     
-    return {row[0]: row[1] for row in results}
+    # Создаем словарь с нулевыми значениями для всех статусов
+    status_counts = {status: 0 for status in CLIENT_STATUSES}
+    
+    # Заполняем реальными данными
+    for row in results:
+        status = row[0]
+        count = row[1]
+        if status in status_counts:
+            status_counts[status] = count
+        else:
+            # Если встретился неизвестный статус, добавляем его
+            status_counts[status] = count
+    
+    return status_counts
 
 def get_client_status_changes(manager: str, current_date: date) -> dict:
     """Получить изменения в статусах клиентов за последние сутки."""
@@ -209,7 +136,7 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
         lines.append(status_line)
     
     lines.append("─" * 35)
-    lines.append(f"{'':19d} {total:3d}    {'+' if sum(d['change'] for d in status_changes.values()) > 0 else ''}{sum(d['change'] for d in status_changes.values()):3d} 100%")
+    lines.append(f"{'':19s} {total:3d}    {'+' if sum(d['change'] for d in status_changes.values()) > 0 else ''}{sum(d['change'] for d in status_changes.values()):3d} 100%")
     
     return "\n".join(lines)
 
