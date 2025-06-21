@@ -36,7 +36,7 @@ STATUS_MAPPING = {
     'Nowi': 'NWI',
     'W trakcie': 'WTR', 
     'Perspektywiczni': 'PSK',
-    'Pir': 'PIZ',
+    'Pierwsze zamówienie': 'PIZ',
     'Stali': 'STL',
     'Nakladka': 'NAK',
     'Rezygnacja': 'REZ'
@@ -90,6 +90,24 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
     
     return status_counts
 
+def get_all_managers_statuses(current_date: date) -> dict:
+    """Получить статусы клиентов для всех менеджеров."""
+    managers_data = {}
+    for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
+        managers_data[manager] = get_client_statuses(manager, current_date)
+    return managers_data
+
+def get_max_counts_by_status(managers_data: dict) -> dict:
+    """Получить максимальное количество клиентов для каждого статуса среди всех менеджеров."""
+    max_counts = {status: 0 for status in CLIENT_STATUSES}
+    
+    for manager_data in managers_data.values():
+        for status, count in manager_data.items():
+            if count > max_counts[status]:
+                max_counts[status] = count
+    
+    return max_counts
+
 def get_client_status_changes(manager: str, current_date: date) -> dict:
     """Получить изменения в статусах клиентов за последние сутки."""
     yesterday = current_date - timedelta(days=1)
@@ -123,12 +141,12 @@ def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
     filled = int(round(width * value / max_value)) if max_value > 0 else 0
     return '█' * filled + ' ' * (width - filled)
 
-def format_client_status_report(manager: str, status_changes: dict) -> str:
-    """Форматировать отчёт по статусам клиентов."""
+def format_client_status_report(manager: str, status_changes: dict, max_counts: dict) -> str:
+    """Форматировать отчёт по статусам клиентов для одного менеджера."""
     total = sum(data['current'] for data in status_changes.values())
     
     lines = []
-    lines.append(f"Woronka {date.today().strftime('%d.%m.%Y')}\n")
+    lines.append(f"{manager} {date.today().strftime('%d.%m.%Y')}\n")
     
     for status in CLIENT_STATUSES:
         data = status_changes[status]
@@ -136,6 +154,9 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
         change = data['change']
         direction = data['direction']
         percentage = (current / total * 100) if total > 0 else 0
+        
+        # Используем максимальное количество для масштабирования прогресс-бара
+        max_count = max_counts[status]
         
         # Форматируем строку изменения
         if change > 0:
@@ -146,7 +167,7 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
             change_str = f"{direction}     "
         
         # Форматируем строку статуса
-        status_line = f"{status} {format_progress_bar(current, total)}{current:3d} {change_str} ({percentage:2.0f}%)"
+        status_line = f"{status} {format_progress_bar(current, max_count)}{current:3d} {change_str} ({percentage:2.0f}%)"
         lines.append(status_line)
     
     lines.append("─" * 32)
@@ -182,27 +203,33 @@ def main():
     today = date.today()
     logger.info(f"Starting client status report generation for date: {today}")
     
-    # Собираем данные для всех менеджеров
+    # Получаем данные для всех менеджеров
+    managers_data = get_all_managers_statuses(today)
+    
+    # Получаем максимальные количества для масштабирования
+    max_counts = get_max_counts_by_status(managers_data)
+    logger.info(f"Max counts by status: {max_counts}")
+    
+    # Генерируем отчёты для каждого менеджера
     all_reports = []
     
-    for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
+    for manager in managers_data.keys():
         try:
             logger.info(f"Processing report for manager: {manager}")
             status_changes = get_client_status_changes(manager, today)
             logger.info(f"Got status changes for {manager}: {status_changes}")
-            report = format_client_status_report(manager, status_changes)
+            report = format_client_status_report(manager, status_changes, max_counts)
             all_reports.append(report)
             logger.info(f"Formatted report for {manager}")
         except Exception as e:
             logger.error(f"Error processing report for {manager}: {str(e)}")
             logger.exception("Full traceback:")
     
-    # Отправляем один общий отчёт
-    if all_reports:
-        combined_report = "\n\n".join(all_reports)
-        logger.info(f"Sending combined report to Telegram")
-        send_to_telegram(combined_report)
-        logger.info("Combined client status report sent successfully")
+    # Отправляем отчёты по отдельности
+    for report in all_reports:
+        logger.info(f"Sending report to Telegram")
+        send_to_telegram(report)
+        logger.info("Report sent successfully")
 
 if __name__ == "__main__":
     logger.info("Client status report script started")
