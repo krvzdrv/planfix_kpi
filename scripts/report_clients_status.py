@@ -28,8 +28,19 @@ CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID_CLIENTS', '-1001866680518')  # Спе
 
 logger = logging.getLogger(__name__)
 
-# Статусы клиентов и их порядок в отчёте
-CLIENT_STATUSES = ['Nowi', 'W trakcie', 'Perspektywiczni', 'Rezygnacja']
+# Статусы клиентов и их порядок в отчёте (сокращённые названия)
+CLIENT_STATUSES = ['NWI', 'WTR', 'PSK', 'PIZ', 'STL', 'NAK', 'REZ']
+
+# Сопоставление полных названий статусов с сокращёнными
+STATUS_MAPPING = {
+    'Nowi': 'NWI',
+    'W trakcie': 'WTR', 
+    'Perspektywiczni': 'PSK',
+    'Pir': 'PIZ',
+    'Stali': 'STL',
+    'Nakladka': 'NAK',
+    'Rezygnacja': 'REZ'
+}
 
 def _execute_query(query: str, params: tuple, description: str) -> list:
     conn = None
@@ -71,13 +82,11 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
     
     # Заполняем реальными данными
     for row in results:
-        status = row[0]
+        full_status = row[0]
         count = row[1]
-        if status in status_counts:
-            status_counts[status] = count
-        else:
-            # Если встретился неизвестный статус, добавляем его
-            status_counts[status] = count
+        short_status = STATUS_MAPPING.get(full_status, full_status)
+        if short_status in status_counts:
+            status_counts[short_status] = count
     
     return status_counts
 
@@ -99,7 +108,7 @@ def get_client_status_changes(manager: str, current_date: date) -> dict:
         elif diff < 0:
             direction = "▼"
         else:
-            direction = "-"
+            direction = "➖"
             
         changes[status] = {
             'current': curr_count,
@@ -119,7 +128,7 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
     total = sum(data['current'] for data in status_changes.values())
     
     lines = []
-    lines.append(f"{manager} {date.today().strftime('%d.%m.%Y')}\n")
+    lines.append(f"Woronka {date.today().strftime('%d.%m.%Y')}\n")
     
     for status in CLIENT_STATUSES:
         data = status_changes[status]
@@ -129,14 +138,19 @@ def format_client_status_report(manager: str, status_changes: dict) -> str:
         percentage = (current / total * 100) if total > 0 else 0
         
         # Форматируем строку изменения
-        change_str = f"{direction:1s} {'+' if change > 0 else ''}{change:3d}" if change != 0 else f"{direction:1s}     "
+        if change > 0:
+            change_str = f"{direction} +{change:2d}"
+        elif change < 0:
+            change_str = f"{direction} {change:3d}"
+        else:
+            change_str = f"{direction}     "
         
         # Форматируем строку статуса
-        status_line = f"{status} {format_progress_bar(current, total)}{current:3d} {change_str} {percentage:3.0f}%"
+        status_line = f"{status} {format_progress_bar(current, total)}{current:3d} {change_str} ({percentage:2.0f}%)"
         lines.append(status_line)
     
-    lines.append("─" * 35)
-    lines.append(f"{'':19s} {total:3d}    {'+' if sum(d['change'] for d in status_changes.values()) > 0 else ''}{sum(d['change'] for d in status_changes.values()):3d} 100%")
+    lines.append("─" * 32)
+    lines.append(f"👥 Wszyscy klienci: {total:8d}")
     
     return "\n".join(lines)
 
@@ -168,18 +182,27 @@ def main():
     today = date.today()
     logger.info(f"Starting client status report generation for date: {today}")
     
+    # Собираем данные для всех менеджеров
+    all_reports = []
+    
     for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
         try:
             logger.info(f"Processing report for manager: {manager}")
             status_changes = get_client_status_changes(manager, today)
             logger.info(f"Got status changes for {manager}: {status_changes}")
             report = format_client_status_report(manager, status_changes)
-            logger.info(f"Formatted report for {manager}:\n{report}")
-            send_to_telegram(report)
-            logger.info(f"Client status report for {manager} sent successfully")
+            all_reports.append(report)
+            logger.info(f"Formatted report for {manager}")
         except Exception as e:
             logger.error(f"Error processing report for {manager}: {str(e)}")
-            logger.exception("Full traceback:")  # Это выведет полный traceback ошибки
+            logger.exception("Full traceback:")
+    
+    # Отправляем один общий отчёт
+    if all_reports:
+        combined_report = "\n\n".join(all_reports)
+        logger.info(f"Sending combined report to Telegram")
+        send_to_telegram(combined_report)
+        logger.info("Combined client status report sent successfully")
 
 if __name__ == "__main__":
     logger.info("Client status report script started")
