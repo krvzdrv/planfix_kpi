@@ -143,7 +143,18 @@ def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
     filled = int(round(width * value / max_value)) if max_value > 0 else 0
     return '█' * filled + ' ' * (width - filled)
 
-def format_client_status_report(manager: str, status_changes: dict, max_counts: dict) -> str:
+def get_global_max_count(managers_data: dict) -> int:
+    """Получить глобальный максимум количества клиентов среди всех статусов и всех менеджеров."""
+    global_max = 0
+    
+    for manager_data in managers_data.values():
+        for count in manager_data.values():
+            if count > global_max:
+                global_max = count
+    
+    return global_max
+
+def format_client_status_report(manager: str, status_changes: dict, global_max: int) -> str:
     """Форматировать отчёт по статусам клиентов для одного менеджера."""
     total = sum(data['current'] for data in status_changes.values())
     
@@ -157,8 +168,8 @@ def format_client_status_report(manager: str, status_changes: dict, max_counts: 
         direction = data['direction']
         percentage = (current / total * 100) if total > 0 else 0
         
-        # Используем максимальное количество для масштабирования прогресс-бара
-        max_count = max_counts[status]
+        # Используем глобальный максимум для масштабирования прогресс-бара
+        max_count = global_max
         
         # Форматируем строку изменения
         if change > 0:
@@ -207,9 +218,9 @@ def main():
     # Получаем данные для всех менеджеров
     managers_data = get_all_managers_statuses(today)
     
-    # Получаем максимальные количества для масштабирования
-    max_counts = get_max_counts_by_status(managers_data)
-    logger.info(f"Max counts by status: {max_counts}")
+    # Получаем глобальный максимум для масштабирования
+    global_max = get_global_max_count(managers_data)
+    logger.info(f"Global max count: {global_max}")
     
     # Генерируем и отправляем отчёты для каждого менеджера
     for manager in managers_data.keys():
@@ -217,7 +228,7 @@ def main():
             logger.info(f"Processing report for manager: {manager}")
             status_changes = get_client_status_changes(manager, today)
             logger.info(f"Got status changes for {manager}: {status_changes}")
-            report = format_client_status_report(manager, status_changes, max_counts)
+            report = format_client_status_report(manager, status_changes, global_max)
             logger.info(f"Formatted report for {manager}")
             
             # Отправляем отчёт сразу после формирования
