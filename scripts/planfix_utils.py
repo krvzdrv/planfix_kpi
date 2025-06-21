@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 import logging
 from dotenv import load_dotenv
+import psycopg2.extras
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
@@ -246,23 +247,75 @@ def upsert_data_to_supabase(conn: psycopg2.extensions.connection, table_name: st
             records_to_insert.append(tuple(record_values))
 
         if records_to_insert:
+            # Log first record for debugging
+            logger.info(f"DEBUG: First record to upsert - columns: {column_names}")
+            logger.info(f"DEBUG: First record to upsert - values: {records_to_insert[0]}")
+            
             # logger.debug(f"Upsert query: {upsert_query}")
             # logger.debug(f"First record to upsert (sample): {records_to_insert[0]}")
-            cursor.executemany(upsert_query, records_to_insert)
-            conn.commit()
-            logger.info(f"Successfully upserted {len(records_to_insert)} records to '{table_name}'.")
-        else:
-            logger.info(f"No valid records to upsert to '{table_name}' after processing data_list.")
+            psycopg2.extras.execute_batch(cursor, upsert_query, records_to_insert)
+            logger.info(f"Successfully upserted {len(records_to_insert)} records to table '{table_name}'.")
 
-    except Exception as e:
-        if conn: # only try to rollback if conn exists
+        conn.commit()
+    except psycopg2.Error as e:
+        logger.error(f"Database error during upsert to table '{table_name}': {e}")
+        if conn:
             conn.rollback()
-        logger.error(f"Error during Supabase upsert to table '{table_name}': {e}")
-        # logger.exception("Exception details during Supabase upsert:") # If more detail is needed
+        raise
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during upsert to table '{table_name}': {e}")
+        if conn:
+            conn.rollback()
         raise
     finally:
         if cursor:
             cursor.close()
+
+def add_missing_columns(conn, table_name, expected_columns_map):
+    """
+    Checks if all expected columns exist in the table and adds any missing ones.
+    The type of the new column is determined by expected_columns_map.
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s;
+            """, (table_name,))
+            existing_columns = {row[0] for row in cur.fetchall()}
+
+            missing_columns = [col for col in expected_columns_map if col not in existing_columns]
+
+            logger.info(f"DEBUG: Existing columns in {table_name}: {sorted(existing_columns)}")
+            logger.info(f"DEBUG: Expected columns: {sorted(expected_columns_map.keys())}")
+            logger.info(f"DEBUG: Missing columns: {missing_columns}")
+
+            if not missing_columns:
+                # logger.info(f"All expected columns are present in table '{table_name}'.")
+                return
+
+            logger.info(f"Found missing columns in '{table_name}': {missing_columns}. Adding them.")
+
+            alter_statements = []
+            for col in missing_columns:
+                col_type = expected_columns_map.get(col, "TEXT") # Default to TEXT
+                alter_statements.append(f'ADD COLUMN IF NOT EXISTS "{col}" {col_type}')
+
+            if not alter_statements:
+                return
+
+            alter_query = f'ALTER TABLE "{table_name}" {", ".join(alter_statements)};'
+
+            logger.info(f"Executing ALTER TABLE statement: {alter_query}")
+            cur.execute(alter_query)
+            conn.commit()
+            logger.info(f"Successfully added missing columns to '{table_name}'.")
+
+    except psycopg2.Error as e:
+        logger.error(f"Error checking or adding columns for table '{table_name}': {e}")
+        conn.rollback()
+        raise
 
 def mark_items_as_deleted_in_supabase(conn: psycopg2.extensions.connection, table_name: str, id_column_name: str, actual_ids: list[int | str]) -> None:
     """

@@ -67,6 +67,41 @@ CUSTOM_MAP = {
 # Поля-справочники, для которых нужно брать текстовое значение (text), а не ID (value)
 TEXT_VALUE_FIELDS = ["Menedżer", "Status współpracy"]
 
+BASE_COLUMNS = {
+    "id": "BIGINT",
+    "userid": "BIGINT",
+    "general": "BIGINT",
+    "template_id": "BIGINT",
+    "name": "TEXT",
+    "last_name": "TEXT",
+    "is_company": "BOOLEAN",
+    "post": "TEXT",
+    "email": "TEXT",
+    "site": "TEXT",
+    "phones": "JSONB",
+    "address": "TEXT",
+    "description": "TEXT",
+    "sex": "TEXT",
+    "skype": "TEXT",
+    "facebook": "TEXT",
+    "vk": "TEXT",
+    "telegram_id": "TEXT",
+    "telegram_name": "TEXT",
+    "group_id": "BIGINT",
+    "group_name": "TEXT",
+    "icq": "TEXT",
+    "can_be_worker": "BOOLEAN",
+    "can_be_client": "BOOLEAN",
+    "user_pic": "TEXT",
+    "birthdate": "TEXT",
+    "created_date": "TIMESTAMP",
+    "have_planfix_access": "BOOLEAN",
+    "responsible_user_id": "BIGINT",
+    "responsible_user_name": "TEXT",
+    "updated_at": "TIMESTAMP",
+    "is_deleted": "BOOLEAN"
+}
+
 logger = logging.getLogger(__name__)
 
 def get_planfix_companies(page):
@@ -147,9 +182,17 @@ def company_to_dict(contact):
             if field is not None and field.text in CUSTOM_MAP:
                 # Для полей-справочников сохраняем text (имя), а не value (ID)
                 if field.text in TEXT_VALUE_FIELDS:
-                    custom_fields[CUSTOM_MAP[field.text]] = text.text if text is not None else None
+                    field_value = text.text if text is not None else None
+                    logger.info(f"DEBUG: Processing TEXT_VALUE_FIELD '{field.text}' -> '{field_value}'")
                 else:
-                    custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
+                    field_value = value.text if value is not None else None
+                    logger.info(f"DEBUG: Processing regular field '{field.text}' -> '{field_value}'")
+                
+                custom_fields[CUSTOM_MAP[field.text]] = field_value
+                logger.info(f"DEBUG: Set custom field '{CUSTOM_MAP[field.text]}' = '{field_value}'")
+
+    # Log the final custom_fields for debugging
+    logger.info(f"DEBUG: Final custom_fields for contact {get_text('id')}: {custom_fields}")
 
     # responsible user
     responsible_user_id = None
@@ -215,185 +258,101 @@ def company_to_dict(contact):
     base.update(custom_fields)
     return base
 
-def get_create_table_sql(table_name, pk_column, columns):
-    # Dynamically create the column definitions from the keys of the first data row
-    column_definitions = [
-        f"id BIGINT PRIMARY KEY",
-        f"userid BIGINT",
-        f"general BIGINT",
-        f"template_id BIGINT",
-        f"name TEXT",
-        f"last_name TEXT",
-        f"is_company BOOLEAN",
-        f"post TEXT",
-        f"email TEXT",
-        f"site TEXT",
-        f"phones JSONB",
-        f"address TEXT",
-        f"description TEXT",
-        f"sex TEXT",
-        f"skype TEXT",
-        f"facebook TEXT",
-        f"vk TEXT",
-        f"telegram_id TEXT",
-        f"telegram_name TEXT",
-        f"group_id BIGINT",
-        f"group_name TEXT",
-        f"icq TEXT",
-        f"can_be_worker BOOLEAN",
-        f"can_be_client BOOLEAN",
-        f"user_pic TEXT",
-        f"birthdate TEXT",
-        f"created_date TIMESTAMP",
-        f"have_planfix_access BOOLEAN",
-        f"responsible_user_id BIGINT",
-        f"responsible_user_name TEXT",
-        f"updated_at TIMESTAMP",
-        f"is_deleted BOOLEAN",
-        f"jezyk_komunikacji TEXT",
-        f"subskrypcje_naszych_mediow TEXT",
-        f"data_ostatniego_kontaktu TEXT",
-        f"preferowana_forma_kontaktu TEXT",
-        f"menedzer TEXT",
-        f"ostatni_komentarz TEXT",
-        f"id_custom TEXT",
-        f"miasto TEXT",
-        f"nazwa_pelna TEXT",
-        f"nip TEXT",
-        f"regon TEXT",
-        f"krs TEXT",
-        f"data_rejestracji_w_krs TEXT",
-        f"adres_rejestrowy TEXT",
-        f"ulica_i_numer_domu TEXT",
-        f"kod_pocztowy TEXT",
-        f"forma_prawna TEXT",
-        f"krotka_nazwa TEXT",
-        f"obszar_dzialalnosci TEXT",
-        f"kategoria TEXT",
-        f"zrodlo_leada TEXT",
-        f"aleo TEXT",
-        f"wszystkie_platnosci TEXT",
-        f"olx TEXT",
-        f"youtube TEXT",
-        f"tiktok TEXT",
-        f"data_rozpoczecia_dzialalnosci_w_ceidg TEXT",
-        f"laczna_liczba_ofert TEXT",
-        f"laczna_liczba_zamowien TEXT",
-        f"suma_zamowien_pln_netto TEXT",
-        f"data_ostatniego_zamowienia TEXT",
-        f"wszystkie_zadania TEXT",
-        f"zmien_nazwe_zadania TEXT",
-        f"data_dodania_do_nowi TEXT",
-        f"data_dodania_do_w_trakcie TEXT",
-        f"data_dodania_do_perspektywiczni TEXT",
-        f"data_dodania_do_rezygnacja TEXT",
-        f"data_pierwszego_zamowienia TEXT",
-        f"obnowit_kpi TEXT",
-        f"status_wspolpracy TEXT"
-    ]
-    return f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_definitions)});"
+def get_create_table_sql(table_name, pk_column, columns_map):
+    column_definitions = [f'"{name}" {dtype}' for name, dtype in columns_map.items()]
+    # Manually set the primary key
+    for i, col_def in enumerate(column_definitions):
+        if col_def.startswith(f'"{pk_column}"'):
+            column_definitions[i] = f'"{pk_column}" BIGINT PRIMARY KEY'
+            break
+    return f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(column_definitions)});'
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
-    )
-    logger.info("Starting Planfix clients to Supabase synchronization...")
-
-    required_env_vars = {
+    """Главная функция для экспорта клиентов из Planfix в Supabase."""
+    logger.info("--- Starting Planfix clients export ---")
+    planfix_utils.check_required_env_vars({
         'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
         'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
         'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
-        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
-        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
-        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
-        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
-        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
-        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT
-    }
-    try:
-        planfix_utils.check_required_env_vars(required_env_vars)
-    except ValueError as e:
-        logger.critical(f"Stopping script due to missing environment variables: {e}")
-        return
+    })
 
-    supabase_conn = None
+    conn = None
     try:
-        supabase_conn = planfix_utils.get_supabase_connection()
-        current_page = 1
-        all_processed_ids = []
-        all_companies = []
+        page = 1
+        all_companies_data = []
+        all_company_ids = []
+
         while True:
-            logger.info(f"Fetching page {current_page} of clients...")
-            try:
-                xml = get_planfix_companies(current_page)
-                companies_xml = parse_companies(xml)
-                companies = [company_to_dict(c) for c in companies_xml]
-                all_companies.extend(companies)
-                logger.info(f"На странице {current_page}: {len(companies)} компаний с шаблоном {CLIENT_TEMPLATE_ID}")
-                if not companies:
-                    logger.info("No more companies found. Exiting loop.")
-                    break
-                for c in companies:
-                    pk_value = c.get(CLIENTS_PK_COLUMN)
-                    if pk_value:
-                        try:
-                            all_processed_ids.append(int(pk_value))
-                        except ValueError:
-                            logger.warning(f"Could not convert primary key '{pk_value}' to int for client ID. Skipping for deletion marking list.")
-                root = ET.fromstring(xml)
-                contacts_root = root.find('.//contacts')
-                if contacts_root is not None and int(contacts_root.attrib.get('count', 0)) < 100:
-                    break
-                current_page += 1
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Error fetching data from Planfix API for clients: {e}")
+            logger.info(f"Fetching page {page} of companies...")
+            xml_text = get_planfix_companies(page)
+            companies = parse_companies(xml_text)
+            if not companies:
+                logger.info("No more companies found.")
                 break
-            except Exception as e:
-                logger.error(f"An unexpected error occurred processing page {current_page} of clients: {e}")
-                break
-        if all_companies:
-            logger.info("Upserting companies to Supabase...")
-            # Use the new dynamic function for CREATE TABLE
-            create_sql = get_create_table_sql(CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, all_companies[0].keys())
-            planfix_utils.create_table_if_not_exists(supabase_conn, create_sql)
 
-            # Ensure all dictionaries have the same keys before upserting
-            all_keys = set().union(*(d.keys() for d in all_companies))
-            for company in all_companies:
-                for key in all_keys:
-                    company.setdefault(key, None)
+            for company_xml in companies:
+                company_data = company_to_dict(company_xml)
+                if company_data and company_data.get("id"):
+                    all_companies_data.append(company_data)
+                    all_company_ids.append(company_data["id"])
+            
+            page += 1
+            # break # для отладки
 
-            planfix_utils.upsert_data(supabase_conn, CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, all_companies)
-            logger.info(f"Upserted {len(all_companies)} companies.")
-        else:
-            logger.info("No companies to upsert.")
-        if supabase_conn:
-            if not all_processed_ids and current_page == 1:
-                logger.info("No clients were found in Planfix. Marking all existing clients in Supabase as deleted.")
-                planfix_utils.mark_items_as_deleted_in_supabase(
-                    supabase_conn, CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, []
-                )
-            elif all_processed_ids:
-                logger.info(f"Total processed client IDs for deletion check: {len(all_processed_ids)}")
-                planfix_utils.mark_items_as_deleted_in_supabase(
-                    supabase_conn, CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, all_processed_ids
-                )
-                logger.info(f"Marked clients not in the current batch as deleted.")
-            else:
-                logger.warning("No new client IDs were processed successfully. Skipping deletion marking to avoid data loss due to potential errors.")
-    except psycopg2.Error as e:
-        logger.critical(f"Supabase connection error: {e}")
-    except ValueError as e:
-        logger.critical(f"Configuration error (likely missing env vars, logged earlier): {e}")
+        logger.info(f"Total companies (templateId={CLIENT_TEMPLATE_ID}) processed: {len(all_companies_data)}")
+
+        if not all_companies_data:
+            logger.info("No companies to update. Exiting.")
+            return
+
+        conn = planfix_utils.get_supabase_connection()
+
+        # --- Schema Management ---
+        # 1. Define all columns and their types
+        all_columns = BASE_COLUMNS.copy()
+        custom_columns_map = {v: "TEXT" for v in CUSTOM_MAP.values()} # Treat all custom as TEXT for simplicity
+        all_columns.update(custom_columns_map)
+
+        # 2. Create table if it doesn't exist
+        create_sql = get_create_table_sql(CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, all_columns)
+        planfix_utils.create_table_if_not_exists(conn, create_sql)
+
+        # 3. Add any missing columns to the existing table
+        planfix_utils.add_missing_columns(conn, CLIENTS_TABLE_NAME, all_columns)
+
+        # --- Data Upsert ---
+        # Get final list of columns from the DB in case some were added
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT * FROM {CLIENTS_TABLE_NAME} LIMIT 0")
+            db_column_names = [desc[0] for desc in cur.description]
+
+        planfix_utils.upsert_data_to_supabase(
+            conn,
+            CLIENTS_TABLE_NAME,
+            CLIENTS_PK_COLUMN,
+            db_column_names,
+            all_companies_data
+        )
+
+        # --- Mark Deleted ---
+        planfix_utils.mark_items_as_deleted_in_supabase(
+            conn,
+            CLIENTS_TABLE_NAME,
+            CLIENTS_PK_COLUMN,
+            all_company_ids
+        )
+
+        logger.info("--- Planfix clients export finished successfully ---")
+
     except Exception as e:
-        logger.critical(f"An unexpected critical error occurred in main client sync: {e}")
+        logger.critical(f"An error occurred in the main process: {e}", exc_info=True)
+        sys.exit(1)
     finally:
-        if supabase_conn:
-            supabase_conn.close()
+        if conn:
+            conn.close()
             logger.info("Supabase connection closed.")
-        logger.info("Client synchronization finished.")
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     main()
