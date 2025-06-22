@@ -87,22 +87,30 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
         last_order_date = row[1]
         count = row[2]
         
-        # Проверяем, является ли клиент "Stali klienci"
-        is_stali = False
+        # Проверяем дату последнего заказа
+        days_diff = None
         if last_order_date and last_order_date != '':
             try:
                 # Парсим дату в формате DD-MM-YYYY
                 if len(last_order_date) >= 10:
                     order_date = datetime.strptime(last_order_date[:10], '%d-%m-%Y').date()
                     days_diff = (current_date - order_date).days
-                    is_stali = days_diff <= 30
             except (ValueError, TypeError):
                 pass
         
-        # Если клиент "Stali klienci", переопределяем статус
-        if is_stali:
-            short_status = 'STL'
+        # Определяем статус на основе даты последнего заказа
+        if days_diff is not None:
+            if days_diff <= 30:
+                # Активные постоянные клиенты
+                short_status = 'STL'
+            elif full_status == 'Stali klienci':
+                # Неактивные постоянные клиенты (были Stali, но заказ >30 дней)
+                short_status = 'NAK'
+            else:
+                # Обычные статусы
+                short_status = STATUS_MAPPING.get(full_status, full_status)
         else:
+            # Если нет даты заказа, используем обычный статус
             short_status = STATUS_MAPPING.get(full_status, full_status)
         
         if short_status in status_counts:
