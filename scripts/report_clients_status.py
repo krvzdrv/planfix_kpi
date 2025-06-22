@@ -64,13 +64,14 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
     query = """
     SELECT 
         status_wspolpracy as status,
+        data_ostatniego_zamowienia,
         COUNT(*) as count
     FROM planfix_clients
     WHERE menedzer = %s
         AND status_wspolpracy IS NOT NULL
         AND status_wspolpracy != ''
         AND is_deleted = false
-    GROUP BY status_wspolpracy
+    GROUP BY status_wspolpracy, data_ostatniego_zamowienia
     ORDER BY status_wspolpracy;
     """
     
@@ -83,10 +84,29 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
     # Заполняем реальными данными
     for row in results:
         full_status = row[0]
-        count = row[1]
-        short_status = STATUS_MAPPING.get(full_status, full_status)
+        last_order_date = row[1]
+        count = row[2]
+        
+        # Проверяем, является ли клиент "Stali klienci"
+        is_stali = False
+        if last_order_date and last_order_date != '':
+            try:
+                # Парсим дату в формате DD-MM-YYYY
+                if len(last_order_date) >= 10:
+                    order_date = datetime.strptime(last_order_date[:10], '%d-%m-%Y').date()
+                    days_diff = (current_date - order_date).days
+                    is_stali = days_diff <= 30
+            except (ValueError, TypeError):
+                pass
+        
+        # Если клиент "Stali klienci", переопределяем статус
+        if is_stali:
+            short_status = 'STL'
+        else:
+            short_status = STATUS_MAPPING.get(full_status, full_status)
+        
         if short_status in status_counts:
-            status_counts[short_status] = count
+            status_counts[short_status] += count
     
     return status_counts
 
