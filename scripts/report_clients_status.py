@@ -248,6 +248,7 @@ def main():
 
         yesterday = today - timedelta(days=1)
         
+        all_reports = []
         for manager, current_totals in all_managers_totals.items():
             report_body = ""
             try:
@@ -275,21 +276,29 @@ def main():
                 # Формируем тело отчета (строки с KPI)
                 report_kpi_lines = format_client_status_report(status_changes, global_max)
                 
-                # Формируем полный текст сообщения
-                header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
+                # Формируем полный текст сообщения для одного менеджера
+                # Заголовок теперь будет общий, а здесь только имя менеджера
+                manager_header = f"👤 {manager}"
                 separator = "──────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
                 # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 18 позиции)
                 footer = f"RZM:{total_sum:>14}"
 
-                full_report = f"{header}\n{report_kpi_lines}\n{separator}\n{footer}"
+                full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
+                all_reports.append(full_report_for_manager)
                 
-                logger.info(f"Generated report for {manager}:\n{full_report}")
-                send_to_telegram(full_report)
+                logger.info(f"Generated report for {manager}:\n{full_report_for_manager}")
 
             except Exception as e:
                 logger.error(f"Failed to generate report for {manager}: {e}", exc_info=True)
-                send_to_telegram(f"Error generating report for {manager}: {e}")
+                error_message = f"Error generating report for {manager}: {e}"
+                all_reports.append(error_message)
+        
+        # Отправляем один общий отчет
+        if all_reports:
+            final_report_header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
+            final_report = f"{final_report_header}\n" + "\n\n".join(all_reports)
+            send_to_telegram(final_report)
 
     except psycopg2.Error as e:
         logger.error(f"Database connection error: {e}", exc_info=True)
