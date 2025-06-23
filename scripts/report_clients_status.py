@@ -214,8 +214,8 @@ def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        # Убираем Markdown, так как используем моноширинный шрифт с ручным выравниванием
-        payload = {'chat_id': CHAT_ID, 'text': f"<pre>\n{message}\n</pre>", 'parse_mode': 'HTML'}
+        # Используем MarkdownV2 для жирного заголовка и блока с кодом для тела отчета
+        payload = {'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'MarkdownV2'}
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             logger.info("Message sent successfully to Telegram")
@@ -296,8 +296,13 @@ def main():
         
         # Отправляем один общий отчет
         if all_reports:
-            final_report_header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
-            final_report = f"{final_report_header}\n" + "\n\n".join(all_reports)
+            # Экранируем точки в дате для MarkdownV2
+            safe_date = today.strftime('%d.%m.%Y').replace('.', r'\.')
+            header = f"📊 **Woronka {safe_date}**"
+            
+            report_body = "\n\n".join(all_reports)
+            
+            final_report = f"{header}\n```\n{report_body}\n```"
             send_to_telegram(final_report)
 
     except psycopg2.Error as e:
