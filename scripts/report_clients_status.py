@@ -87,30 +87,25 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
         last_order_date = row[1]
         count = row[2]
         
-        # Проверяем дату последнего заказа
-        days_diff = None
-        if last_order_date and last_order_date != '':
-            try:
-                # Парсим дату в формате DD-MM-YYYY
-                if len(last_order_date) >= 10:
-                    order_date = datetime.strptime(last_order_date[:10], '%d-%m-%Y').date()
-                    days_diff = (current_date - order_date).days
-            except (ValueError, TypeError):
-                pass
-        
-        # Определяем статус на основе даты последнего заказа
-        if days_diff is not None:
-            if days_diff <= 30:
-                # Активные постоянные клиенты
-                short_status = 'STL'
-            elif full_status == 'Stali klienci':
-                # Неактивные постоянные клиенты (были Stali, но заказ >30 дней)
-                short_status = 'NAK'
+        short_status = ''
+
+        # Логика по дате применяется ТОЛЬКО к статусу "Stali klienci"
+        if full_status == 'Stali klienci':
+            days_diff = None
+            if last_order_date and last_order_date != '':
+                try:
+                    if len(last_order_date) >= 10:
+                        order_date = datetime.strptime(last_order_date[:10], '%d-%m-%Y').date()
+                        days_diff = (current_date - order_date).days
+                except (ValueError, TypeError):
+                    pass
+            
+            if days_diff is not None and days_diff <= 30:
+                short_status = 'STL'  # Активные постоянные
             else:
-                # Обычные статусы
-                short_status = STATUS_MAPPING.get(full_status, full_status)
+                short_status = 'NAK'  # Неактивные (нет даты или > 30 дней)
         else:
-            # Если нет даты заказа, используем обычный статус
+            # Для всех остальных статусов (NWI, WTR, PSK, PIZ, REZ) используется прямое сопоставление
             short_status = STATUS_MAPPING.get(full_status, full_status)
         
         if short_status in status_counts:
