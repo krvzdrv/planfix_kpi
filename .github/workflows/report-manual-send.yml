@@ -1,0 +1,85 @@
+name: Manual Report Sending
+
+on:
+  workflow_dispatch:
+    inputs:
+      report:
+        description: 'Which report to send?'
+        required: true
+        default: 'activity'
+        type: choice
+        options:
+          - activity
+          - kpi
+          - bonus
+          - income
+          - clients_status
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/Warsaw
+      
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Send Activity Report
+        if: github.event.inputs.report == 'activity'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/report_activity.py
+
+      - name: Send KPI Report
+        if: github.event.inputs.report == 'kpi'
+        env:
+          PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/report_kpi.py
+
+      - name: Send Bonus Report
+        if: github.event.inputs.report == 'bonus'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/report_bonus.py
+
+      - name: Send Income Report
+        if: github.event.inputs.report == 'income'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/report_income.py
+        
+      - name: Send Clients Status Report
+        if: github.event.inputs.report == 'clients_status'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/report_clients_status.py 
