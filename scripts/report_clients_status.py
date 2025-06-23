@@ -167,79 +167,48 @@ def get_global_max_count(all_managers_data: dict) -> int:
 
 def format_client_status_report(changes: dict, global_max: int) -> str:
     """Форматировать отчёт по статусам клиентов в соответствии с ТЗ."""
-    
-    # --- Шаг 1: Предварительные расчеты ---
-    
-    # Общая сумма для расчета процентов
     total_sum = sum(data['current'] for data in changes.values())
-    if total_sum == 0:
-        total_sum = 1 # Избегаем деления на ноль
-        
-    # Находим максимальную длину строки изменения (например, "+10", "-5")
-    # для корректного выравнивания нулевых изменений
+    if total_sum == 0: total_sum = 1
+
     max_change_str_len = 0
     change_strings = {}
     for status in CLIENT_STATUSES:
         change = changes[status]['change']
-        if change > 0:
-            s = f"+{change}"
-        elif change < 0:
-            s = str(change)
-        else:
-            s = "" # Пустая строка для нулевых изменений
+        s = f"+{change}" if change > 0 else (str(change) if change < 0 else "")
         change_strings[status] = s
-        if len(s) > max_change_str_len:
-            max_change_str_len = len(s)
+        max_change_str_len = max(max_change_str_len, len(s))
 
-    # --- Шаг 2: Расчет максимальной длины прогресс-бара ---
-    # Общая ширина 30
-    # [KPI ](4) [BAR+PAD](9) [VAL](3) [ ](1) [IND](1) [ ](1) [CHANGE+PAD] [PERCENT]
-    # Зона для бара и отступа: 9 символов. Минимальный отступ 2.
-    # Значит, максимальная длина бара = 9 - 2 = 7
-    max_bar_len = 7
-    
-    # --- Шаг 3: Сборка строк отчета ---
+    # Макс. длина бара = 9.
+    # Левая часть будет 18 символов, правая 12.
+    max_bar_len = 9
+
     lines = []
     for status in CLIENT_STATUSES:
         data = changes[status]
         current = data['current']
-        change = data['change']
         indicator = data['direction']
 
-        # Прогресс-бар
-        if global_max > 0 and current > 0:
-            bar_len = max(1, round(current / global_max * max_bar_len))
-        else:
-            bar_len = 0
+        bar_len = max(1, round(current / global_max * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
-        
-        # Левая часть: "KPI BAR  VALUE"
-        # KPI (3) + " " (1) + bar_str (bar_len) + padding (9-bar_len) + value (3) = 16
-        kpi_part = f"{status} {bar_str}"
-        # Отступ между баром и значением (минимум 2 пробела)
-        left_part = f"{kpi_part:<{4 + 9}}{current:>3}"
-        
-        # Правая часть: " INDICATOR CHANGE (PERCENT)"
-        # " " (1) + indicator (1) + " " (1) + change_str (padded) + " " (padding) + percent_str
-        # Общая длина правой части: 30 - 16 = 14
-        
-        # Строка изменения с отступом
+
+        # Левая часть: "KPI BAR  VALUE" - 18 символов.
+        # Поле для KPI(3), пробела(1) и бара с отступом = 18 - 3(value) = 15.
+        kpi_bar_part = f"{status} {bar_str}"
+        left_part = f"{kpi_bar_part:<15}{current:>3}"
+
+        # Правая часть: " INDICATOR CHANGE (PERCENT)" - 12 символов.
         change_str = change_strings[status]
         change_part = f" {indicator} {change_str}".ljust(3 + max_change_str_len)
 
-        # Процент
         percentage = round(current / total_sum * 100)
         percent_str = f"({percentage}%)"
-        
-        # Собираем правую часть с выравниванием процентов по правому краю
-        # Общая длина 14. Отнимаем длину блока с изменением и длину процентов.
-        padding_len = 14 - len(change_part) - len(percent_str)
-        right_part = f"{change_part}{' ' * padding_len}{percent_str}"
-        
+
+        padding_len = 12 - len(change_part) - len(percent_str)
+        right_part = f"{change_part}{' ' * max(0, padding_len)}{percent_str}"
+
         lines.append(f"{left_part}{right_part}")
 
     return "\n".join(lines)
-
 
 def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
@@ -310,7 +279,8 @@ def main():
                 header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
                 separator = "──────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
-                footer = f"RZM:           {total_sum:>3}"
+                # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 18 позиции)
+                footer = f"RZM:{total_sum:>14}"
 
                 full_report = f"{header}\n{report_kpi_lines}\n{separator}\n{footer}"
                 
