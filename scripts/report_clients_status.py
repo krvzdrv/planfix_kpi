@@ -163,36 +163,90 @@ def get_global_max_count(all_managers_data: dict) -> int:
                  max_val = max(data.values())
                  if max_val > global_max:
                     global_max = max_val
-    return global_max
+    return global_max if global_max > 0 else 1 # Избегаем деления на ноль
 
-def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
-    """Форматировать прогресс-бар."""
-    if max_value == 0: return ' ' * width
-    filled = int(round(width * value / max_value))
-    return '█' * filled + ' ' * (width - filled)
+def format_client_status_report(changes: dict, global_max: int) -> str:
+    """Форматировать отчёт по статусам клиентов в соответствии с ТЗ."""
+    
+    # --- Шаг 1: Предварительные расчеты ---
+    
+    # Общая сумма для расчета процентов
+    total_sum = sum(data['current'] for data in changes.values())
+    if total_sum == 0:
+        total_sum = 1 # Избегаем деления на ноль
+        
+    # Находим максимальную длину строки изменения (например, "+10", "-5")
+    # для корректного выравнивания нулевых изменений
+    max_change_str_len = 0
+    change_strings = {}
+    for status in CLIENT_STATUSES:
+        change = changes[status]['change']
+        if change > 0:
+            s = f"+{change}"
+        elif change < 0:
+            s = str(change)
+        else:
+            s = "" # Пустая строка для нулевых изменений
+        change_strings[status] = s
+        if len(s) > max_change_str_len:
+            max_change_str_len = len(s)
 
-def format_client_status_report(manager: str, changes: dict, global_max: int) -> str:
-    """Форматировать отчёт по статусам клиентов."""
-    total = sum(data['current'] for data in changes.values())
-    lines = [f"{manager} {date.today().strftime('%d.%m.%Y')}\n"]
+    # --- Шаг 2: Расчет максимальной длины прогресс-бара ---
+    # Общая ширина 30
+    # [KPI ](4) [BAR+PAD](9) [VAL](3) [ ](1) [IND](1) [ ](1) [CHANGE+PAD] [PERCENT]
+    # Зона для бара и отступа: 9 символов. Минимальный отступ 2.
+    # Значит, максимальная длина бара = 9 - 2 = 7
+    max_bar_len = 7
+    
+    # --- Шаг 3: Сборка строк отчета ---
+    lines = []
     for status in CLIENT_STATUSES:
         data = changes[status]
-        current, change, direction = data['current'], data['change'], data['direction']
-        percentage = (current / total * 100) if total > 0 else 0
+        current = data['current']
+        change = data['change']
+        indicator = data['direction']
+
+        # Прогресс-бар
+        if global_max > 0 and current > 0:
+            bar_len = max(1, round(current / global_max * max_bar_len))
+        else:
+            bar_len = 0
+        bar_str = '█' * bar_len
         
-        change_str = f"{direction} +{change:2d}" if change > 0 else (f"{direction} {change:3d}" if change < 0 else f"{direction}     ")
+        # Левая часть: "KPI BAR  VALUE"
+        # KPI (3) + " " (1) + bar_str (bar_len) + padding (9-bar_len) + value (3) = 16
+        kpi_part = f"{status} {bar_str}"
+        # Отступ между баром и значением (минимум 2 пробела)
+        left_part = f"{kpi_part:<{4 + 9}}{current:>3}"
         
-        lines.append(f"{status} {format_progress_bar(current, global_max)}{current:3d} {change_str} ({percentage:2.0f}%)")
-    
-    lines.append("─" * 32)
-    lines.append(f"👥 Wszyscy klienci: {total:8d}")
+        # Правая часть: " INDICATOR CHANGE (PERCENT)"
+        # " " (1) + indicator (1) + " " (1) + change_str (padded) + " " (padding) + percent_str
+        # Общая длина правой части: 30 - 16 = 14
+        
+        # Строка изменения с отступом
+        change_str = change_strings[status]
+        change_part = f" {indicator} {change_str}".ljust(3 + max_change_str_len)
+
+        # Процент
+        percentage = round(current / total_sum * 100)
+        percent_str = f"({percentage}%)"
+        
+        # Собираем правую часть с выравниванием процентов по правому краю
+        # Общая длина 14. Отнимаем длину блока с изменением и длину процентов.
+        padding_len = 14 - len(change_part) - len(percent_str)
+        right_part = f"{change_part}{' ' * padding_len}{percent_str}"
+        
+        lines.append(f"{left_part}{right_part}")
+
     return "\n".join(lines)
+
 
 def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {'chat_id': CHAT_ID, 'text': f"```\n{message}\n```", 'parse_mode': 'Markdown'}
+        # Убираем Markdown, так как используем моноширинный шрифт с ручным выравниванием
+        payload = {'chat_id': CHAT_ID, 'text': f"<pre>\n{message}\n</pre>", 'parse_mode': 'HTML'}
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             logger.info("Message sent successfully to Telegram")
@@ -226,6 +280,7 @@ def main():
         yesterday = today - timedelta(days=1)
         
         for manager, current_totals in all_managers_totals.items():
+            report_body = ""
             try:
                 logger.info(f"Processing report for manager: {manager}")
                 
@@ -243,24 +298,38 @@ def main():
                         # Динамика для остальных - дневной приток
                         diff = all_managers_inflow[manager].get(status, 0)
 
-                    direction = "▲" if diff > 0 else ("▼" if diff < 0 else "➖")
+                    direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
                     status_changes[status] = {'current': curr_count, 'change': diff, 'direction': direction}
                 
                 logger.info(f"Got status changes for {manager}: {status_changes}")
-                report = format_client_status_report(manager, status_changes, global_max)
                 
-                logger.info(f"Sending report for {manager} to Telegram")
-                send_to_telegram(report)
-            
-            except Exception as e:
-                logger.error(f"Error processing report for {manager}: {str(e)}", exc_info=True)
+                # Формируем тело отчета (строки с KPI)
+                report_kpi_lines = format_client_status_report(status_changes, global_max)
+                
+                # Формируем полный текст сообщения
+                header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
+                separator = "──────────────────────────────"
+                total_sum = sum(data['current'] for data in status_changes.values())
+                footer = f"RZM:           {total_sum:>3}"
 
-    except (psycopg2.Error, ValueError) as e:
-        logger.critical(f"Database or configuration error: {e}", exc_info=True)
+                full_report = f"{header}\n{report_kpi_lines}\n{separator}\n{footer}"
+                
+                logger.info(f"Generated report for {manager}:\n{full_report}")
+                send_to_telegram(full_report)
+
+            except Exception as e:
+                logger.error(f"Failed to generate report for {manager}: {e}", exc_info=True)
+                send_to_telegram(f"Error generating report for {manager}: {e}")
+
+    except psycopg2.Error as e:
+        logger.error(f"Database connection error: {e}", exc_info=True)
+        send_to_telegram(f"Database connection error: {e}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+        send_to_telegram(f"An unexpected error occurred: {e}")
     finally:
         if conn:
             conn.close()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
-    logger.info("Client status report script finished") 
