@@ -248,6 +248,32 @@ jobs:
             exit 1
           fi
 
+      - name: Generate Clients Status Report
+        id: send-clients-status
+        if: steps.send-income.outcome == 'success'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
+          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          echo "[REPORT] Starting clients status report generation..."
+          # Check if all required variables are set
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::error::Missing required Telegram configuration for clients status report"
+            exit 1
+          fi
+          
+          # Run the script with debug output
+          if ! python -u scripts/report_clients_status.py; then
+            echo "::error::Failed to generate and send clients status report"
+            exit 1
+          fi
+
       - name: Notify on failure
         if: failure()
         run: |
