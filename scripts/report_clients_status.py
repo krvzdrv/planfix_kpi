@@ -1,4 +1,5 @@
 import psycopg2
+import psycopg2.extras
 import requests
 from datetime import datetime, date, timedelta
 import os
@@ -26,6 +27,7 @@ PG_PORT = os.environ.get('SUPABASE_PORT')
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID_CLIENTS', '-1001866680518')  # Специальный чат для отчёта по клиентам
 
+HISTORY_TABLE_NAME = "report_clients_status_history"
 logger = logging.getLogger(__name__)
 
 # Статусы клиентов и их порядок в отчёте (сокращённые названия)
@@ -34,62 +36,97 @@ CLIENT_STATUSES = ['NWI', 'WTR', 'PSK', 'PIZ', 'STL', 'NAK', 'REZ']
 # Сопоставление полных названий статусов с сокращёнными
 STATUS_MAPPING = {
     'Nowi': 'NWI',
-    'W trakcie': 'WTR', 
+    'W trakcie': 'WTR',
     'Perspektywiczni': 'PSK',
     'Pierwsze zamówienie': 'PIZ',
-    'Stali': 'STL',
-    'Nakladka': 'NAK',
+    'Stali klienci': 'STL', # Важно - полное имя для сопоставления
     'Rezygnacja': 'REZ'
 }
 
-def _execute_query(query: str, params: tuple, description: str) -> list:
-    conn = None
+def _execute_query(conn, query: str, params: tuple, description: str) -> list:
+    """Выполняет запрос с использованием существующего соединения."""
     try:
-        conn = psycopg2.connect(host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT)
-        cur = conn.cursor()
-        logger.info(f"Executing query for: {description} with params: {params}")
-        cur.execute(query, params)
-        rows = cur.fetchall()
-        logger.info(f"Query for {description} returned {len(rows)} rows.")
-        return rows
+        with conn.cursor() as cur:
+            # logger.info(f"Executing query for: {description} with params: {params}")
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            # logger.info(f"Query for {description} returned {len(rows)} rows.")
+            return rows
     except psycopg2.Error as e:
         logger.error(f"Database error during query for {description}: {e}")
         raise
-    finally:
-        if conn:
-            conn.close()
 
-def get_client_statuses(manager: str, current_date: date) -> dict:
+def create_history_table_if_not_exists(conn):
+    """Создает таблицу для хранения истории статусов, если она не существует."""
+    query = f"""
+    CREATE TABLE IF NOT EXISTS {HISTORY_TABLE_NAME} (
+        report_date DATE NOT NULL,
+        manager TEXT NOT NULL,
+        status TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        PRIMARY KEY (report_date, manager, status)
+    );
+    """
+    try:
+        with conn.cursor() as cur:
+            logger.info(f"Checking/Creating history table: {HISTORY_TABLE_NAME}...")
+            cur.execute(query)
+            conn.commit()
+            logger.info(f"Table {HISTORY_TABLE_NAME} is ready.")
+    except psycopg2.Error as e:
+        logger.error(f"Error creating history table: {e}")
+        conn.rollback()
+        raise
+
+def save_statuses_to_history(conn, report_date: date, manager: str, statuses: dict):
+    """Сохраняет дневной срез статусов в таблицу истории."""
+    query = f"""
+    INSERT INTO {HISTORY_TABLE_NAME} (report_date, manager, status, count)
+    VALUES (%s, %s, %s, %s)
+    ON CONFLICT (report_date, manager, status) DO UPDATE SET
+        count = EXCLUDED.count;
+    """
+    records = [(report_date, manager, status, count) for status, count in statuses.items()]
+    try:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_batch(cur, query, records)
+            conn.commit()
+            logger.info(f"Saved {len(records)} records to history for {manager} on {report_date}.")
+    except psycopg2.Error as e:
+        logger.error(f"Error saving statuses to history for {manager}: {e}")
+        conn.rollback()
+        raise
+
+def get_statuses_from_history(conn, report_date: date, manager: str) -> dict:
+    """Получает статусы из таблицы истории за определенную дату."""
+    query = f"SELECT status, count FROM {HISTORY_TABLE_NAME} WHERE report_date = %s AND manager = %s;"
+    params = (report_date, manager)
+    
+    results = _execute_query(conn, query, params, f"history for {manager} on {report_date}")
+
+    statuses = {status: 0 for status in CLIENT_STATUSES}
+    for status, count in results:
+        if status in statuses:
+            statuses[status] = count
+    return statuses
+
+
+def get_client_statuses(conn, manager: str, current_date: date) -> dict:
     """Получить текущие статусы клиентов для менеджера."""
     query = """
-    SELECT 
+    SELECT
         status_wspolpracy as status,
-        data_ostatniego_zamowienia,
-        COUNT(*) as count
+        data_ostatniego_zamowienia
     FROM planfix_clients
-    WHERE menedzer = %s
-        AND status_wspolpracy IS NOT NULL
-        AND status_wspolpracy != ''
-        AND is_deleted = false
-    GROUP BY status_wspolpracy, data_ostatniego_zamowienia
-    ORDER BY status_wspolpracy;
+    WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''
     """
-    
     params = (manager,)
-    results = _execute_query(query, params, f"client statuses for {manager}")
-    
-    # Создаем словарь с нулевыми значениями для всех статусов
-    status_counts = {status: 0 for status in CLIENT_STATUSES}
-    
-    # Заполняем реальными данными
-    for row in results:
-        full_status = row[0]
-        last_order_date = row[1]
-        count = row[2]
-        
-        short_status = ''
+    results = _execute_query(conn, query, params, f"current statuses for {manager}")
 
-        # Логика по дате применяется ТОЛЬКО к статусу "Stali klienci"
+    status_counts = {status: 0 for status in CLIENT_STATUSES}
+
+    for full_status, last_order_date in results:
+        short_status = ''
         if full_status == 'Stali klienci':
             days_diff = None
             if last_order_date and last_order_date != '':
@@ -101,63 +138,27 @@ def get_client_statuses(manager: str, current_date: date) -> dict:
                     pass
             
             if days_diff is not None and days_diff <= 30:
-                short_status = 'STL'  # Активные постоянные
+                short_status = 'STL'
             else:
-                short_status = 'NAK'  # Неактивные (нет даты или > 30 дней)
+                short_status = 'NAK'
         else:
-            # Для всех остальных статусов (NWI, WTR, PSK, PIZ, REZ) используется прямое сопоставление
             short_status = STATUS_MAPPING.get(full_status, full_status)
-        
+
         if short_status in status_counts:
-            status_counts[short_status] += count
+            status_counts[short_status] += 1
     
     return status_counts
 
-def get_all_managers_statuses(current_date: date) -> dict:
-    """Получить статусы клиентов для всех менеджеров."""
-    managers_data = {}
-    for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
-        managers_data[manager] = get_client_statuses(manager, current_date)
-    return managers_data
-
-def get_max_counts_by_status(managers_data: dict) -> dict:
-    """Получить максимальное количество клиентов для каждого статуса среди всех менеджеров."""
-    max_counts = {status: 0 for status in CLIENT_STATUSES}
-    
-    for manager_data in managers_data.values():
-        for status, count in manager_data.items():
-            if count > max_counts[status]:
-                max_counts[status] = count
-    
-    return max_counts
-
-def get_client_status_changes(manager: str, current_date: date) -> dict:
-    """Получить изменения в статусах клиентов за последние сутки."""
-    yesterday = current_date - timedelta(days=1)
-    
-    current = get_client_statuses(manager, current_date)
-    previous = get_client_statuses(manager, yesterday)
-    
-    changes = {}
-    for status in CLIENT_STATUSES:
-        curr_count = current.get(status, 0)
-        prev_count = previous.get(status, 0)
-        diff = curr_count - prev_count
-        
-        if diff > 0:
-            direction = "▲"
-        elif diff < 0:
-            direction = "▼"
-        else:
-            direction = "➖"
-            
-        changes[status] = {
-            'current': curr_count,
-            'change': diff,
-            'direction': direction
-        }
-    
-    return changes
+def get_global_max_count(managers_data: dict) -> int:
+    """Получить глобальный максимум количества клиентов среди всех статусов и всех менеджеров."""
+    global_max = 0
+    if managers_data:
+        for manager_data in managers_data.values():
+            if manager_data:
+                 max_val = max(manager_data.values())
+                 if max_val > global_max:
+                    global_max = max_val
+    return global_max
 
 def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
     """Форматировать прогресс-бар из символов █."""
@@ -165,17 +166,6 @@ def format_progress_bar(value: int, max_value: int, width: int = 14) -> str:
         return ' ' * width
     filled = int(round(width * value / max_value)) if max_value > 0 else 0
     return '█' * filled + ' ' * (width - filled)
-
-def get_global_max_count(managers_data: dict) -> int:
-    """Получить глобальный максимум количества клиентов среди всех статусов и всех менеджеров."""
-    global_max = 0
-    
-    for manager_data in managers_data.values():
-        for count in manager_data.values():
-            if count > global_max:
-                global_max = count
-    
-    return global_max
 
 def format_client_status_report(manager: str, status_changes: dict, global_max: int) -> str:
     """Форматировать отчёт по статусам клиентов для одного менеджера."""
@@ -191,10 +181,8 @@ def format_client_status_report(manager: str, status_changes: dict, global_max: 
         direction = data['direction']
         percentage = (current / total * 100) if total > 0 else 0
         
-        # Используем глобальный максимум для масштабирования прогресс-бара
         max_count = global_max
         
-        # Форматируем строку изменения
         if change > 0:
             change_str = f"{direction} +{change:2d}"
         elif change < 0:
@@ -202,7 +190,6 @@ def format_client_status_report(manager: str, status_changes: dict, global_max: 
         else:
             change_str = f"{direction}     "
         
-        # Форматируем строку статуса
         status_line = f"{status} {format_progress_bar(current, max_count)}{current:3d} {change_str} ({percentage:2.0f}%)"
         lines.append(status_line)
     
@@ -214,16 +201,16 @@ def format_client_status_report(manager: str, status_changes: dict, global_max: 
 def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
     try:
-        logger.info(f"Attempting to send message to Telegram chat {CHAT_ID}")
+        # logger.info(f"Attempting to send message to Telegram chat {CHAT_ID}")
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {
             'chat_id': CHAT_ID,
             'text': f"```\n{message}\n```",
             'parse_mode': 'Markdown'
         }
-        logger.info(f"Sending request to Telegram API...")
+        # logger.info(f"Sending request to Telegram API...")
         response = requests.post(url, json=payload, timeout=10)
-        logger.info(f"Telegram API response status code: {response.status_code}")
+        # logger.info(f"Telegram API response status code: {response.status_code}")
         
         if response.status_code != 200:
             logger.error(f"Failed to send message to Telegram: {response.text}")
@@ -237,31 +224,62 @@ def main():
     """Основная функция для генерации и отправки отчёта."""
     today = date.today()
     logger.info(f"Starting client status report generation for date: {today}")
-    
-    # Получаем данные для всех менеджеров
-    managers_data = get_all_managers_statuses(today)
-    
-    # Получаем глобальный максимум для масштабирования
-    global_max = get_global_max_count(managers_data)
-    logger.info(f"Global max count: {global_max}")
-    
-    # Генерируем и отправляем отчёты для каждого менеджера
-    for manager in managers_data.keys():
-        try:
-            logger.info(f"Processing report for manager: {manager}")
-            status_changes = get_client_status_changes(manager, today)
-            logger.info(f"Got status changes for {manager}: {status_changes}")
-            report = format_client_status_report(manager, status_changes, global_max)
-            logger.info(f"Formatted report for {manager}")
+
+    conn = None
+    try:
+        conn = psycopg2.connect(host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT)
+        create_history_table_if_not_exists(conn)
+
+        all_managers_current_statuses = {}
+        for manager in (m['planfix_user_name'] for m in MANAGERS_KPI):
+            all_managers_current_statuses[manager] = get_client_statuses(conn, manager, today)
+
+        global_max = get_global_max_count(all_managers_current_statuses)
+        logger.info(f"Global max count for today is: {global_max}")
+
+        yesterday = today - timedelta(days=1)
+
+        for manager, current_statuses in all_managers_current_statuses.items():
+            try:
+                logger.info(f"Processing report for manager: {manager}")
+                
+                save_statuses_to_history(conn, today, manager, current_statuses)
+                previous_statuses = get_statuses_from_history(conn, yesterday, manager)
+                
+                status_changes = {}
+                for status in CLIENT_STATUSES:
+                    curr_count = current_statuses.get(status, 0)
+                    prev_count = previous_statuses.get(status, 0)
+                    diff = curr_count - prev_count
+                    
+                    if diff > 0:
+                        direction = "▲"
+                    elif diff < 0:
+                        direction = "▼"
+                    else:
+                        direction = "➖"
+                        
+                    status_changes[status] = {
+                        'current': curr_count,
+                        'change': diff,
+                        'direction': direction
+                    }
+                
+                logger.info(f"Got status changes for {manager}: {status_changes}")
+                report = format_client_status_report(manager, status_changes, global_max)
+                
+                logger.info(f"Sending report for {manager} to Telegram")
+                send_to_telegram(report)
             
-            # Отправляем отчёт сразу после формирования
-            logger.info(f"Sending report for {manager} to Telegram")
-            send_to_telegram(report)
-            logger.info(f"Report for {manager} sent successfully")
-            
-        except Exception as e:
-            logger.error(f"Error processing report for {manager}: {str(e)}")
-            logger.exception("Full traceback:")
+            except Exception as e:
+                logger.error(f"Error processing report for {manager}: {str(e)}")
+                logger.exception("Full traceback:")
+
+    except (psycopg2.Error, ValueError) as e:
+        logger.critical(f"Database or configuration error: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     logger.info("Client status report script started")
