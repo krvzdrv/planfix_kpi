@@ -15,16 +15,12 @@ on:
           - bonus
           - income
           - status
-      date:
-        description: 'Date for the report (YYYY-MM-DD)'
-        required: false
 
 jobs:
   send-report:
     runs-on: ubuntu-latest
     env:
       TZ: Europe/Warsaw
-      REPORT_DATE: ${{ github.event.inputs.date }}
       
     steps:
       - uses: actions/checkout@v4
