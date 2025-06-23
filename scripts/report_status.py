@@ -248,61 +248,33 @@ def main():
 
         yesterday = today - timedelta(days=1)
         
-        all_reports = []
-        for manager, current_totals in all_managers_totals.items():
-            report_body = ""
-            try:
-                logger.info(f"Processing report for manager: {manager}")
+        final_report_parts = []
+        for manager, totals in all_managers_totals.items():
+            yesterday_statuses = get_statuses_from_history(conn, yesterday, manager)
+            changes = {}
+            for s in CLIENT_STATUSES:
+                current_val = totals.get(s, 0)
+                prev_val = yesterday_statuses.get(s, 0)
+                change = current_val - prev_val
+                inflow_val = all_managers_inflow.get(manager, {}).get(s, 0)
                 
-                previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
+                direction_symbol = '→' # без изменений
+                if inflow_val > 0:
+                    direction_symbol = '↗' # приток
+                elif change < 0:
+                    direction_symbol = '↘' # отток
                 
-                status_changes = {}
-                for status in CLIENT_STATUSES:
-                    curr_count = current_totals.get(status, 0)
-                    
-                    if status in ['STL', 'NAK']:
-                        # Динамика для STL/NAK - чистая разница со вчера
-                        prev_count = previous_stl_nak.get(status, 0)
-                        diff = curr_count - prev_count
-                    else:
-                        # Динамика для остальных - дневной приток
-                        diff = all_managers_inflow[manager].get(status, 0)
+                changes[s] = {'current': current_val, 'change': change, 'direction': direction_symbol}
 
-                    direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
-                    status_changes[status] = {'current': curr_count, 'change': diff, 'direction': direction}
-                
-                logger.info(f"Got status changes for {manager}: {status_changes}")
-                
-                # Формируем тело отчета (строки с KPI)
-                report_kpi_lines = format_client_status_report(status_changes, global_max)
-                
-                # Формируем полный текст сообщения для одного менеджера
-                # Заголовок теперь будет общий, а здесь только имя менеджера
-                manager_header = f"👤 {manager}"
-                separator = "──────────────────────────────"
-                total_sum = sum(data['current'] for data in status_changes.values())
-                # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 18 позиции)
-                footer = f"RZM:{total_sum:>14}"
+            manager_name_for_report = manager.split()[0]
+            report_for_manager = format_client_status_report(changes, global_max)
+            final_report_parts.append(f"👨‍💻 {manager_name_for_report}\n{report_for_manager}")
 
-                full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
-                all_reports.append(full_report_for_manager)
-                
-                logger.info(f"Generated report for {manager}:\n{full_report_for_manager}")
-
-            except Exception as e:
-                logger.error(f"Failed to generate report for {manager}: {e}", exc_info=True)
-                error_message = f"Error generating report for {manager}: {e}"
-                all_reports.append(error_message)
+        today_str = today.strftime('%d.%m.%Y')
+        full_report = f"📊 STATUS_{today_str}\n\n" + "\n\n".join(final_report_parts)
         
-        # Отправляем один общий отчет
-        if all_reports:
-            # Заголовок как часть тела отчета, с нижним подчеркиванием
-            header = f"Woronka_{today.strftime('%d.%m.%Y')}"
-            
-            report_body = "\n\n".join(all_reports)
-            
-            final_report = f"{header}\n\n{report_body}"
-            send_to_telegram(final_report)
+        logger.info("Full report generated. Sending to Telegram.")
+        send_to_telegram(full_report)
 
     except psycopg2.Error as e:
         logger.error(f"Database connection error: {e}", exc_info=True)
