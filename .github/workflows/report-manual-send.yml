@@ -9,17 +9,22 @@ on:
         default: 'activity'
         type: choice
         options:
+          - all
           - activity
           - kpi
           - bonus
           - income
-          - clients_status
+          - status
+      date:
+        description: 'Date for the report (YYYY-MM-DD)'
+        required: false
 
 jobs:
   send-report:
     runs-on: ubuntu-latest
     env:
       TZ: Europe/Warsaw
+      REPORT_DATE: ${{ github.event.inputs.date }}
       
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +47,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Send Activity Report
-        if: github.event.inputs.report == 'activity'
+        if: github.event.inputs.report == 'all' || github.event.inputs.report == 'activity'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -50,7 +55,7 @@ jobs:
         run: python scripts/report_activity.py
 
       - name: Send KPI Report
-        if: github.event.inputs.report == 'kpi'
+        if: github.event.inputs.report == 'all' || github.event.inputs.report == 'kpi'
         env:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
@@ -61,7 +66,7 @@ jobs:
         run: python scripts/report_kpi.py
 
       - name: Send Bonus Report
-        if: github.event.inputs.report == 'bonus'
+        if: github.event.inputs.report == 'all' || github.event.inputs.report == 'bonus'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -69,17 +74,17 @@ jobs:
         run: python scripts/report_bonus.py
 
       - name: Send Income Report
-        if: github.event.inputs.report == 'income'
+        if: github.event.inputs.report == 'all' || github.event.inputs.report == 'income'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/report_income.py
         
-      - name: Send Clients Status Report
-        if: github.event.inputs.report == 'clients_status'
+      - name: Send Status Report
+        if: github.event.inputs.report == 'all' || github.event.inputs.report == 'status'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/report_clients_status.py 
+        run: python scripts/report_status.py 

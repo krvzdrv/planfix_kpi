@@ -269,7 +269,7 @@ jobs:
           fi
           
           # Run the script with debug output
-          if ! python -u scripts/report_clients_status.py; then
+          if ! python -u scripts/report_status.py; then
             echo "::error::Failed to generate and send clients status report"
             exit 1
           fi
