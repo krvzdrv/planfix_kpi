@@ -213,8 +213,8 @@ def generate_income_report(conn):
         for key in ['fakt', 'dlug', 'brak']:
             max_sum_len = max(max_sum_len, len(format_int_currency(l[key])))
     
-    # Длина бара = 15 символов (увеличено с 31 для лучшей визуализации)
-    bar_length = 15
+    # Длина бара = 31 символ (возвращаем как было)
+    bar_length = 31
     
     # Собираем все проценты в строковом виде для выравнивания
     percent_strs = []
@@ -224,26 +224,16 @@ def generate_income_report(conn):
         percent_strs.append(format_percent(l['brak_percent']))
     max_percent_len = max(len(s) for s in percent_strs)
     
-    # Для выравнивания: левая часть будет 24 символа (как в статусах), правая 12
-    # Левая часть: "LABEL VALUE PLN" - 24 символа
-    # Поле для LABEL(8), пробела(1), VALUE(max_sum_len), " PLN "(5) = 14 + max_sum_len
-    # Остальное место для бара = 24 - (14 + max_sum_len)
-    max_bar_len = 24 - (14 + max_sum_len)
-    
+    # Для выравнивания: после PLN добавляем столько пробелов, чтобы скобка с процентом начиналась на одной позиции
     def line_with_percent(label, value, percent):
         sum_str = format_int_currency(value).rjust(max_sum_len)
         percent_str = format_percent(percent)
-        
-        # Левая часть: "LABEL VALUE PLN BAR" - 24 символа
-        left_part = f" {label} {sum_str} PLN "
-        bar_str = '█' * max_bar_len  # Используем полную длину бара для всех строк
-        left_part_with_bar = f"{left_part}{bar_str}"
-        left_part_final = f"{left_part_with_bar:<24}"
-        
-        # Правая часть: " PERCENT" - 12 символов
-        right_part = f" {percent_str}".ljust(12)
-        
-        return f"{left_part_final}{right_part}"
+        # позиция, где должна начинаться скобка
+        after_pln_pos = max_sum_len + 8  # 8 = len(' PLN ') + 2 (дополнительные пробелы)
+        line = f" {label} {sum_str} PLN "
+        # Добавляем пробелы так, чтобы символ '%' был на одной позиции
+        spaces = ' ' * (after_pln_pos - len(line))
+        return f"{line}{spaces}{percent_str}"
     
     def generate_proportional_bar(fakt_percent, dlug_percent, brak_percent, total_length):
         """
@@ -290,11 +280,7 @@ def generate_income_report(conn):
         message += line_with_percent('▒  Dług:', l['dlug'], l['dlug_percent']) + '\n'
         message += line_with_percent('░  Brak:', l['brak'], l['brak_percent']) + '\n'
         plan_sum = format_int_currency(l['plan']).rjust(max_sum_len)
-        # Выравниваем план так же, как остальные строки, но без процента
-        plan_line = f"    Plan: {plan_sum} PLN "
-        plan_line_with_bar = f"{plan_line}{'█' * max_bar_len}"
-        plan_line_final = f"{plan_line_with_bar:<24}{' ' * 12}"
-        message += plan_line_final + '\n'
+        message += f"    Plan: {plan_sum} PLN\n"
         message += '\n'
     
     message += '```'
