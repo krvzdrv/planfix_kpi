@@ -296,8 +296,8 @@ def main():
         
         # Отправляем один общий отчет
         if all_reports:
-            final_report_header = f"Woronka {today.strftime('%d.%m.%Y')}\n"
-            final_report = f"{final_report_header}\n" + "\n\n".join(all_reports)
+            final_report_header = f"Woronka {today.strftime('%d.%m.%Y')}"
+            final_report = f"```{final_report_header}\n" + "\n\n".join(all_reports) + "\n```"
             send_to_telegram(final_report)
 
     except psycopg2.Error as e:
