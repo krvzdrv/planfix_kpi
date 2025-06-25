@@ -232,9 +232,9 @@ def generate_income_report(conn):
         # Левая часть: "LABEL VALUE PLN" - фиксированная ширина
         left_part = f" {label} {sum_str} PLN "
         
-        # Правая часть: " PERCENT" - 12 символов, процент по правому краю
+        # Правая часть: " PERCENT" - 6 символов (уменьшено с 12), процент по правому краю
         # Используем логику как в скрипте статусов
-        padding_len = 12 - len(percent_str)
+        padding_len = 6 - len(percent_str)
         right_part = f"{' ' * max(0, padding_len)}{percent_str}"
         
         return f"{left_part}{right_part}"
