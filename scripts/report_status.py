@@ -178,9 +178,9 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         change_strings[status] = s
         max_change_str_len = max(max_change_str_len, len(s))
 
-    # Макс. длина бара = 15 (увеличено с 9 на 6 символов).
-    # Левая часть будет 24 символа (увеличено с 18 на 6), правая 12.
-    max_bar_len = 15
+    # Макс. длина бара = 9.
+    # Левая часть будет 18 символов, правая 12.
+    max_bar_len = 9
 
     lines = []
     for status in CLIENT_STATUSES:
@@ -191,10 +191,10 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         bar_len = max(1, round(current / global_max * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
 
-        # Левая часть: "KPI BAR  VALUE" - 24 символа (увеличено с 18 на 6).
-        # Поле для KPI(3), пробела(1) и бара с отступом = 24 - 3(value) = 21.
+        # Левая часть: "KPI BAR  VALUE" - 18 символов.
+        # Поле для KPI(3), пробела(1) и бара с отступом = 18 - 3(value) = 15.
         kpi_bar_part = f"{status} {bar_str}"
-        left_part = f"{kpi_bar_part:<21}{current:>3}"
+        left_part = f"{kpi_bar_part:<15}{current:>3}"
 
         # Правая часть: " INDICATOR CHANGE (PERCENT)" - 12 символов.
         change_str = change_strings[status]
@@ -279,10 +279,10 @@ def main():
                 # Формируем полный текст сообщения для одного менеджера
                 # Заголовок теперь будет общий, а здесь только имя менеджера
                 manager_header = f"👤 {manager}"
-                separator = "──────────────────────────────────────────"
+                separator = "──────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
-                # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 24 позиции)
-                footer = f"RZM:{total_sum:>20}"
+                # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 18 позиции)
+                footer = f"RZM:{total_sum:>14}"
 
                 full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
                 all_reports.append(full_report_for_manager)
