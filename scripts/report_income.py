@@ -265,7 +265,7 @@ def generate_income_report(conn):
     message += f'PRZYCHODY_{current_month:02d}.{current_year}\n'
     
     for l in all_lines:
-        message += f"👤 {l['manager']}:\n"
+        message += f"👤 {l['manager']}:\n\n"
         
         # Генерируем пропорциональный бар
         progress_bar = generate_proportional_bar(
