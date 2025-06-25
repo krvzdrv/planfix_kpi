@@ -228,12 +228,14 @@ def generate_income_report(conn):
     def line_with_percent(label, value, percent):
         sum_str = format_int_currency(value).rjust(max_sum_len)
         percent_str = format_percent(percent)
-        # позиция, где должна начинаться скобка
-        after_pln_pos = max_sum_len + 8  # 8 = len(' PLN ') + 2 (дополнительные пробелы)
-        line = f" {label} {sum_str} PLN "
-        # Добавляем пробелы так, чтобы символ '%' был на одной позиции
-        spaces = ' ' * (after_pln_pos - len(line))
-        return f"{line}{spaces}{percent_str}"
+        
+        # Левая часть: "LABEL VALUE PLN" - фиксированная ширина
+        left_part = f" {label} {sum_str} PLN "
+        
+        # Правая часть: " PERCENT" - 12 символов, процент по правому краю
+        right_part = f" {percent_str}".ljust(12)
+        
+        return f"{left_part}{right_part}"
     
     def generate_proportional_bar(fakt_percent, dlug_percent, brak_percent, total_length):
         """
