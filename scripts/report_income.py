@@ -233,7 +233,9 @@ def generate_income_report(conn):
         left_part = f" {label} {sum_str} PLN "
         
         # Правая часть: " PERCENT" - 12 символов, процент по правому краю
-        right_part = f" {percent_str}".ljust(12)
+        # Используем логику как в скрипте статусов
+        padding_len = 12 - len(percent_str)
+        right_part = f"{' ' * max(0, padding_len)}{percent_str}"
         
         return f"{left_part}{right_part}"
     
