@@ -214,8 +214,7 @@ def send_to_telegram(message: str):
     """Отправить сообщение в Telegram."""
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        # Убираем Markdown, так как используем моноширинный шрифт с ручным выравниванием
-        payload = {'chat_id': CHAT_ID, 'text': f"<pre>\n{message}\n</pre>", 'parse_mode': 'HTML'}
+        payload = {'chat_id': CHAT_ID, 'text': message, 'parse_mode': 'Markdown'}
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             logger.info("Message sent successfully to Telegram")
