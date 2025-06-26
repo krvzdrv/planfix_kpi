@@ -2,6 +2,14 @@
 .env
 .env.*
 
+# Secrets and configuration files
+secrets_template.md
+*secrets*
+*config*
+*.template
+secrets/
+config/
+
 # Python
 __pycache__/
 *.py[cod]
