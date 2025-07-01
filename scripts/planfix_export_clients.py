@@ -59,6 +59,8 @@ CUSTOM_MAP = {
     "Data dodania do \"W trakcie\"": "data_dodania_do_w_trakcie",
     "Data dodania do \"Perspektywiczni\"": "data_dodania_do_perspektywiczni",
     "Data dodania do \"Rezygnacja\"": "data_dodania_do_rezygnacja",
+    "Data dodania do \"Brak kontaktu\"": "data_dodania_do_brak_kontaktu",
+    "Data dodania do \"Archiwum\"": "data_dodania_do_archiwum",
     "Data pierwszego zamówienia": "data_pierwszego_zamowienia",
     "Обновить KPI": "obnowit_kpi",
     "Status współpracy": "status_wspolpracy"
