@@ -31,7 +31,7 @@ HISTORY_TABLE_NAME = "report_clients_status_history"
 logger = logging.getLogger(__name__)
 
 # Статусы клиентов и их порядок в отчёте
-CLIENT_STATUSES = ['NWI', 'WTR', 'PSK', 'PIZ', 'STL', 'NAK', 'REZ']
+CLIENT_STATUSES = ['NWI', 'WTR', 'PSK', 'PIZ', 'STL', 'NAK', 'REZ', 'BRK', 'ARC']
 
 # Сопоставление для статусов, чья логика НЕ зависит от дат (кроме STL)
 STATUS_MAPPING = {
@@ -40,7 +40,9 @@ STATUS_MAPPING = {
     'Perspektywiczni': 'PSK',
     'Pierwsze zamówienie': 'PIZ',
     'Stali klienci': 'STL',
-    'Rezygnacja': 'REZ'
+    'Rezygnacja': 'REZ',
+    'Brak kontaktu': 'BRK',
+    'Archiwum': 'ARC'
 }
 
 # Сопоставление статусов с их полем даты для расчета ПРИТОКА
@@ -50,6 +52,8 @@ STATUS_INFLOW_DATE_COLS = {
     'PSK': 'data_dodania_do_perspektywiczni',
     'PIZ': 'data_pierwszego_zamowienia',
     'REZ': 'data_dodania_do_rezygnacja',
+    'BRK': 'data_dodania_do_brak_kontaktu',
+    'ARC': 'data_dodania_do_archiwum',
 }
 
 def _execute_query(conn, query: str, params: tuple = (), description: str = "") -> list:
