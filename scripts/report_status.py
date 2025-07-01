@@ -134,7 +134,17 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
 
     current_totals = {status: 0 for status in CLIENT_STATUSES}
     for full_status, last_order_date in results:
-        short_status = STATUS_MAPPING.get(full_status.strip())
+        status_clean = full_status.strip()
+        if status_clean == 'Stali klienci':
+            days_diff = float('inf')
+            if last_order_date and last_order_date.strip():
+                try:
+                    days_diff = (today - datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()).days
+                except (ValueError, TypeError):
+                    pass
+            short_status = 'STL' if days_diff <= 30 else 'NAK'
+        else:
+            short_status = STATUS_MAPPING.get(status_clean)
 
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
