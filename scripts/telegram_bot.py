@@ -10,6 +10,8 @@ from config import MANAGERS_KPI
 import asyncio
 from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
+from core.kpi_data import get_kpi_metrics, get_actual_kpi_values, calculate_kpi_coefficients, get_additional_premia
+from core.kpi_report import format_premia_report
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,6 +27,7 @@ PG_PORT = os.environ.get('SUPABASE_PORT')
 
 # --- Telegram Settings ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # Get a logger instance for this module
 logger = logging.getLogger(__name__)
@@ -558,6 +561,19 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
     if update and update.message:
         await update.message.reply_text("❌ Произошла ошибка при обработке команды. Попробуйте позже.")
+
+def send_to_telegram(message: str):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = {
+        "chat_id": CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    try:
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Failed to send message to Telegram: {e}")
 
 def main():
     """Main function to run the Telegram bot."""
