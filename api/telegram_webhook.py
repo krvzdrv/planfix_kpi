@@ -1,12 +1,19 @@
 import os
 import requests
 
-def handler(request, response):
+def handler(request):
     GITHUB_TOKEN = os.environ['GITHUB_TOKEN']
     GITHUB_REPO = os.environ['GITHUB_REPO']  # например, "krvzdrv/planfix_kpi"
     GITHUB_EVENT_TYPE = "telegram_command"
 
-    data = request.json()
+    try:
+        data = request.json()
+    except Exception:
+        return {
+            "statusCode": 400,
+            "body": "Invalid JSON"
+        }
+
     message = data.get('message', {})
     text = message.get('text', '')
 
@@ -20,7 +27,7 @@ def handler(request, response):
         payload = {
             "event_type": GITHUB_EVENT_TYPE,
             "client_payload": {
-                "chat_id": message['chat']['id'],
+                "chat_id": message.get('chat', {}).get('id'),
                 "command": "premia_current"
             }
         }
@@ -29,10 +36,12 @@ def handler(request, response):
             json=payload,
             headers=headers
         )
-        response.status_code = 200
-        response.text = "OK"
-        return response
+        return {
+            "statusCode": 200,
+            "body": "OK"
+        }
     else:
-        response.status_code = 200
-        response.text = "Ignored"
-        return response 
+        return {
+            "statusCode": 200,
+            "body": "Ignored"
+        } 
