@@ -1,7 +1,7 @@
 import os
 import requests
 
-def handler(request):
+def main(request):
     GITHUB_TOKEN = os.environ['GITHUB_TOKEN']
     GITHUB_REPO = os.environ['GITHUB_REPO']  # например, "krvzdrv/planfix_kpi"
     GITHUB_EVENT_TYPE = "telegram_command"
