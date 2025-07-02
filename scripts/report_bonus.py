@@ -43,6 +43,14 @@ KPI_INDICATORS = [
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+# Импортируем core-модули (новая архитектура)
+try:
+    from core.kpi_data import get_kpi_metrics, get_actual_kpi_values, calculate_kpi_coefficients
+    from core.kpi_report import format_premia_report
+except ImportError:
+    # Для совместимости, если core ещё не реализован полностью
+    pass
+
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
