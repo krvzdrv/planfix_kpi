@@ -69,6 +69,21 @@ CUSTOM_MAP = {
 # Поля-справочники, для которых нужно брать текстовое значение (text), а не ID (value)
 TEXT_VALUE_FIELDS = ["Menedżer", "Status współpracy"]
 
+# Поля с датами, которые нужно парсить
+DATE_FIELDS = [
+    "Data ostatniego kontaktu",
+    "Data rejestracji w KRS", 
+    "Data rozpoczęcia działalności w CEIDG",
+    "Data ostatniego zamówienia",
+    "Data dodania do \"Nowi\"",
+    "Data dodania do \"W trakcie\"",
+    "Data dodania do \"Perspektywiczni\"",
+    "Data dodania do \"Rezygnacja\"",
+    "Data dodania do \"Brak kontaktu\"",
+    "Data dodania do \"Archiwum\"",
+    "Data pierwszego zamówienia"
+]
+
 BASE_COLUMNS = {
     "id": "BIGINT",
     "userid": "BIGINT",
@@ -105,6 +120,17 @@ BASE_COLUMNS = {
 }
 
 logger = logging.getLogger(__name__)
+
+def parse_date(date_str):
+    """Парсит дату из строки в формате DD-MM-YYYY или DD-MM-YYYY HH:MM"""
+    if not date_str:
+        return None
+    for fmt in ("%d-%m-%Y %H:%M", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None
 
 def get_planfix_companies(page):
     headers = {
@@ -181,6 +207,19 @@ def company_to_dict(contact):
                 # Для полей-справочников сохраняем text (имя), а не value (ID)
                 if field.text in TEXT_VALUE_FIELDS:
                     custom_fields[CUSTOM_MAP[field.text]] = text.text if text is not None else None
+                # Для полей с датами парсим и сохраняем в правильном формате
+                elif field.text in DATE_FIELDS:
+                    date_value = value.text if value is not None else None
+                    if date_value:
+                        parsed_date = parse_date(date_value)
+                        if parsed_date:
+                            # Сохраняем в формате DD-MM-YYYY для совместимости с базой данных
+                            custom_fields[CUSTOM_MAP[field.text]] = parsed_date.strftime("%d-%m-%Y")
+                        else:
+                            # Если не удалось распарсить, сохраняем как есть
+                            custom_fields[CUSTOM_MAP[field.text]] = date_value
+                    else:
+                        custom_fields[CUSTOM_MAP[field.text]] = None
                 else:
                     custom_fields[CUSTOM_MAP[field.text]] = value.text if value is not None else None
 
