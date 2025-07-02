@@ -196,3 +196,17 @@ black scripts/
 ```bash
 pytest
 ```
+
+## Интеграция Telegram и GitHub через Vercel
+
+1. В корне репозитория есть папка `api/` с файлом `telegram_webhook.py` — это serverless-функция для Vercel.
+2. В настройках Vercel добавьте переменные окружения:
+   - `GITHUB_TOKEN` — токен GitHub с правом на repository_dispatch
+   - `GITHUB_REPO` — например, `krvzdrv/planfix_kpi`
+3. После деплоя настройте webhook Telegram:
+   - Вызовите:
+     ```
+     https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<your-vercel-app>.vercel.app/api/telegram_webhook
+     ```
+4. В репозитории должен быть workflow `.github/workflows/telegram_dispatch.yml` для обработки событий repository_dispatch.
+5. Теперь при отправке команды `/premia_current` в Telegram-бота будет запускаться GitHub Actions и формироваться отчёт.
