@@ -1,4 +1,6 @@
 requests
+python-dotenv
 psycopg2-binary==2.9.9
 python-telegram-bot==20.7
-python-dotenv==1.0.1 
+flask
+gunicorn 
