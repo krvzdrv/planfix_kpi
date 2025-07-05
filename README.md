@@ -230,3 +230,5 @@ Telegram Bot → Render Webhook → GitHub API → GitHub Actions → Отчет
 ### Подробная инструкция
 
 Для полной настройки системы через Render см. [RENDER_SETUP.md](RENDER_SETUP.md)
+
+Для настройки GitHub токена см. [GITHUB_TOKEN_SETUP.md](GITHUB_TOKEN_SETUP.md)
