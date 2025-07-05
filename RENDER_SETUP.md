@@ -76,6 +76,7 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ### 3.1 Проверка Render сервиса
 
 - Health check: `https://your-app-name.onrender.com/health`
+- Debug info: `https://your-app-name.onrender.com/debug`
 - Информация: `https://your-app-name.onrender.com/`
 
 ### 3.2 Тестирование команд
@@ -100,7 +101,28 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 - `SUPABASE_PORT`
 - `TELEGRAM_BOT_TOKEN`
 
-## Устранение неполадок
+## Диагностика проблем
+
+### Проблема: GitHub API возвращает 404
+
+Если в логах Render видите ошибку 404 при вызове GitHub API:
+
+1. **Запустите диагностику:**
+   ```bash
+   python scripts/test_github_api.py
+   ```
+
+2. **Проверьте переменные окружения на Render:**
+   - `GITHUB_TOKEN` должен быть установлен
+   - `GITHUB_REPO` должен быть в формате `owner/repo`
+
+3. **Проверьте права токена:**
+   - Токен должен иметь права `repo`
+   - Токен должен иметь доступ к репозиторию
+
+4. **Проверьте формат репозитория:**
+   - Должен быть: `krvzdrv/planfix_kpi`
+   - НЕ: `https://github.com/krvzdrv/planfix_kpi`
 
 ### Проблема: Webhook не работает
 
@@ -127,6 +149,11 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 
 ## Полезные команды
 
+### Диагностика GitHub API
+```bash
+python scripts/test_github_api.py
+```
+
 ### Проверка статуса webhook
 ```bash
 python scripts/setup_telegram_webhook.py --check
@@ -140,6 +167,7 @@ python scripts/setup_telegram_webhook.py https://your-app-name.onrender.com
 ### Тестирование Render сервиса
 ```bash
 curl https://your-app-name.onrender.com/health
+curl https://your-app-name.onrender.com/debug
 ```
 
 ## Структура файлов
@@ -149,6 +177,7 @@ curl https://your-app-name.onrender.com/health
 │   └── telegram_webhook.py    # Flask приложение для Render
 ├── scripts/
 │   ├── setup_telegram_webhook.py  # Настройка webhook
+│   ├── test_github_api.py         # Диагностика GitHub API
 │   ├── report_bonus.py            # Отчет за текущий месяц
 │   └── report_bonus_previous.py   # Отчет за предыдущий месяц
 ├── .github/workflows/
