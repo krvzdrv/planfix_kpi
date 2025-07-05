@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
 PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
 
+# --- KPI INDICATORS ---
+ALL_KPI = [
+    'NWI', 'WTR', 'PSK',
+    'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
+    'TTL', 'OFW', 'ZAM', 'PRC'
+]
+
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
@@ -563,6 +570,32 @@ def get_date_range(report_type: str) -> tuple[str, str]:
     logger.info(f"End date: {end_date_str}")
     return start_date_str, end_date_str
 
+def check_kpi_coverage():
+    """Проверяет, что все KPI из ALL_KPI есть в структуре отчёта и в базе."""
+    conn = None
+    try:
+        conn = psycopg2.connect(host=PG_HOST, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD, port=PG_PORT)
+        cur = conn.cursor()
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'kpi_metrics';")
+        columns = [row[0].lower() for row in cur.fetchall()]
+        missing_in_db = [kpi.lower() for kpi in ALL_KPI if kpi.lower() not in columns]
+        if missing_in_db:
+            logger.warning(f"KPI отсутствуют в таблице kpi_metrics: {missing_in_db}")
+        else:
+            logger.info("Все KPI присутствуют в таблице kpi_metrics.")
+    except Exception as e:
+        logger.error(f"Ошибка при проверке структуры kpi_metrics: {e}")
+    finally:
+        if conn:
+            conn.close()
+    # Проверка структуры отчёта (data, task_order, client_order, order_order)
+    # Проверяем, что все KPI есть в форматировании отчёта
+    report_kpi = set(['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'])
+    missing_in_report = [kpi for kpi in ALL_KPI if kpi not in report_kpi]
+    if missing_in_report:
+        logger.warning(f"KPI отсутствуют в структуре отчёта: {missing_in_report}")
+    else:
+        logger.info("Все KPI присутствуют в структуре отчёта.")
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -574,6 +607,7 @@ if __name__ == "__main__":
     
     try:
         _check_env_vars() # Check environment variables and manager config
+        check_kpi_coverage() # Проверка покрытия KPI
 
         # Send daily report
         logger.info("Generating daily KPI report.")

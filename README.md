@@ -197,16 +197,36 @@ black scripts/
 pytest
 ```
 
-## Интеграция Telegram и GitHub через Vercel
+## Интеграция Telegram и GitHub через Render
 
-1. В корне репозитория есть папка `api/` с файлом `telegram_webhook.py` — это serverless-функция для Vercel.
-2. В настройках Vercel добавьте переменные окружения:
+1. В корне репозитория есть папка `api/` с файлом `telegram_webhook.py` — это Flask-приложение для Render.
+2. В настройках Render добавьте переменные окружения:
    - `GITHUB_TOKEN` — токен GitHub с правом на repository_dispatch
    - `GITHUB_REPO` — например, `krvzdrv/planfix_kpi`
-3. После деплоя настройте webhook Telegram:
+3. После деплоя на Render настройте webhook Telegram:
    - Вызовите:
      ```
-     https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<your-vercel-app>.vercel.app/api/telegram_webhook
+     https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<your-render-app>.onrender.com/api/telegram_webhook
      ```
-4. В репозитории должен быть workflow `.github/workflows/telegram_dispatch.yml` для обработки событий repository_dispatch.
-5. Теперь при отправке команды `/premia_current` в Telegram-бота будет запускаться GitHub Actions и формироваться отчёт.
+4. В репозитории есть workflow `.github/workflows/telegram-dispatch.yml` для обработки событий repository_dispatch.
+5. Теперь при отправке команд `/premia_current` или `/premia_previous` в Telegram-бота будет запускаться GitHub Actions и формироваться отчёт.
+
+### Поддерживаемые команды
+
+- `/premia_current` — отчет по премии за текущий месяц
+- `/premia_previous` — отчет по премии за предыдущий месяц
+
+### Архитектура системы
+
+```
+Telegram Bot → Render Webhook → GitHub API → GitHub Actions → Отчет → Telegram
+```
+
+### Мониторинг
+
+- Health check: `https://<your-render-app>.onrender.com/health`
+- Информация о сервисе: `https://<your-render-app>.onrender.com/`
+
+### Подробная инструкция
+
+Для полной настройки системы через Render см. [RENDER_SETUP.md](RENDER_SETUP.md)

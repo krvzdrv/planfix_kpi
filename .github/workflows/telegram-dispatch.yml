@@ -23,10 +23,61 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Log command details
+        run: |
+          echo "Command: ${{ github.event.client_payload.command }}"
+          echo "Chat ID: ${{ github.event.client_payload.chat_id }}"
+          echo "User ID: ${{ github.event.client_payload.user_id }}"
+          echo "User Name: ${{ github.event.client_payload.user_name }}"
+
       - name: Run KPI Bonus Report (premia_current)
         if: github.event.client_payload.command == 'premia_current'
         env:
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
+          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
-        run: python scripts/report_bonus.py 
+        run: |
+          echo "🔄 Generating current month premia report..."
+          python scripts/report_bonus.py
+          echo "✅ Current month premia report completed"
+
+      - name: Run KPI Bonus Report (premia_previous)
+        if: github.event.client_payload.command == 'premia_previous'
+        env:
+          SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
+          SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
+          SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
+          SUPABASE_USER: ${{ secrets.SUPABASE_USER }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PORT: ${{ secrets.SUPABASE_PORT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+        run: |
+          echo "🔄 Generating previous month premia report..."
+          python scripts/report_bonus_previous.py
+          echo "✅ Previous month premia report completed"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"❌ Ошибка при генерации отчета по премии. Попробуйте позже.\",\"parse_mode\":\"Markdown\"}"
+
+      - name: Notify on success
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+        run: |
+          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"✅ Отчет по премии сгенерирован и отправлен!\",\"parse_mode\":\"Markdown\"}" 

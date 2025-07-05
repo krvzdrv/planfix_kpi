@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: planfix-kpi-webhook
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api.telegram_webhook:app
+    envVars:
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO
+        value: krvzdrv/planfix_kpi
+    healthCheckPath: /health
+    autoDeploy: true 

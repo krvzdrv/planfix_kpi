@@ -1,3 +1,9 @@
+# DEPRECATED: This file is no longer used.
+# The system now uses webhook-based processing through Render.
+# See api/telegram_webhook.py for the current implementation.
+# 
+# This file is kept for reference but should not be used in production.
+
 import os
 import sys
 import logging
