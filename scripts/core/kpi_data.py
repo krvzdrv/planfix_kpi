@@ -254,7 +254,7 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                 else:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
-                sum_coefficient += coefficient
+                sum_coefficient += Decimal(str(coefficient))
         manager_coefficients['SUM'] = Decimal(str(math_round(sum_coefficient, 2)))
         if 'premia' in metrics and metrics['premia'] is not None:
             premia = Decimal(str(metrics['premia']))

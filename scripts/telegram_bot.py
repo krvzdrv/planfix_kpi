@@ -384,7 +384,7 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                 else:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
-                sum_coefficient += coefficient
+                sum_coefficient += Decimal(str(coefficient))
         # Add SUM coefficient
         manager_coefficients['SUM'] = Decimal(str(math_round(sum_coefficient, 2)))
         # Calculate PRK (FND * SUM)
