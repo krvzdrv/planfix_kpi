@@ -16,9 +16,9 @@
 │   └── telegram_webhook.py         # Webhook для обработки Telegram команд через Render
 ├── scripts/
 │   ├── core/                       # Основная бизнес-логика KPI
-│   │   ├── kpi_data.py            # Получение и обработка KPI данных
-│   │   ├── kpi_report.py          # Форматирование KPI отчетов
-│   │   └── kpi_utils.py           # Утилиты (математическое округление)
+│   │   ├── kpi_data.py             # Получение и обработка KPI данных
+│   │   ├── kpi_report.py           # Форматирование KPI отчетов
+│   │   └── kpi_utils.py            # Утилиты (математическое округление)
 │   ├── config.py                   # Конфигурация менеджеров
 │   ├── planfix_export_clients.py   # Синхронизация клиентов
 │   ├── planfix_export_orders.py    # Синхронизация заказов
