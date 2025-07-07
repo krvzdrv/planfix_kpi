@@ -48,7 +48,7 @@ def format_int_currency(value):
 
 def format_percent(val):
     # Округляем до целых значений и форматируем как (XX%)
-    return f"({int(math_round(float(val)))}%)"
+    return f"({math_round(float(val), 0)}%)"
 
 def _parse_netto_pln(value):
     """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""

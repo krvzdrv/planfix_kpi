@@ -238,6 +238,8 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
     for manager, values in actual_values.items():
         manager_coefficients = {}
         sum_coefficient = Decimal('0')
+        
+        # Рассчитываем коэффициенты для всех показателей, включая TTL
         for indicator in KPI_INDICATORS:
             if indicator in metrics and metrics[indicator]['plan'] is not None:
                 actual = Decimal(str(values.get(indicator, 0)))
@@ -255,12 +257,17 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
                 sum_coefficient += Decimal(str(coefficient))
+        
+        # Добавляем SUM коэффициент
         manager_coefficients['SUM'] = Decimal(str(math_round(sum_coefficient, 2)))
+        
+        # Рассчитываем PRK
         if 'premia' in metrics and metrics['premia'] is not None:
             premia = Decimal(str(metrics['premia']))
             manager_coefficients['PRK'] = Decimal(str(math_round(premia * sum_coefficient, 2)))
         else:
             manager_coefficients['PRK'] = Decimal('0')
+        
         coefficients[manager] = manager_coefficients
     return coefficients
 

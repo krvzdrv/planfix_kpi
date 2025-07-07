@@ -436,7 +436,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
             if manager in data:
                 data[manager]['ZAM'] = count  # Количество подтвержденных заказов
-                data[manager]['PRC'] = math_round(float(amount))  # Округляем PRC до целых
+                data[manager]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
 
         # Process offer results
         for row in offer_results:
