@@ -91,7 +91,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                 CASE 
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Зadzwonić do klienta' THEN 'ZKL'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                     ELSE NULL
                 END AS task_type,
@@ -118,9 +118,9 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                 AND owner_name IN %s
                 AND is_deleted = false
                 AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
-                    'Nawiązać pierwszy контакт',
+                    'Nawiązać pierwszy kontakt',
                     'Przeprowadzić pierwszą rozmowę telefoniczną',
-                    'Зadzwonić до клиента',
+                    'Zadzwonić do klienta',
                     'Przeprowadzić spotkanie'
                 )
             GROUP BY owner_name
