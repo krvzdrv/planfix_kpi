@@ -118,6 +118,18 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                 AND data_zakonczenia_zadania < %s::timestamp
                 AND owner_name IN %s
                 AND is_deleted = false
+                AND TRIM(SPLIT_PART(title, ' /', 1)) IN (
+                    'Nawiązać pierwszy kontakt',
+                    'Przeprowadzić pierwszą rozmowę telefoniczną',
+                    'Przeprowadzić spotkanie',
+                    'Wysłać materiały',
+                    'Zadzwonić do klienta',
+                    'Odpowiedzieć na pytanie techniczne',
+                    'Zapisać na media społecznościowe',
+                    'Opowiedzieć o nowościach',
+                    'Przywrócić klienta',
+                    'Zebrać opinie'
+                )
             GROUP BY owner_name
         )
         SELECT 
