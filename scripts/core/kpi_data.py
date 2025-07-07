@@ -8,6 +8,7 @@ from typing import Dict, Any
 from config import MANAGERS_KPI
 import planfix_utils
 import psycopg2
+from .kpi_utils import math_round
 
 logger = logging.getLogger(__name__)
 
@@ -247,15 +248,15 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                         used_value = min(actual, plan)
                     else:
                         used_value = actual
-                    coefficient = round((used_value / plan) * weight, 2)
+                    coefficient = math_round((used_value / plan) * weight, 2)
                 else:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
                 sum_coefficient += coefficient
-        manager_coefficients['SUM'] = round(sum_coefficient, 2)
+        manager_coefficients['SUM'] = math_round(sum_coefficient, 2)
         if 'premia' in metrics and metrics['premia'] is not None:
             premia = Decimal(str(metrics['premia']))
-            manager_coefficients['PRK'] = round(premia * sum_coefficient, 2)
+            manager_coefficients['PRK'] = math_round(premia * sum_coefficient, 2)
         else:
             manager_coefficients['PRK'] = Decimal('0')
         coefficients[manager] = manager_coefficients

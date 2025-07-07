@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from config import MANAGERS_KPI
+from core.kpi_utils import math_round
 
 # Load environment variables from .env file
 load_dotenv()
@@ -193,7 +194,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         current = data['current']
         indicator = data['direction']
 
-        bar_len = max(1, round(current / global_max * max_bar_len)) if global_max > 0 and current > 0 else 0
+        bar_len = max(1, math_round(current / global_max * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
 
         # Левая часть: "KPI BAR  VALUE" - 18 символов.
@@ -205,7 +206,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         change_str = change_strings[status]
         change_part = f" {indicator} {change_str}".ljust(3 + max_change_str_len)
 
-        percentage = round(current / total_sum * 100)
+        percentage = math_round(current / total_sum * 100)
         percent_str = f"({percentage}%)"
 
         padding_len = 12 - len(change_part) - len(percent_str)

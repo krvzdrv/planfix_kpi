@@ -18,6 +18,7 @@ from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 from core.kpi_data import get_kpi_metrics, get_actual_kpi_values, calculate_kpi_coefficients, get_additional_premia
 from core.kpi_report import format_premia_report
+from core.kpi_utils import math_round
 
 # Load environment variables from .env file
 load_dotenv()
@@ -377,17 +378,17 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                         used_value = min(actual, plan)
                     else:
                         used_value = actual
-                    coefficient = round((used_value / plan) * weight, 2)
+                    coefficient = math_round((used_value / plan) * weight, 2)
                 else:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
                 sum_coefficient += coefficient
         # Add SUM coefficient
-        manager_coefficients['SUM'] = round(sum_coefficient, 2)
+        manager_coefficients['SUM'] = math_round(sum_coefficient, 2)
         # Calculate PRK (FND * SUM)
         if 'premia' in metrics and metrics['premia'] is not None:
             premia = Decimal(str(metrics['premia']))
-            manager_coefficients['PRK'] = round(premia * sum_coefficient, 2)
+            manager_coefficients['PRK'] = math_round(premia * sum_coefficient, 2)
         else:
             manager_coefficients['PRK'] = Decimal('0')
         coefficients[manager] = manager_coefficients

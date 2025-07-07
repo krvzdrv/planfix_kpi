@@ -2,6 +2,7 @@
 Модуль для формирования текстовых отчетов по KPI (Telegram/Markdown)
 """
 from typing import Dict
+from .kpi_utils import math_round
 
 def format_premia_report(coefficients: Dict, current_month: int, current_year: int, additional_premia: Dict) -> str:
     kpi_order = [

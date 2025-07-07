@@ -8,6 +8,7 @@ from config import MANAGERS_KPI
 import planfix_utils
 import sys
 import re
+from core.kpi_utils import math_round
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -435,7 +436,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
             if manager in data:
                 data[manager]['ZAM'] = count  # Количество подтвержденных заказов
-                data[manager]['PRC'] = round(amount)  # Округляем PRC до целых
+                data[manager]['PRC'] = math_round(amount)  # Округляем PRC до целых
 
         # Process offer results
         for row in offer_results:
