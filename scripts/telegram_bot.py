@@ -384,11 +384,11 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                 manager_coefficients[indicator] = coefficient
                 sum_coefficient += coefficient
         # Add SUM coefficient
-        manager_coefficients['SUM'] = math_round(sum_coefficient, 2)
+        manager_coefficients['SUM'] = Decimal(str(math_round(sum_coefficient, 2)))
         # Calculate PRK (FND * SUM)
         if 'premia' in metrics and metrics['premia'] is not None:
             premia = Decimal(str(metrics['premia']))
-            manager_coefficients['PRK'] = math_round(premia * sum_coefficient, 2)
+            manager_coefficients['PRK'] = Decimal(str(math_round(premia * sum_coefficient, 2)))
         else:
             manager_coefficients['PRK'] = Decimal('0')
         coefficients[manager] = manager_coefficients
