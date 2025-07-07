@@ -36,6 +36,7 @@ def math_round(value, decimals=0):
         return int(math.floor(float(value) + 0.5))
     else:
         multiplier = 10 ** decimals
+        # Математическое округление: добавляем 0.5 и берем floor
         result = math.floor(float(value) * multiplier + 0.5) / multiplier
         # Если исходное значение было Decimal, возвращаем Decimal
         if hasattr(value, '_is_special'):  # Это Decimal

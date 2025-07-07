@@ -194,7 +194,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         current = data['current']
         indicator = data['direction']
 
-        bar_len = max(1, math_round(current / global_max * max_bar_len)) if global_max > 0 and current > 0 else 0
+        bar_len = max(1, math_round(float(current) / float(global_max) * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
 
         # Левая часть: "KPI BAR  VALUE" - 18 символов.
@@ -206,7 +206,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         change_str = change_strings[status]
         change_part = f" {indicator} {change_str}".ljust(3 + max_change_str_len)
 
-        percentage = math_round(current / total_sum * 100)
+        percentage = math_round(float(current) / float(total_sum) * 100)
         percent_str = f"({percentage}%)"
 
         padding_len = 12 - len(change_part) - len(percent_str)

@@ -38,7 +38,7 @@ def format_int_currency(value):
 
 def format_percent(val):
     """Format percentage value."""
-    return f"({int(math_round(val))}%)"
+    return f"({int(math_round(float(val)))}%)"
 
 def _parse_netto_pln(value):
     """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""
@@ -332,10 +332,10 @@ def generate_sales_report(conn):
         data = income_data.get(manager_id)
         
         if data:
-            fakt = math_round(data['fakt'])
-            dlug = math_round(data['dlug'])
-            brak = math_round(data['brak'])
-            plan = math_round(data['plan'])
+            fakt = math_round(float(data['fakt']))
+            dlug = math_round(float(data['dlug']))
+            brak = math_round(float(data['brak']))
+            plan = math_round(float(data['plan']))
             total = fakt + dlug + brak
             
             fakt_percent = (fakt / total) * 100 if total > 0 else 0

@@ -378,7 +378,9 @@ def calculate_kpi_coefficients(metrics: dict, actual_values: dict) -> dict:
                         used_value = min(actual, plan)
                     else:
                         used_value = actual
-                    coefficient = math_round((used_value / plan) * weight, 2)
+                    # Преобразуем в float для математического округления
+                    coefficient_value = float((used_value / plan) * weight)
+                    coefficient = math_round(coefficient_value, 2)
                 else:
                     coefficient = Decimal('0')
                 manager_coefficients[indicator] = coefficient
