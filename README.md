@@ -32,7 +32,7 @@
 │   ├── report_sales.py             # Генерация и отправка отчёта по продажам
 │   ├── report_sales_monthly.py     # Генерация и отправка месячного отчёта по продажам
 │   ├── report_status.py            # Генерация и отправка отчёта по статусам
-│   └── telegram_bot.py             # Устаревший файл (используется webhook)
+│   └── telegram_bot.py             # Содержит логику KPI расчетов (устаревший standalone бот)
 ├── requirements.txt                # Зависимости Python
 ├── render.yaml                     # Конфигурация для Render
 └── README.md                       # Документация
