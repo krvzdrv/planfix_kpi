@@ -142,8 +142,8 @@ def get_income_data(conn, month, year):
         # После получения данных из БД фильтруем по нулю
         for d in [fakt_data, dlug_data, brak_data]:
             for k in list(d.keys()):
-                if d[k] is None or float(d[k]) == 0.0:
-                    d[k] = 0.0
+                if d[k] is None or d[k] == Decimal('0'):
+                    d[k] = Decimal('0')
 
         # Объединяем данные
         income_data = {}
