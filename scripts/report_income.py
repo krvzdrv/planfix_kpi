@@ -153,7 +153,7 @@ def get_income_data(conn, month, year):
         for manager in all_managers:
             fakt = fakt_data.get(manager, Decimal('0'))
             dlug = dlug_data.get(manager, Decimal('0'))
-            brak = max(0, revenue_plan - fakt - dlug)  # Brak = Plan - Fakt - Dlug (если положительное)
+            brak = max(Decimal('0'), revenue_plan - fakt - dlug)  # Brak = Plan - Fakt - Dlug (если положительное)
             
             income_data[manager] = {
                 'fakt': fakt,
