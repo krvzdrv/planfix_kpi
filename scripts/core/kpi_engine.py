@@ -169,12 +169,12 @@ class KPIEngine:
         for indicator, col_index in column_mapping.items():
             metrics[indicator] = {'plan': row[col_index], 'weight': 0}
         
-        # Рассчитываем вес на основе активных KPI
-        active_kpis = sum(1 for metric in metrics.values() if metric['plan'] is not None)
+        # Рассчитываем вес на основе активных KPI (только с планом > 0)
+        active_kpis = sum(1 for metric in metrics.values() if isinstance(metric, dict) and metric.get('plan') is not None and metric['plan'] > 0)
         if active_kpis > 0:
             weight = 1.0 / active_kpis
             for metric in metrics.values():
-                if metric['plan'] is not None:
+                if isinstance(metric, dict) and metric.get('plan') is not None and metric['plan'] > 0:
                     metric['weight'] = weight
         
         metrics['premia'] = row[2]  # premia_kpi
@@ -360,7 +360,7 @@ class KPIEngine:
             
             # Рассчитываем коэффициенты для всех показателей
             for indicator in KPI_INDICATORS:
-                if indicator in metrics and metrics[indicator]['plan'] is not None:
+                if indicator in metrics and isinstance(metrics[indicator], dict) and metrics[indicator].get('plan') is not None and metrics[indicator]['plan'] > 0:
                     actual = Decimal(str(values.get(indicator, 0)))
                     plan = Decimal(str(metrics[indicator]['plan']))
                     weight = Decimal(str(metrics[indicator]['weight']))
