@@ -1,4 +1,4 @@
-name: Telegram Manual Bonus Reports
+name: Manual Bot Commands
 
 on:
   repository_dispatch:
