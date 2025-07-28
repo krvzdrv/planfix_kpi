@@ -1,0 +1,26 @@
+column_name,data_type,is_nullable
+id,integer,NO
+month,character varying,NO
+year,integer,NO
+premia_kpi,numeric,YES
+nwi,numeric,YES
+wtr,numeric,YES
+psk,numeric,YES
+wdm,numeric,YES
+prz,numeric,YES
+zkl,numeric,YES
+spt,numeric,YES
+ofw,numeric,YES
+ttl,numeric,YES
+created_at,timestamp with time zone,YES
+updated_at,timestamp with time zone,YES
+revenue_plan,numeric,YES
+msp,numeric,YES
+now,numeric,YES
+opi,numeric,YES
+wrk,numeric,YES
+zam,numeric,YES
+prc,numeric,YES
+kzi,numeric,YES
+mat,numeric,YES
+tpy,numeric,YES

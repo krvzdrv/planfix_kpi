@@ -149,7 +149,7 @@ class KPIEngine:
         query = """
             SELECT 
                 month, year, premia_kpi,
-                nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl
+                nwi, wtr, psk, wdm, prz, zkl, spt, msp, ofw, ttl
             FROM kpi_metrics
             WHERE month = %s AND year = %s
         """
@@ -163,7 +163,7 @@ class KPIEngine:
         metrics = {}
         column_mapping = {
             'NWI': 3, 'WTR': 4, 'PSK': 5, 'WDM': 6, 'PRZ': 7, 
-            'ZKL': 8, 'SPT': 9, 'OFW': 10, 'TTL': 11
+            'ZKL': 8, 'SPT': 9, 'MSP': 10, 'OFW': 11, 'TTL': 12
         }
         
         for indicator, col_index in column_mapping.items():
@@ -192,6 +192,7 @@ class KPIEngine:
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
                         ELSE NULL
                     END AS task_type,
                     COUNT(*) AS task_count
@@ -317,7 +318,7 @@ class KPIEngine:
         for manager in self.managers:
             actual_values[manager] = {
                 'NWI': 0, 'WTR': 0, 'PSK': 0, 'WDM': 0, 'PRZ': 0,
-                'ZKL': 0, 'SPT': 0, 'OFW': 0, 'TTL': 0
+                'ZKL': 0, 'SPT': 0, 'MSP': 0, 'OFW': 0, 'TTL': 0
             }
         
         # Обрабатываем результаты задач
@@ -346,7 +347,14 @@ class KPIEngine:
         """Рассчитывает коэффициенты KPI для каждого менеджера"""
         coefficients = {}
         
+        # Отладочная информация
+        logger.info(f"Available metrics: {list(metrics.keys())}")
+        logger.info(f"Metrics with plans: {[k for k, v in metrics.items() if isinstance(v, dict) and v.get('plan') is not None]}")
+        
         for manager, values in actual_values.items():
+            logger.info(f"Processing manager: {manager}")
+            logger.info(f"Actual values for {manager}: {values}")
+            
             manager_coefficients = {}
             sum_coefficient = Decimal('0')
             
@@ -357,6 +365,8 @@ class KPIEngine:
                     plan = Decimal(str(metrics[indicator]['plan']))
                     weight = Decimal(str(metrics[indicator]['weight']))
                     
+                    logger.info(f"  {indicator}: actual={actual}, plan={plan}, weight={weight}")
+                    
                     if plan > 0:
                         if indicator in CAPPED_KPI:
                             used_value = min(actual, plan)
@@ -365,19 +375,23 @@ class KPIEngine:
                         
                         coefficient_value = float((used_value / plan) * weight)
                         coefficient = math_round(coefficient_value, 2)
+                        logger.info(f"    used_value={used_value}, coefficient={coefficient}")
                     else:
                         coefficient = Decimal('0')
+                        logger.info(f"    plan=0, coefficient={coefficient}")
                     
                     manager_coefficients[indicator] = coefficient
                     sum_coefficient += Decimal(str(coefficient))
             
             # Добавляем SUM коэффициент
             manager_coefficients['SUM'] = Decimal(str(math_round(sum_coefficient, 2)))
+            logger.info(f"  SUM coefficient: {sum_coefficient}")
             
             # Рассчитываем PRK
             if 'premia' in metrics and metrics['premia'] is not None:
                 premia = Decimal(str(metrics['premia']))
                 manager_coefficients['PRK'] = Decimal(str(math_round(premia * sum_coefficient, 2)))
+                logger.info(f"  PRK: {premia} * {sum_coefficient} = {manager_coefficients['PRK']}")
             else:
                 manager_coefficients['PRK'] = Decimal('0')
             
