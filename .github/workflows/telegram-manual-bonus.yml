@@ -1,4 +1,4 @@
-name: Telegram KPI Command Dispatch
+name: Telegram Manual Bonus Reports
 
 on:
   repository_dispatch:
