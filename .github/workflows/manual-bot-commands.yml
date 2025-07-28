@@ -43,7 +43,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
         run: |
           echo "🔄 Generating current month premia report..."
-          python scripts/report_bonus.py
+          python scripts/report_bonus.py --period current
           echo "✅ Current month premia report completed"
 
       - name: Run KPI Bonus Report (premia_previous)
@@ -59,7 +59,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
         run: |
           echo "🔄 Generating previous month premia report..."
-          python scripts/report_bonus_previous.py
+          python scripts/report_bonus.py --period previous
           echo "✅ Previous month premia report completed"
 
       - name: Notify on failure
