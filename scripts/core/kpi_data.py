@@ -50,7 +50,7 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
             month,
             year,
             premia_kpi,
-            nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl
+            nwi, wtr, psk, wdm, prz, zkl, spt, msp, ofw, ttl
         FROM kpi_metrics
         WHERE month = %s AND year = %s
     """
@@ -61,7 +61,7 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
     row = results[0]
     metrics = {}
     column_mapping = {
-        'NWI': 3, 'WTR': 4, 'PSK': 5, 'WDM': 6, 'PRZ': 7, 'ZKL': 8, 'SPT': 9, 'OFW': 10, 'TTL': 11
+        'NWI': 3, 'WTR': 4, 'PSK': 5, 'WDM': 6, 'PRZ': 7, 'ZKL': 8, 'SPT': 9, 'MSP': 10, 'OFW': 11, 'TTL': 12
     }
     for indicator, col_index in column_mapping.items():
         metrics[indicator] = {'plan': row[col_index], 'weight': 0}
@@ -94,6 +94,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
                     ELSE NULL
                 END AS task_type,
                 COUNT(*) AS task_count
@@ -220,7 +221,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     for manager in PLANFIX_USER_NAMES:
         actual_values[manager] = {
             'NWI': 0, 'WTR': 0, 'PSK': 0, 'WDM': 0, 'PRZ': 0,
-            'ZKL': 0, 'SPT': 0, 'OFW': 0, 'TTL': 0
+            'ZKL': 0, 'SPT': 0, 'MSP': 0, 'OFW': 0, 'TTL': 0
         }
     for row in task_results:
         manager, task_type, count = row

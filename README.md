@@ -25,6 +25,8 @@
 │   ├── planfix_export_clients.py   # Синхронизация клиентов
 │   ├── planfix_export_orders.py    # Синхронизация заказов
 │   ├── planfix_export_tasks.py     # Синхронизация задач
+│   ├── planfix_export_analytics.py # Синхронизация аналитических данных
+│   ├── planfix_get_analytics_list.py # Получение списка аналитик
 │   ├── planfix_utils.py            # Утилиты для работы с Planfix API
 │   ├── report_kpi.py               # Генерация и отправка KPI отчетов
 │   ├── report_activity.py          # Генерация и отправка ежедневного отчёта
@@ -36,6 +38,7 @@
 │   └── telegram_bot.py             # Содержит логику KPI расчетов (устаревший standalone бот)
 ├── requirements.txt                # Зависимости Python
 ├── render.yaml                     # Конфигурация для Render
+├── ANALYTICS_EXPORT_README.md     # Документация по экспорту аналитик
 └── README.md                       # Документация
 ```
 
@@ -66,6 +69,13 @@
 - TTL теперь включает 10 типов задач вместо 4
 - Добавлены новые типы: Wysłać materiały, Odpowiedzieć na pytanie techniczne, Zapisać na media społecznościowe, Opowiedzieć o nowościach, Przywrócić klienta, Zebrać opinie
 
+### ✅ Экспорт аналитических данных
+- **planfix_export_analytics.py** - экспорт аналитических данных по продуктам из ПланФикса
+- **planfix_get_analytics_list.py** - получение списка доступных аналитик
+- Создание таблицы `planfix_analytics` в Supabase
+- Поддержка API `analitic.getData` для получения данных аналитик
+- Автоматизация через GitHub Actions
+
 ## Установка
 
 1. Клонируйте репозиторий:
@@ -87,7 +97,7 @@ pip install -r requirements.txt
 - `PLANFIX_ACCOUNT` - аккаунт Planfix
 
 ### 2. Supabase Database
-Для скриптов синхронизации (`planfix_export_clients.py`, `planfix_export_orders.py`, `planfix_export_tasks.py`):
+Для скриптов синхронизации (`planfix_export_clients.py`, `planfix_export_orders.py`, `planfix_export_tasks.py`, `planfix_export_analytics.py`):
 - `SUPABASE_CONNECTION_STRING` - полная строка подключения к Supabase (например, `postgresql://user:password@host:port/database`)
 
 Для скрипта отправки KPI (`report_kpi.py`):
@@ -204,6 +214,7 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
   - Генерация и отправка KPI-отчёта (report_kpi.py)
   - Генерация и отправка отчёта по премиям (report_bonus.py)
   - Генерация и отправка отчёта по доходу (report_income.py)
+- **analytics-export.yml** — экспорт аналитических данных по продуктам
 - **report-manual-send.yml** — ручной запуск отчётов
 - **planfix-manual-sync.yml** — ручная синхронизация с Planfix
 - **telegram-dispatch.yml** — обработка Telegram команд через webhook
@@ -230,6 +241,10 @@ Workflow `Send All Reports` настроен на автоматический �
 python scripts/planfix_export_clients.py
 python scripts/planfix_export_orders.py
 python scripts/planfix_export_tasks.py
+python scripts/planfix_export_analytics.py
+
+# Получение списка аналитик
+python scripts/planfix_get_analytics_list.py
 
 # Отправка KPI отчета
 python scripts/report_kpi.py
@@ -361,3 +376,10 @@ Telegram Bot → Render Webhook → GitHub API → GitHub Actions → Отчет
 Для полной настройки системы через Render см. [RENDER_SETUP.md](RENDER_SETUP.md)
 
 Для настройки GitHub токена см. [GITHUB_TOKEN_SETUP.md](GITHUB_TOKEN_SETUP.md)
+
+## Экспорт аналитики
+
+Функционал экспорта аналитических данных из ПланФикса вынесен в отдельный репозиторий:
+[planfix_analytics](https://github.com/your-username/planfix_analytics)
+
+Для работы с экспортом аналитики перейдите в репозиторий `planfix_analytics`.
