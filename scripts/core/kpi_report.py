@@ -7,7 +7,7 @@ from .kpi_utils import math_round
 def format_premia_report(coefficients: Dict, current_month: int, current_year: int, additional_premia: Dict) -> str:
     kpi_order = [
         'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT',
-        'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+        'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'
     ]
     managers = ['Kozik Andrzej', 'Stukalo Nazarii']
     top_line = '══════════════════════'

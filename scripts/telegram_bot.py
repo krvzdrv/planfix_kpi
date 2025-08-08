@@ -42,12 +42,12 @@ logger = logging.getLogger(__name__)
 # Список всех возможных показателей KPI
 KPI_INDICATORS = [
     'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 
-    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'
 ]
 
 # Список KPI, для которых применяется ограничение min(факт, план)
 CAPPED_KPI = [
-    'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM'
+    'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM'
 ]
 
 # Импортируем core-модули (новая архитектура)
@@ -103,7 +103,7 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
             month,
             year,
             premia_kpi,
-            nwi, wtr, psk, wdm, prz, zkl, spt, ofw, ttl
+            nwi, wtr, psk, wdm, prz, zkl, spt, msp, knt, ofw, ttl
         FROM kpi_metrics
         WHERE month = %s AND year = %s
     """
@@ -127,8 +127,10 @@ def get_kpi_metrics(current_month: int, current_year: int) -> dict:
         'PRZ': 7,  # prz
         'ZKL': 8,  # zkl
         'SPT': 9,  # spt
-        'OFW': 10, # ofw
-        'TTL': 11  # ttl
+        'MSP': 10, # msp
+        'KNT': 11, # knt
+        'OFW': 12, # ofw
+        'TTL': 13  # ttl
     }
     
     for indicator, col_index in column_mapping.items():
@@ -170,6 +172,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
                     ELSE NULL
                 END AS task_type,
                 COUNT(*) AS task_count
@@ -204,7 +207,8 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
                     'Zapisać na media społecznościowe',
                     'Opowiedzieć o nowościach',
                     'Przywrócić klienta',
-                    'Zebrać opinie'
+                    'Zebrać opinie',
+                    'Tworzyć kontent'
                 )
             GROUP BY owner_name
         )
@@ -437,7 +441,7 @@ def format_premia_report(coefficients: dict, current_month: int, current_year: i
     """Format the premia report for Telegram (строгое оформление по ТЗ)."""
     kpi_order = [
         'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT',
-        'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+        'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'
     ]
     managers = ['Kozik Andrzej', 'Stukalo Nazarii']
     top_line = '══════════════════════'

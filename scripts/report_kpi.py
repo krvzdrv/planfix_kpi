@@ -45,7 +45,7 @@ PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS
 # --- KPI INDICATORS ---
 ALL_KPI = [
     'NWI', 'WTR', 'PSK',
-    'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK',
+    'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT',
     'TTL', 'OFW', 'ZAM', 'PRC'
 ]
 
@@ -121,7 +121,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
         'Zapisać na media społecznościowe': 'MSP',
         'Opowiedzieć o nowościach': 'NOW',
         'Zebrać opinie': 'OPI',
-        'Przywrócić klienta': 'WRK'
+        'Przywrócić klienta': 'WRK',
+        'Tworzyć kontent': 'KNT'
     }
     
     # Основной KPI-запрос
@@ -140,6 +141,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
                     ELSE NULL
                 END AS task_type,
                 CASE 
@@ -173,7 +175,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     'Zapisać na media społecznościowe',
                     'Opowiedzieć o nowościach',
                     'Zebrać opinie',
-                    'Przywrócić klienta'
+                    'Przywrócić klienta',
+                    'Tworzyć kontent'
                 )
             GROUP BY
                 owner_name, 
@@ -188,6 +191,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
                     ELSE NULL
                 END,
                 CASE 
@@ -201,7 +205,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 9
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 10
                     WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 11
-                    ELSE 12
+                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 12
+                    ELSE 13
                 END
         ),
         kzi_counts AS (
@@ -396,13 +401,13 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
         data = {
             'Kozik Andrzej': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
                 'OFW': 0, 'ZAM': 0, 'PRC': 0
             },
             'Stukalo Nazarii': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0,
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
                 'OFW': 0, 'ZAM': 0, 'PRC': 0
             }
@@ -468,7 +473,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                     message += f'{status:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
             message += f'{mid_line}\n'
             message += 'zadania\n'
-            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT']
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
@@ -504,7 +509,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                     message += f'{status:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
             message += f'{mid_line}\n'
             message += 'zadania\n'
-            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK']
+            task_order = ['WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT']
             for task_type in task_order:
                 kozik_count = data['Kozik Andrzej'][task_type]
                 stukalo_count = data['Stukalo Nazarii'][task_type]
@@ -591,7 +596,7 @@ def check_kpi_coverage():
             conn.close()
     # Проверка структуры отчёта (data, task_order, client_order, order_order)
     # Проверяем, что все KPI есть в форматировании отчёта
-    report_kpi = set(['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'])
+    report_kpi = set(['NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'])
     missing_in_report = [kpi for kpi in ALL_KPI if kpi not in report_kpi]
     if missing_in_report:
         logger.warning(f"KPI отсутствуют в структуре отчёта: {missing_in_report}")

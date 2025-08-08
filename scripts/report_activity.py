@@ -74,6 +74,7 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
                 WHEN TRIM(SPLIT_PART(t.title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
                 WHEN TRIM(SPLIT_PART(t.title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
                 WHEN TRIM(SPLIT_PART(t.title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
+                WHEN TRIM(SPLIT_PART(t.title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
                 ELSE NULL
             END AS metric,
             COUNT(*) as count
@@ -91,7 +92,8 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
             'Zapisać na media społecznościowe',
             'Opowiedzieć o nowościach',
             'Zebrać opinie',
-            'Przywrócić klienta'
+            'Przywrócić klienta',
+            'Tworzyć kontent'
         )
         GROUP BY hour, t.owner_name, metric
     ),
@@ -183,7 +185,7 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         UNION ALL
         SELECT * FROM order_metrics
     ) combined
-    WHERE metric IN ('NWI', 'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'OFW', 'ZAM')
+    WHERE metric IN ('NWI', 'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'OFW', 'ZAM')
     ORDER BY hour, manager_name, metric
     """
     
@@ -213,6 +215,7 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
             'NOW': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'OPI': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'WRK': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
+            'KNT': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'OFW': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'ZAM': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0}
         }

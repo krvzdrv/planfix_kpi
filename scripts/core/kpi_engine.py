@@ -24,13 +24,13 @@ PG_PORT = os.environ.get('SUPABASE_PORT')
 # KPI Configuration
 KPI_INDICATORS = [
     'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 
-    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'
 ]
 
 # KPI с ограничением min(факт, план)
 CAPPED_KPI = [
     'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT', 
-    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM'
+    'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM'
 ]
 
 # Периоды для расчетов
@@ -149,7 +149,7 @@ class KPIEngine:
         query = """
             SELECT 
                 month, year, premia_kpi,
-                nwi, wtr, psk, wdm, prz, zkl, spt, msp, ofw, ttl
+                nwi, wtr, psk, wdm, prz, zkl, spt, msp, knt, ofw, ttl
             FROM kpi_metrics
             WHERE month = %s AND year = %s
         """
@@ -163,7 +163,7 @@ class KPIEngine:
         metrics = {}
         column_mapping = {
             'NWI': 3, 'WTR': 4, 'PSK': 5, 'WDM': 6, 'PRZ': 7, 
-            'ZKL': 8, 'SPT': 9, 'MSP': 10, 'OFW': 11, 'TTL': 12
+            'ZKL': 8, 'SPT': 9, 'MSP': 10, 'KNT': 11, 'OFW': 12, 'TTL': 13
         }
         
         for indicator, col_index in column_mapping.items():
@@ -193,6 +193,7 @@ class KPIEngine:
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
                         WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
+                        WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
                         ELSE NULL
                     END AS task_type,
                     COUNT(*) AS task_count
@@ -227,7 +228,8 @@ class KPIEngine:
                         'Zapisać na media społecznościowe',
                         'Opowiedzieć o nowościach',
                         'Przywrócić klienta',
-                        'Zebrać opinie'
+                        'Zebrać opinie',
+                        'Tworzyć kontent'
                     )
                 GROUP BY owner_name
             )

@@ -12,7 +12,7 @@ class ReportFormatter:
     def __init__(self):
         self.kpi_order = [
             'NWI', 'WTR', 'PSK', 'WDM', 'PRZ', 'KZI', 'ZKL', 'SPT', 'MAT',
-            'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'TTL', 'OFW', 'ZAM', 'PRC'
+            'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'TTL', 'OFW', 'ZAM', 'PRC'
         ]
         self.managers = ['Kozik Andrzej', 'Stukalo Nazarii']
     
