@@ -50,17 +50,6 @@ def format_percent(val):
     # Округляем до целых значений и форматируем как (XX%)
     return f"({math_round(float(val), 0)}%)"
 
-def _parse_netto_pln(value):
-    """Преобразует текстовое значение wartosc_netto_pln в float. Возвращает 0.0 при ошибке."""
-    if value is None:
-        return 0.0
-    try:
-        import re
-        cleaned = re.sub(r'[^0-9,.-]', '', str(value)).replace(',', '.').replace(' ', '')
-        return float(cleaned)
-    except Exception:
-        return 0.0
-
 def get_income_data(conn, month, year):
     """Получает данные о доходах из Supabase."""
     try:
@@ -126,21 +115,8 @@ def get_income_data(conn, month, year):
             dlug_data = {row[0]: row[1] for row in cur.fetchall()}
             logger.info(f"Dlug data: {dlug_data}")
 
-            # Получаем все заказы (brak)
-            cur.execute("""
-                SELECT 
-                    menedzher,
-                    SUM(CAST(REPLACE(wartosc_netto_pln, ',', '.') AS DECIMAL)) as brak
-                FROM planfix_orders
-                WHERE 
-                    is_deleted = false
-                GROUP BY menedzher
-            """)
-            brak_data = {row[0]: row[1] for row in cur.fetchall()}
-            logger.info(f"Brak data: {brak_data}")
-
         # После получения данных из БД фильтруем по нулю
-        for d in [fakt_data, dlug_data, brak_data]:
+        for d in [fakt_data, dlug_data]:
             for k in list(d.keys()):
                 if d[k] is None or d[k] == Decimal('0'):
                     d[k] = Decimal('0')
