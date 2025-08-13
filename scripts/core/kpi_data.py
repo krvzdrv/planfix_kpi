@@ -197,7 +197,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         GROUP BY menedzher;
     """
     PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
     task_results = _execute_query(task_query, (
         start_date, end_date, PLANFIX_USER_NAMES,
         start_date, end_date, PLANFIX_USER_NAMES

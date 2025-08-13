@@ -217,7 +217,7 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
     return results
 
 def count_offers(start_date_str: str, end_date_str: str) -> list:
-    if not PLANFIX_USER_IDS: return []
+    if not PLANFIX_USER_NAMES: return []
     
     logger.info(f"\nDebug - Offer query parameters:")
     logger.info(f"Start date: {start_date_str}")
@@ -235,7 +235,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         AND data_wyslania_oferty != ''
         LIMIT 5;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug offers")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug offers")
     logger.info("\nDebug - Sample offer data:")
     for row in debug_results:
         logger.info(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
@@ -264,7 +264,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     return results
 
 def count_orders(start_date_str: str, end_date_str: str) -> list:
-    if not PLANFIX_USER_IDS: return []
+    if not PLANFIX_USER_NAMES: return []
     
     logger.info(f"\nDebug - Order query parameters:")
     logger.info(f"Start date: {start_date_str}")
