@@ -222,6 +222,18 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     logger.info(f"\nDebug - Offer query parameters:")
     logger.info(f"Start date: {start_date_str}")
     logger.info(f"End date: {end_date_str}")
+    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
+    
+    # Debug query to check all manager names in orders table
+    all_managers_query = """
+        SELECT DISTINCT menedzher 
+        FROM planfix_orders 
+        WHERE menedzher IS NOT NULL 
+        AND menedzher != '' 
+        ORDER BY menedzher;
+    """
+    all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
+    logger.info(f"All managers in orders table: {all_managers_results}")
     
     # Debug query to check offer data format
     debug_query = """
@@ -269,6 +281,18 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     logger.info(f"\nDebug - Order query parameters:")
     logger.info(f"Start date: {start_date_str}")
     logger.info(f"End date: {end_date_str}")
+    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
+    
+    # Debug query to check all manager names in orders table
+    all_managers_query = """
+        SELECT DISTINCT menedzher 
+        FROM planfix_orders 
+        WHERE menedzher IS NOT NULL 
+        AND menedzher != '' 
+        ORDER BY menedzher;
+    """
+    all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
+    logger.info(f"All managers in orders table: {all_managers_results}")
     
     # Debug query to check order data format
     debug_query = """
