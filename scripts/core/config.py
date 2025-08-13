@@ -11,11 +11,11 @@
 MANAGERS_KPI = [
     {
         'planfix_user_name': 'Kozik Andrzej',
-        'planfix_user_id': 853159  # Реальный ID из Planfix
+        'planfix_user_id': 945243  # Реальный ID из Planfix
     },
     {
         'planfix_user_name': 'Stukalo Nazarii', 
-        'planfix_user_id': 945243  # Реальный ID из Planfix
+        'planfix_user_id': 945245  # Реальный ID из Planfix
     }
 ]
 

@@ -45,7 +45,7 @@ PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS
 # Логика работы с менеджерами:
 # - В таблице planfix_clients (поле menedzer) - используются ИМЕНА менеджеров
 # - В таблице planfix_tasks (поле owner_name) - используются ИМЕНА менеджеров  
-# - В таблице planfix_orders (поле menedzher) - используются ИМЕНА менеджеров (как в рабочей версии)
+# - В таблице planfix_orders (поле menedzher) - используются ID менеджеров
 
 # --- KPI INDICATORS ---
 ALL_KPI = [
@@ -301,8 +301,9 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем имена менеджеров (как в рабочей версии)
-    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
+    # Для таблицы заказов используем только нужные ID менеджеров
+    PLANFIX_USER_IDS = ('945243', '945245')  # Kozik Andrzej, Stukalo Nazarii
+    logger.info(f"PLANFIX_USER_IDS for orders: {PLANFIX_USER_IDS}")
     
     debug_query = """
         SELECT 
@@ -317,7 +318,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
         LIMIT 100;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug orders")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
     logger.info("\nDebug - Sample order data:")
     filtered_debug = []
     for row in debug_results:
@@ -358,7 +359,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         FROM order_metrics
         GROUP BY manager_name;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "orders and revenue")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
     logger.info(f"Order results: {results}")
     return results
 
@@ -421,7 +422,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             },
             'Stukalo Nazarii': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
+                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
                 'OFW': 0, 'ZAM': 0, 'PRC': 0
             }
@@ -447,18 +448,25 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process order results
         for row in order_results:
-            manager_name = row[0]  # Это имя менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
             
-            logger.info(f"Processing order result: manager_name={manager_name}, count={count}, amount={amount}")
+            # Преобразуем ID в имя менеджера (хардкод для нужных менеджеров)
+            manager_name = None
+            if str(manager_id) == '945243':
+                manager_name = 'Kozik Andrzej'
+            elif str(manager_id) == '945245':
+                manager_name = 'Stukalo Nazarii'
             
-            if manager_name in data:
+            logger.info(f"Processing order result: manager_id={manager_id}, manager_name={manager_name}, count={count}, amount={amount}")
+            
+            if manager_name and manager_name in data:
                 data[manager_name]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager_name]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
                 logger.info(f"Updated data for {manager_name}: ZAM={count}, PRC={amount}")
             else:
-                logger.warning(f"Manager not found in data: {manager_name}")
+                logger.warning(f"Manager not found in data: ID={manager_id}, name={manager_name}")
 
         # Process offer results
         for row in offer_results:
