@@ -42,6 +42,11 @@ logger = logging.getLogger(__name__)
 PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
 PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS_KPI else tuple()
 
+# Логика работы с менеджерами:
+# - В таблице planfix_clients (поле menedzer) - используются ИМЕНА менеджеров
+# - В таблице planfix_tasks (поле owner_name) - используются ИМЕНА менеджеров  
+# - В таблице planfix_orders (поле menedzher) - используются ID менеджеров
+
 # --- KPI INDICATORS ---
 ALL_KPI = [
     'NWI', 'WTR', 'PSK',
@@ -235,7 +240,10 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Debug query to check offer data format
+    # Для таблицы заказов используем ID менеджеров
+    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
+    
     debug_query = """
         SELECT 
             menedzher,
@@ -247,10 +255,10 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         AND data_wyslania_oferty != ''
         LIMIT 5;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug offers")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug offers")
     logger.info("\nDebug - Sample offer data:")
     for row in debug_results:
-        logger.info(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
+        logger.info(f"Manager ID: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
     
     query = f"""
         SELECT
@@ -271,7 +279,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         GROUP BY
             menedzher;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "offers sent")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
     logger.info(f"Offer results: {results}")
     return results
 
@@ -294,7 +302,10 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Debug query to check order data format
+    # Для таблицы заказов используем ID менеджеров
+    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
+    
     debug_query = """
         SELECT 
             menedzher,
@@ -308,12 +319,12 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
         LIMIT 100;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug orders")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
     logger.info("\nDebug - Sample order data:")
     filtered_debug = []
     for row in debug_results:
         netto = _parse_netto_pln(row[3])
-        logger.info(f"Manager: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}, Parsed: {netto}")
+        logger.info(f"Manager ID: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}, Parsed: {netto}")
         logger.info(f"Parsed dates - Confirmation: {row[4]}, Realization: {row[5]}")
         if netto != 0:
             filtered_debug.append(row)
@@ -349,7 +360,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         FROM order_metrics
         GROUP BY manager_id;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "orders and revenue")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
     logger.info(f"Order results: {results}")
     return results
 
@@ -432,22 +443,24 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process order results
         for row in order_results:
-            manager_name = row[0]  # Это имя менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
             
-            # Проверяем, что имя менеджера есть в наших данных
-            if manager_name in data:
+            # Находим имя менеджера по ID
+            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            if manager_name and manager_name in data:
                 data[manager_name]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager_name]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
 
         # Process offer results
         for row in offer_results:
-            manager_name = row[0]  # Это имя менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             
-            # Проверяем, что имя менеджера есть в наших данных
-            if manager_name in data:
+            # Находим имя менеджера по ID
+            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            if manager_name and manager_name in data:
                 data[manager_name]['OFW'] = count  # Количество отправленных предложений
 
         # Format message
