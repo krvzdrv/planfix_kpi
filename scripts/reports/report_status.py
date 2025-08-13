@@ -7,7 +7,7 @@ import logging
 from dotenv import load_dotenv
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import MANAGERS_KPI
+from config.config import MANAGERS_KPI
 from core.kpi_utils import math_round
 
 # Load environment variables from .env file

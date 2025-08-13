@@ -8,7 +8,7 @@ import sys
 import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import MANAGERS_KPI 
+from config.config import MANAGERS_KPI 
 from utils import planfix_utils
 from core.kpi_utils import math_round
 
