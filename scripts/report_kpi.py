@@ -180,34 +180,8 @@ def count_tasks_by_type(start_date_str: str, end_date_str: str) -> list:
                 )
             GROUP BY
                 owner_name, 
-                CASE 
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 'WDM'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 'PRZ'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 'ZKL'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 'SPT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 'MAT'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 'TPY'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 'MSP'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 'NOW'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 'OPI'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 'WRK'
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 'KNT'
-                    ELSE NULL
-                END,
-                CASE 
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Nawiązać pierwszy kontakt' THEN 1
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić pierwszą rozmowę telefoniczną' THEN 2
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zadzwonić do klienta' THEN 4
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przeprowadzić spotkanie' THEN 5
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Wysłać materiały' THEN 6
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Odpowiedzieć na pytanie techniczne' THEN 7
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zapisać na media społecznościowe' THEN 8
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Opowiedzieć o nowościach' THEN 9
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Zebrać opinie' THEN 10
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Przywrócić klienta' THEN 11
-                    WHEN TRIM(SPLIT_PART(title, ' /', 1)) = 'Tworzyć kontent' THEN 12
-                    ELSE 13
-                END
+                task_type,
+                task_order
         ),
         kzi_counts AS (
             SELECT
@@ -278,6 +252,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
             AND TO_TIMESTAMP(data_wyslania_oferty, 'DD-MM-YYYY HH24:MI') < %s::timestamp
             AND menedzher IN %s
+            AND is_deleted = false
             AND wartosc_netto_pln IS NOT NULL
             AND TRIM(wartosc_netto_pln) != ''
             AND wartosc_netto_pln != '0,00'
@@ -492,7 +467,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n''```'
+            message += f'{top_line}\n```'
         # --- MONTHLY REPORT ---
         else:
             message = '```'
@@ -528,7 +503,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
                 stukalo_count = data['Stukalo Nazarii'][order_type]
                 if kozik_count > 0 or stukalo_count > 0:
                     message += f'{order_type:<3} |{kozik_count:7d} |{stukalo_count:7d}\n'
-            message += f'{top_line}\n''```'
+            message += f'{top_line}\n```'
         
         # Send to Telegram
         bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
