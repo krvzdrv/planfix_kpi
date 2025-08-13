@@ -16,6 +16,12 @@ planfix_kpi/
 │   └── planfix-manual-sync.yml   # Ручная синхронизация данных
 ├── scripts/                      # Основные скрипты
 │   ├── core/                     # KPI логика (КРИТИЧЕСКИ НУЖНА)
+│   │   ├── config.py             # MANAGERS_KPI
+│   │   ├── kpi_engine.py         # KPI движок
+│   │   ├── kpi_data.py           # KPI данные
+│   │   ├── kpi_report.py         # KPI отчеты
+│   │   ├── kpi_utils.py          # KPI утилиты
+│   │   └── report_formatter.py   # Форматирование отчетов
 │   ├── exporters/                # Экспорт данных из Planfix
 │   │   ├── planfix_export_clients.py
 │   │   ├── planfix_export_orders.py
@@ -26,10 +32,8 @@ planfix_kpi/
 │   │   ├── report_income.py
 │   │   ├── report_kpi.py
 │   │   └── report_status.py
-│   ├── utils/                    # Утилиты для работы с Planfix
-│   │   └── planfix_utils.py
-│   └── config/                   # Конфигурация
-│       └── config.py             # MANAGERS_KPI
+│   └── utils/                    # Утилиты для работы с Planfix
+│       └── planfix_utils.py
 ├── requirements.txt               # Python зависимости
 ├── env.example                   # Пример переменных окружения
 └── .gitignore                    # Git ignore файлы
@@ -61,8 +65,8 @@ planfix_kpi/
 ## 📋 Критически важные файлы
 
 **НЕ УДАЛЯТЬ:**
-- `scripts/core/` - вся папка с KPI логикой
-- `scripts/config.py` - содержит MANAGERS_KPI
+- `scripts/core/` - вся папка с KPI логикой (КРИТИЧЕСКИ!)
+- `scripts/core/config.py` - содержит MANAGERS_KPI
 - `scripts/report_*.py` - генерация отчетов
 - `scripts/planfix_export_*.py` - экспорт данных
 - `scripts/planfix_utils.py` - утилиты
