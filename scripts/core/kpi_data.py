@@ -5,8 +5,8 @@ import os
 import logging
 from decimal import Decimal
 from typing import Dict, Any
-from config import MANAGERS_KPI
-import planfix_utils
+from .config import MANAGERS_KPI
+from utils import planfix_utils
 import psycopg2
 from .kpi_utils import math_round
 

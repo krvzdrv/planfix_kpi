@@ -7,8 +7,8 @@ import logging
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Dict, Any, List, Tuple
-from config import MANAGERS_KPI
-import planfix_utils
+from .config import MANAGERS_KPI
+from utils import planfix_utils
 import psycopg2
 from .kpi_utils import math_round
 

@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import MANAGERS_KPI
+from core.config import MANAGERS_KPI
 
 # Load environment variables from .env file
 load_dotenv()
