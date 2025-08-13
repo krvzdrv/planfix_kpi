@@ -46,12 +46,12 @@ jobs:
 
       - name: Run Clients Export
         if: github.event.inputs.script == 'all' || github.event.inputs.script == 'clients'
-        run: python scripts/planfix_export_clients.py
+        run: python scripts/exporters/planfix_export_clients.py
 
       - name: Run Orders Export
         if: github.event.inputs.script == 'all' || github.event.inputs.script == 'orders'
-        run: python scripts/planfix_export_orders.py
+        run: python scripts/exporters/planfix_export_orders.py
 
       - name: Run Tasks Export
         if: github.event.inputs.script == 'all' || github.event.inputs.script == 'tasks'
-        run: python scripts/planfix_export_tasks.py 
+        run: python scripts/exporters/planfix_export_tasks.py 

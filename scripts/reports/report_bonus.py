@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import sys
 
 # Добавляем путь к скриптам
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from core.kpi_engine import KPIEngine
 from core.report_formatter import ReportFormatter

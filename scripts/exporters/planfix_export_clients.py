@@ -13,7 +13,7 @@ load_dotenv()
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import scripts.planfix_utils as planfix_utils
+from utils import planfix_utils
 
 # --- Константы ---
 CLIENT_TEMPLATE_ID = 20

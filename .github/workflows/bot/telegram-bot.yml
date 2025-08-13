@@ -1,4 +1,4 @@
-name: Manual Bot Commands
+name: Telegram Bot Commands
 
 on:
   repository_dispatch:
@@ -43,7 +43,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
         run: |
           echo "🔄 Generating current month premia report..."
-          python scripts/report_bonus.py --period current
+          python scripts/reports/report_bonus.py --period current
           echo "✅ Current month premia report completed"
 
       - name: Run KPI Bonus Report (premia_previous)
@@ -59,7 +59,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
         run: |
           echo "🔄 Generating previous month premia report..."
-          python scripts/report_bonus.py --period previous
+          python scripts/reports/report_bonus.py --period previous
           echo "✅ Previous month premia report completed"
 
       - name: Notify on failure
@@ -80,4 +80,4 @@ jobs:
         run: |
           curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"✅ Отчет по премии сгенерирован и отправлен!\",\"parse_mode\":\"Markdown\"}" 
+            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"✅ Отчет по премии сгенерирован и отправлен!\",\"parse_mode\":\"Markdown\"}"
