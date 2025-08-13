@@ -1,4 +1,4 @@
-name: Telegram Bot Commands
+name: Manual Bot Commands
 
 on:
   repository_dispatch:

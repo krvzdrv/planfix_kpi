@@ -10,12 +10,10 @@ planfix_kpi/
 │   └── api/
 │       └── telegram_webhook.py   # Webhook API для команд /premia_current, /premia_previous
 ├── .github/workflows/            # GitHub Actions
-│   ├── bot/
-│   │   └── telegram-bot.yml      # Workflow для команд бота
-│   └── reports/                  # Workflows для отчетов
-│       ├── send_all_reports.yml  # Автоматическая отправка всех отчетов
-│       ├── report-manual-send.yml # Ручная отправка отчетов
-│       └── planfix-manual-sync.yml # Ручная синхронизация данных
+│   ├── manual-bot-commands.yml   # Workflow для команд бота
+│   ├── send_all_reports.yml      # Автоматическая отправка всех отчетов
+│   ├── report-manual-send.yml    # Ручная отправка отчетов
+│   └── planfix-manual-sync.yml   # Ручная синхронизация данных
 ├── scripts/                      # Основные скрипты
 │   ├── core/                     # KPI логика (КРИТИЧЕСКИ НУЖНА)
 │   ├── exporters/                # Экспорт данных из Planfix
@@ -42,7 +40,7 @@ planfix_kpi/
 ### 1. Telegram Bot
 - **Команды:** `/premia_current`, `/premia_previous`
 - **Файл:** `bot/api/telegram_webhook.py`
-- **Workflow:** `.github/workflows/bot/telegram-bot.yml`
+- **Workflow:** `.github/workflows/manual-bot-commands.yml`
 
 ### 2. Автоматические отчеты
 - **Расписание:** Ежедневно в 19:00 по варшавскому времени
@@ -50,8 +48,8 @@ planfix_kpi/
 - **Отчеты:** Activity, KPI, Bonus, Income, Status
 
 ### 3. Ручные операции
-- **Отправка отчетов:** `.github/workflows/reports/report-manual-send.yml`
-- **Синхронизация данных:** `.github/workflows/reports/planfix-manual-sync.yml`
+- **Отправка отчетов:** `.github/workflows/report-manual-send.yml`
+- **Синхронизация данных:** `.github/workflows/planfix-manual-sync.yml`
 
 ## 🔧 Настройка
 
@@ -79,6 +77,6 @@ planfix_kpi/
 ## 📊 Workflows
 
 - **send_all_reports** - автоматическая отправка всех отчетов
-- **telegram-bot** - обработка команд бота
+- **manual-bot-commands** - обработка команд бота
 - **report-manual-send** - ручная отправка отчетов
 - **planfix-manual-sync** - ручная синхронизация данных
