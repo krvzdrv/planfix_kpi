@@ -408,25 +408,23 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process order results
         for row in order_results:
-            manager_id = row[0]
+            manager_name = row[0]  # Это имя менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
             
-            # Find manager name by ID
-            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
-            if manager in data:
-                data[manager]['ZAM'] = count  # Количество подтвержденных заказов
-                data[manager]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
+            # Проверяем, что имя менеджера есть в наших данных
+            if manager_name in data:
+                data[manager_name]['ZAM'] = count  # Количество подтвержденных заказов
+                data[manager_name]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
 
         # Process offer results
         for row in offer_results:
-            manager_id = row[0]
+            manager_name = row[0]  # Это имя менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             
-            # Find manager name by ID
-            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
-            if manager in data:
-                data[manager]['OFW'] = count  # Количество отправленных предложений
+            # Проверяем, что имя менеджера есть в наших данных
+            if manager_name in data:
+                data[manager_name]['OFW'] = count  # Количество отправленных предложений
 
         # Format message
         today = date.today()
