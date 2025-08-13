@@ -158,9 +158,18 @@ def generate_income_report(conn):
     for manager in MANAGERS_KPI:
         manager_id = manager['planfix_user_id']
         manager_name = manager['planfix_user_name']
-        data = revenue_data.get(manager_id)
+        
+        # Ищем данные по ID менеджера в revenue_data
+        data = None
+        for key in revenue_data.keys():
+            if str(key) == str(manager_id):
+                data = revenue_data[key]
+                break
+        
         if not data or 'plan' not in data:
+            logger.warning(f"No data found for manager {manager_name} (ID: {manager_id})")
             continue
+            
         fakt = math_round(float(data['fakt']))
         dlug = math_round(float(data['dlug']))
         brak = math_round(float(data['brak']))

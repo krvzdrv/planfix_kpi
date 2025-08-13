@@ -240,8 +240,9 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем имена менеджеров (как в рабочей версии)
-    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
+    # Для таблицы заказов используем ID менеджеров (поле menedzher содержит ID)
+    PLANFIX_USER_IDS = ('945243', '945245')  # Kozik Andrzej, Stukalo Nazarii
+    logger.info(f"PLANFIX_USER_IDS for offers: {PLANFIX_USER_IDS}")
     
     debug_query = """
         SELECT 
@@ -254,7 +255,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         AND data_wyslania_oferty != ''
         LIMIT 5;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug offers")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug offers")
     logger.info("\nDebug - Sample offer data:")
     for row in debug_results:
         logger.info(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
@@ -278,7 +279,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         GROUP BY
             menedzher;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "offers sent")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
     logger.info(f"Offer results: {results}")
     return results
 
@@ -470,16 +471,23 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process offer results
         for row in offer_results:
-            manager_name = row[0]  # Это имя менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             
-            logger.info(f"Processing offer result: manager_name={manager_name}, count={count}")
+            # Преобразуем ID в имя менеджера (хардкод для нужных менеджеров)
+            manager_name = None
+            if str(manager_id) == '945243':
+                manager_name = 'Kozik Andrzej'
+            elif str(manager_id) == '945245':
+                manager_name = 'Stukalo Nazarii'
             
-            if manager_name in data:
+            logger.info(f"Processing offer result: manager_id={manager_id}, manager_name={manager_name}, count={count}")
+            
+            if manager_name and manager_name in data:
                 data[manager_name]['OFW'] = count  # Количество отправленных предложений
                 logger.info(f"Updated data for {manager_name}: OFW={count}")
             else:
-                logger.warning(f"Manager not found in data: {manager_name}")
+                logger.warning(f"Manager not found in data: ID={manager_id}, name={manager_name}")
 
         # Format message
         today = date.today()
