@@ -240,8 +240,8 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем ID менеджеров
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    # Для таблицы заказов используем ID менеджеров как строки (поле menedzher имеет тип text)
+    PLANFIX_USER_IDS = tuple(str(m['planfix_user_id']) for m in MANAGERS_KPI)
     logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
     
     debug_query = """
@@ -302,8 +302,8 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем ID менеджеров
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
+    # Для таблицы заказов используем ID менеджеров как строки (поле menedzher имеет тип text)
+    PLANFIX_USER_IDS = tuple(str(m['planfix_user_id']) for m in MANAGERS_KPI)
     logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
     
     debug_query = """
@@ -443,23 +443,23 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process order results
         for row in order_results:
-            manager_id = row[0]  # Это ID менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных (строка)
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
             
-            # Находим имя менеджера по ID
-            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            # Находим имя менеджера по ID (сравниваем строки)
+            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if str(m['planfix_user_id']) == manager_id), None)
             if manager_name and manager_name in data:
                 data[manager_name]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager_name]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
 
         # Process offer results
         for row in offer_results:
-            manager_id = row[0]  # Это ID менеджера из базы данных
+            manager_id = row[0]  # Это ID менеджера из базы данных (строка)
             count = int(row[1]) if row[1] is not None else 0
             
-            # Находим имя менеджера по ID
-            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            # Находим имя менеджера по ID (сравниваем строки)
+            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if str(m['planfix_user_id']) == manager_id), None)
             if manager_name and manager_name in data:
                 data[manager_name]['OFW'] = count  # Количество отправленных предложений
 
