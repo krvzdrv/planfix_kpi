@@ -45,7 +45,7 @@ PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI) if MANAGERS
 # Логика работы с менеджерами:
 # - В таблице planfix_clients (поле menedzer) - используются ИМЕНА менеджеров
 # - В таблице planfix_tasks (поле owner_name) - используются ИМЕНА менеджеров  
-# - В таблице planfix_orders (поле menedzher) - используются ID менеджеров
+# - В таблице planfix_orders (поле menedzher) - используются ИМЕНА менеджеров (как в рабочей версии)
 
 # --- KPI INDICATORS ---
 ALL_KPI = [
@@ -240,9 +240,8 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем ID менеджеров как строки (поле menedzher имеет тип text)
-    PLANFIX_USER_IDS = tuple(str(m['planfix_user_id']) for m in MANAGERS_KPI)
-    logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
+    # Для таблицы заказов используем имена менеджеров (как в рабочей версии)
+    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
     
     debug_query = """
         SELECT 
@@ -255,14 +254,14 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         AND data_wyslania_oferty != ''
         LIMIT 5;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug offers")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug offers")
     logger.info("\nDebug - Sample offer data:")
     for row in debug_results:
-        logger.info(f"Manager ID: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
+        logger.info(f"Manager: {row[0]}, Date: {row[1]}, Parsed: {row[2]}")
     
     query = f"""
         SELECT
-            menedzher AS manager_id,
+            menedzher AS manager_name,
             COUNT(*) AS offer_count
         FROM
             planfix_orders
@@ -279,7 +278,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         GROUP BY
             menedzher;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "offers sent")
     logger.info(f"Offer results: {results}")
     return results
 
@@ -407,6 +406,12 @@ def count_client_statuses(start_date_str: str, end_date_str: str) -> list:
 def send_to_telegram(task_results, offer_results, order_results, client_results, report_type):
     """Send KPI report to Telegram."""
     try:
+        logger.info(f"=== Processing results for {report_type} report ===")
+        logger.info(f"Task results: {task_results}")
+        logger.info(f"Offer results: {offer_results}")
+        logger.info(f"Order results: {order_results}")
+        logger.info(f"Client results: {client_results}")
+        
         # Initialize data structure for each manager
         data = {
             'Kozik Andrzej': {
@@ -417,7 +422,7 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
             },
             'Stukalo Nazarii': {
                 'WDM': 0, 'PRZ': 0, 'KZI': 0, 'ZKL': 0, 'SPT': 0, 
-                'MAT': 0, 'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
+                'TPY': 0, 'MSP': 0, 'NOW': 0, 'OPI': 0, 'WRK': 0, 'KNT': 0,
                 'NWI': 0, 'WTR': 0, 'PSK': 0,
                 'OFW': 0, 'ZAM': 0, 'PRC': 0
             }
@@ -443,25 +448,31 @@ def send_to_telegram(task_results, offer_results, order_results, client_results,
 
         # Process order results
         for row in order_results:
-            manager_id = row[0]  # Это ID менеджера из базы данных (строка)
+            manager_name = row[0]  # Это имя менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             amount = float(row[2]) if row[2] is not None else 0.0
             
-            # Находим имя менеджера по ID (сравниваем строки)
-            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if str(m['planfix_user_id']) == manager_id), None)
-            if manager_name and manager_name in data:
+            logger.info(f"Processing order result: manager_name={manager_name}, count={count}, amount={amount}")
+            
+            if manager_name in data:
                 data[manager_name]['ZAM'] = count  # Количество подтвержденных заказов
                 data[manager_name]['PRC'] = math_round(float(amount), 0)  # Округляем PRC до целых
+                logger.info(f"Updated data for {manager_name}: ZAM={count}, PRC={amount}")
+            else:
+                logger.warning(f"Manager not found in data: {manager_name}")
 
         # Process offer results
         for row in offer_results:
-            manager_id = row[0]  # Это ID менеджера из базы данных (строка)
+            manager_name = row[0]  # Это имя менеджера из базы данных
             count = int(row[1]) if row[1] is not None else 0
             
-            # Находим имя менеджера по ID (сравниваем строки)
-            manager_name = next((m['planfix_user_name'] for m in MANAGERS_KPI if str(m['planfix_user_id']) == manager_id), None)
-            if manager_name and manager_name in data:
+            logger.info(f"Processing offer result: manager_name={manager_name}, count={count}")
+            
+            if manager_name in data:
                 data[manager_name]['OFW'] = count  # Количество отправленных предложений
+                logger.info(f"Updated data for {manager_name}: OFW={count}")
+            else:
+                logger.warning(f"Manager not found in data: {manager_name}")
 
         # Format message
         today = date.today()
