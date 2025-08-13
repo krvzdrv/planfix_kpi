@@ -416,17 +416,30 @@ class KPIEngine:
             GROUP BY menedzher;
         """
         
+        # Используем ID менеджеров для таблицы заказов
+        manager_ids = ('945243', '945245')  # Kozik Andrzej, Stukalo Nazarii
+        
         results = self._execute_query(query, (
-            period.start_date, period.end_date, tuple(self.managers)
+            period.start_date, period.end_date, manager_ids
         ), "Additional premia (PRW)")
         
         additional_premia = {}
         for row in results:
             manager_id = row[0]
             prw = row[1]
-            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name'] == manager_id), None)
-            if manager:
-                additional_premia[manager] = {'PRW': prw}
+            
+            # Ищем менеджера по ID (хардкод для нужных менеджеров)
+            manager_name = None
+            if str(manager_id) == '945243':
+                manager_name = 'Kozik Andrzej'
+            elif str(manager_id) == '945245':
+                manager_name = 'Stukalo Nazarii'
+            
+            if manager_name:
+                additional_premia[manager_name] = {'PRW': prw}
+                logger.info(f"Found PRW for {manager_name}: {prw}")
+            else:
+                logger.warning(f"Manager not found for ID: {manager_id}")
         
         logger.info(f"PRW calculation results: {additional_premia}")
         return additional_premia
