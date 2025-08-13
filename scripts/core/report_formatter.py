@@ -35,7 +35,7 @@ class ReportFormatter:
         mid_line = '──────────────────────'
         
         message = '```\n'
-        message += f'PREMIA_{title}_{today.strftime("%m.%Y")}\n'
+        message += f'PREMIA_{today.strftime("%m.%Y")}\n'
         message += f'{top_line}\n'
         message += 'KPI | Kozik  | Stukalo\n'
         message += f'{mid_line}\n'
