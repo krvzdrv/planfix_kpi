@@ -301,9 +301,8 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     all_managers_results = _execute_kpi_query(all_managers_query, (), "all managers in orders")
     logger.info(f"All managers in orders table: {all_managers_results}")
     
-    # Для таблицы заказов используем ID менеджеров как строки (поле menedzher имеет тип text)
-    PLANFIX_USER_IDS = tuple(str(m['planfix_user_id']) for m in MANAGERS_KPI)
-    logger.info(f"PLANFIX_USER_IDS: {PLANFIX_USER_IDS}")
+    # Для таблицы заказов используем имена менеджеров (как в рабочей версии)
+    logger.info(f"PLANFIX_USER_NAMES: {PLANFIX_USER_NAMES}")
     
     debug_query = """
         SELECT 
@@ -318,12 +317,12 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
         LIMIT 100;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug orders")
     logger.info("\nDebug - Sample order data:")
     filtered_debug = []
     for row in debug_results:
         netto = _parse_netto_pln(row[3])
-        logger.info(f"Manager ID: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}, Parsed: {netto}")
+        logger.info(f"Manager: {row[0]}, Confirmation: {row[1]}, Realization: {row[2]}, Amount: {row[3]}, Parsed: {netto}")
         logger.info(f"Parsed dates - Confirmation: {row[4]}, Realization: {row[5]}")
         if netto != 0:
             filtered_debug.append(row)
@@ -332,7 +331,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
     query = f"""
         WITH order_metrics AS (
             SELECT
-                menedzher AS manager_id, COUNT(*) AS order_count, 0 AS total_amount
+                menedzher AS manager_name, COUNT(*) AS order_count, 0 AS total_amount
             FROM planfix_orders
             WHERE data_potwierdzenia_zamowienia IS NOT NULL AND data_potwierdzenia_zamowienia != ''
                 AND TO_TIMESTAMP(data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI') >= %s::timestamp
@@ -345,7 +344,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
             GROUP BY menedzher
             UNION ALL
             SELECT
-                menedzher AS manager_id, 0 AS order_count,
+                menedzher AS manager_name, 0 AS order_count,
                 COALESCE(SUM(NULLIF(REPLACE(REPLACE(wartosc_netto_pln, ' ', ''), ',', '.'), '')::DECIMAL(10,2)), 0) AS total_amount
             FROM planfix_orders
             WHERE data_realizacji IS NOT NULL AND data_realizacji != ''
@@ -355,11 +354,11 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
                 AND is_deleted = false
             GROUP BY menedzher
         )
-        SELECT manager_id, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount
+        SELECT manager_name, SUM(order_count) AS order_count, SUM(total_amount) AS total_amount
         FROM order_metrics
-        GROUP BY manager_id;
+        GROUP BY manager_name;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "orders and revenue")
     logger.info(f"Order results: {results}")
     return results
 
