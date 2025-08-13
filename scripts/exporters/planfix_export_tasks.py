@@ -14,13 +14,7 @@ load_dotenv()
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.planfix_utils import (
-    check_required_env_vars,
-    make_planfix_request,
-    get_supabase_connection,
-    mark_items_as_deleted_in_supabase,
-    upsert_data_to_supabase
-)
+from utils import planfix_utils
 
 # Script-specific constants
 TASK_TEMPLATE_ID = 2465239  # Planfix ID for "Tasks" general task template
@@ -40,7 +34,7 @@ def get_planfix_tasks(page):
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<request method="task.getList">'
-        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
+        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<filters>'
@@ -70,10 +64,10 @@ def get_planfix_tasks(page):
         '</request>'
     )
     response = requests.post(
-        os.environ.get("PLANFIX_API_URL", "https://api.planfix.com/xml/"),
+        "https://api.planfix.com/xml/",
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(os.environ.get("PLANFIX_API_KEY"), os.environ.get("PLANFIX_TOKEN"))
+        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
     )
     response.raise_for_status()
     return response.text

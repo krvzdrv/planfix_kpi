@@ -49,6 +49,7 @@ jobs:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          PLANFIX_API_URL: https://api.planfix.com/xml/
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
@@ -70,6 +71,7 @@ jobs:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          PLANFIX_API_URL: https://api.planfix.com/xml/
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
@@ -91,6 +93,7 @@ jobs:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          PLANFIX_API_URL: https://api.planfix.com/xml/
           SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
@@ -141,6 +144,7 @@ jobs:
           PLANFIX_API_KEY: ${{ secrets.PLANFIX_API_KEY }}
           PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
           PLANFIX_ACCOUNT: ${{ secrets.PLANFIX_ACCOUNT }}
+          PLANFIX_API_URL: https://api.planfix.com/xml/
           SUPABASE_CONNECTION_STRING: postgresql://${{ secrets.SUPABASE_USER }}:${{ secrets.SUPABASE_PASSWORD }}@${{ secrets.SUPABASE_HOST }}:${{ secrets.SUPABASE_PORT }}/${{ secrets.SUPABASE_DB }}
           SUPABASE_HOST: ${{ secrets.SUPABASE_HOST }}
           SUPABASE_DB: ${{ secrets.SUPABASE_DB }}
