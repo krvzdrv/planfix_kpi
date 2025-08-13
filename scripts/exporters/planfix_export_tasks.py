@@ -183,21 +183,13 @@ def main():
     )
     logger.info("Starting Planfix tasks to Supabase synchronization...")
 
-    required_env_vars = {
-        'PLANFIX_API_KEY': os.environ.get('PLANFIX_API_KEY'),
-        'PLANFIX_TOKEN': os.environ.get('PLANFIX_TOKEN'),
-        'PLANFIX_ACCOUNT': os.environ.get('PLANFIX_ACCOUNT'),
-        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
-        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
-        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
-        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
-        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
-        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT')
-    }
-    try:
-        check_required_env_vars(required_env_vars)
-    except ValueError as e:
-        logger.critical(f"Stopping script due to missing environment variables: {e}")
+    # Проверяем наличие критических переменных окружения
+    if not os.environ.get('PLANFIX_API_KEY') or not os.environ.get('PLANFIX_TOKEN') or not os.environ.get('PLANFIX_ACCOUNT'):
+        logger.critical("Missing required Planfix environment variables")
+        return
+    
+    if not os.environ.get('SUPABASE_HOST') or not os.environ.get('SUPABASE_DB') or not os.environ.get('SUPABASE_USER') or not os.environ.get('SUPABASE_PASSWORD'):
+        logger.critical("Missing required Supabase environment variables")
         return
 
     supabase_conn = None
