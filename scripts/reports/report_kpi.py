@@ -7,14 +7,8 @@ from dotenv import load_dotenv
 import sys
 import re
 
-import importlib.util
-
-# Динамический импорт config модуля
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.py')
-spec = importlib.util.spec_from_file_location("config", config_path)
-config = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(config)
-MANAGERS_KPI = config.MANAGERS_KPI 
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from config import MANAGERS_KPI 
 from utils import planfix_utils
 from core.kpi_utils import math_round
 
