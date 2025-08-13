@@ -312,7 +312,7 @@ class KPIEngine:
         ), "Client status counts")
         
         offer_results = self._execute_query(offer_query, (
-            period.start_date, period.end_date, tuple(self.manager_ids)
+            period.start_date, period.end_date, tuple(self.managers)
         ), "Offer counts")
         
         # Формируем результат
@@ -339,7 +339,7 @@ class KPIEngine:
         for row in offer_results:
             manager_id = row[0]
             count = row[2]
-            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name'] == manager_id), None)
             if manager in actual_values:
                 actual_values[manager]['OFW'] = count
         
@@ -417,14 +417,14 @@ class KPIEngine:
         """
         
         results = self._execute_query(query, (
-            period.start_date, period.end_date, tuple(self.manager_ids)
+            period.start_date, period.end_date, tuple(self.managers)
         ), "Additional premia (PRW)")
         
         additional_premia = {}
         for row in results:
             manager_id = row[0]
             prw = row[1]
-            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+            manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name'] == manager_id), None)
             if manager:
                 additional_premia[manager] = {'PRW': prw}
         

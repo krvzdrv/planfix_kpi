@@ -208,7 +208,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
         start_date, end_date, PLANFIX_USER_NAMES
     ), "Client status counts")
     offer_results = _execute_query(offer_query, (
-        start_date, end_date, PLANFIX_USER_IDS
+        start_date, end_date, PLANFIX_USER_NAMES
     ), "Offer counts")
     filtered_offer_results = []
     for row in offer_results:
@@ -236,7 +236,7 @@ def get_actual_kpi_values(start_date: str, end_date: str) -> dict:
     for row in offer_results:
         manager_id = row[0]
         count = row[2]
-        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name'] == manager_id), None)
         if manager in actual_values:
             actual_values[manager]['OFW'] = count
     return actual_values
@@ -293,13 +293,13 @@ def get_additional_premia(start_date: str, end_date: str) -> dict:
             AND is_deleted = false
         GROUP BY menedzher;
     """
-    PLANFIX_USER_IDS = tuple(m['planfix_user_id'] for m in MANAGERS_KPI)
-    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_IDS), "Additional premia (PRW)")
+    PLANFIX_USER_NAMES = tuple(m['planfix_user_name'] for m in MANAGERS_KPI)
+    results = _execute_query(query, (start_date, end_date, PLANFIX_USER_NAMES), "Additional premia (PRW)")
     additional_premia = {}
     for row in results:
         manager_id = row[0]
         prw = row[1]
-        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_id'] == manager_id), None)
+        manager = next((m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name'] == manager_id), None)
         if manager:
             additional_premia[manager] = {'PRW': prw}
     logger.info(f"PRW calculation results: {additional_premia}")

@@ -259,7 +259,7 @@ def count_offers(start_date_str: str, end_date_str: str) -> list:
         GROUP BY
             menedzher;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS), "offers sent")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES), "offers sent")
     logger.info(f"Offer results: {results}")
     return results
 
@@ -284,7 +284,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         AND (data_potwierdzenia_zamowienia IS NOT NULL OR data_realizacji IS NOT NULL)
         LIMIT 100;
     """
-    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_IDS,), "debug orders")
+    debug_results = _execute_kpi_query(debug_query, (PLANFIX_USER_NAMES,), "debug orders")
     logger.info("\nDebug - Sample order data:")
     filtered_debug = []
     for row in debug_results:
@@ -325,7 +325,7 @@ def count_orders(start_date_str: str, end_date_str: str) -> list:
         FROM order_metrics
         GROUP BY manager_id;
     """
-    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_IDS, start_date_str, end_date_str, PLANFIX_USER_IDS), "orders and revenue")
+    results = _execute_kpi_query(query, (start_date_str, end_date_str, PLANFIX_USER_NAMES, start_date_str, end_date_str, PLANFIX_USER_NAMES), "orders and revenue")
     logger.info(f"Order results: {results}")
     return results
 
