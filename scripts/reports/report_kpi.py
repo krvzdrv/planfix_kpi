@@ -9,7 +9,17 @@ import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from core.config import MANAGERS_KPI 
-from utils import planfix_utils
+from utils.planfix_utils import (
+    PLANFIX_API_KEY,
+    PLANFIX_TOKEN,
+    PLANFIX_ACCOUNT,
+    SUPABASE_CONNECTION_STRING,
+    SUPABASE_HOST,
+    SUPABASE_DB,
+    SUPABASE_USER,
+    SUPABASE_PASSWORD,
+    SUPABASE_PORT
+)
 from core.kpi_utils import math_round
 
 # Load environment variables from .env file
@@ -57,15 +67,15 @@ ALL_KPI = [
 def _check_env_vars():
     """Checks for required environment variables and logs errors if any are missing."""
     required_env_vars = {
-        'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
-        'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
-        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
-        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
-        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
-        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
-        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
-        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT,
+        'PLANFIX_API_KEY': PLANFIX_API_KEY,
+        'PLANFIX_TOKEN': PLANFIX_TOKEN,
+        'PLANFIX_ACCOUNT': PLANFIX_ACCOUNT,
+        'SUPABASE_CONNECTION_STRING': SUPABASE_CONNECTION_STRING,
+        'SUPABASE_HOST': SUPABASE_HOST,
+        'SUPABASE_DB': SUPABASE_DB,
+        'SUPABASE_USER': SUPABASE_USER,
+        'SUPABASE_PASSWORD': SUPABASE_PASSWORD,
+        'SUPABASE_PORT': SUPABASE_PORT,
         'TELEGRAM_BOT_TOKEN': TELEGRAM_TOKEN,
         'TELEGRAM_CHAT_ID': CHAT_ID
     }

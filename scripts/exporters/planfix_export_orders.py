@@ -13,7 +13,13 @@ load_dotenv()
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import planfix_utils
+from utils.planfix_utils import (
+    check_required_env_vars,
+    make_planfix_request,
+    get_supabase_connection,
+    mark_items_as_deleted_in_supabase,
+    upsert_data_to_supabase
+)
 
 ORDER_TEMPLATE_ID = 2420917
 ORDERS_TABLE_NAME = "planfix_orders"
@@ -84,7 +90,7 @@ def get_planfix_orders(page):
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         f'<request method="task.getList">'
-        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
+        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<filters>'
@@ -121,10 +127,10 @@ def get_planfix_orders(page):
         '</request>'
     )
     response = requests.post(
-        planfix_utils.PLANFIX_API_URL,
+        "https://api.planfix.com/xml/",
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
+        auth=(os.environ.get('PLANFIX_API_KEY'), os.environ.get('PLANFIX_TOKEN'))
     )
     response.raise_for_status()
     return response.text
@@ -197,7 +203,7 @@ def upsert_orders(orders, supabase_conn):
         return
     first_item_keys = orders[0].keys()
     all_column_names = list(first_item_keys)
-    planfix_utils.upsert_data_to_supabase(
+    upsert_data_to_supabase(
         supabase_conn,
         ORDERS_TABLE_NAME,
         ORDERS_PK_COLUMN,
@@ -215,25 +221,25 @@ def main():
     logger.info("Starting Planfix orders to Supabase synchronization...")
 
     required_env_vars = {
-        'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
-        'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
-        'SUPABASE_CONNECTION_STRING': planfix_utils.SUPABASE_CONNECTION_STRING,
-        'SUPABASE_HOST': planfix_utils.SUPABASE_HOST,
-        'SUPABASE_DB': planfix_utils.SUPABASE_DB,
-        'SUPABASE_USER': planfix_utils.SUPABASE_USER,
-        'SUPABASE_PASSWORD': planfix_utils.SUPABASE_PASSWORD,
-        'SUPABASE_PORT': planfix_utils.SUPABASE_PORT
+        'PLANFIX_API_KEY': os.environ.get('PLANFIX_API_KEY'),
+        'PLANFIX_TOKEN': os.environ.get('PLANFIX_TOKEN'),
+        'PLANFIX_ACCOUNT': os.environ.get('PLANFIX_ACCOUNT'),
+        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
+        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
+        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
+        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
+        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
+        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT')
     }
     try:
-        planfix_utils.check_required_env_vars(required_env_vars)
+        check_required_env_vars(required_env_vars)
     except ValueError as e:
         logger.critical(f"Stopping script due to missing environment variables: {e}")
         return
 
     supabase_conn = None
     try:
-        supabase_conn = planfix_utils.get_supabase_connection()
+        supabase_conn = get_supabase_connection()
         all_orders = []
         all_ids = []
         page = 1

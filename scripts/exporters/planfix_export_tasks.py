@@ -14,7 +14,13 @@ load_dotenv()
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils import planfix_utils
+from utils.planfix_utils import (
+    check_required_env_vars,
+    make_planfix_request,
+    get_supabase_connection,
+    mark_items_as_deleted_in_supabase,
+    upsert_data_to_supabase
+)
 
 # Script-specific constants
 TASK_TEMPLATE_ID = 2465239  # Planfix ID for "Tasks" general task template
@@ -34,7 +40,7 @@ def get_planfix_tasks(page):
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<request method="task.getList">'
-        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
+        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<filters>'
@@ -67,7 +73,7 @@ def get_planfix_tasks(page):
         "https://api.planfix.com/xml/",
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
+        auth=(os.environ.get('PLANFIX_API_KEY'), os.environ.get('PLANFIX_TOKEN'))
     )
     response.raise_for_status()
     return response.text
@@ -183,13 +189,21 @@ def main():
     )
     logger.info("Starting Planfix tasks to Supabase synchronization...")
 
-    # Проверяем наличие критических переменных окружения
-    if not os.environ.get('PLANFIX_API_KEY') or not os.environ.get('PLANFIX_TOKEN') or not os.environ.get('PLANFIX_ACCOUNT'):
-        logger.critical("Missing required Planfix environment variables")
-        return
-    
-    if not os.environ.get('SUPABASE_HOST') or not os.environ.get('SUPABASE_DB') or not os.environ.get('SUPABASE_USER') or not os.environ.get('SUPABASE_PASSWORD'):
-        logger.critical("Missing required Supabase environment variables")
+    required_env_vars = {
+        'PLANFIX_API_KEY': os.environ.get('PLANFIX_API_KEY'),
+        'PLANFIX_TOKEN': os.environ.get('PLANFIX_TOKEN'),
+        'PLANFIX_ACCOUNT': os.environ.get('PLANFIX_ACCOUNT'),
+        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
+        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
+        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
+        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
+        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
+        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT')
+    }
+    try:
+        check_required_env_vars(required_env_vars)
+    except ValueError as e:
+        logger.critical(f"Stopping script due to missing environment variables: {e}")
         return
 
     supabase_conn = None
@@ -202,10 +216,6 @@ def main():
             logger.info(f"Fetching page {current_page} of tasks...")
             try:
                 xml = get_planfix_tasks(current_page)
-                if current_page == 1:
-                    with open('planfix_tasks_response_page1.xml', 'w', encoding='utf-8') as f:
-                        f.write(xml)
-                    logger.info('Сохранил XML-ответ первой страницы в planfix_tasks_response_page1.xml')
                 tasks = parse_tasks(xml)
                 all_tasks.extend(tasks)
                 logger.info(f"На странице {current_page}: {len(tasks)} задач с шаблоном {TASK_TEMPLATE_ID}")
@@ -219,9 +229,9 @@ def main():
                             all_processed_ids.append(int(pk_value))
                         except ValueError:
                             logger.warning(f"Could not convert primary key '{pk_value}' to int for task ID. Skipping for deletion marking list.")
-                root = ET.fromstring(xml)
-                tasks_root = root.find('.//tasks')
-                if tasks_root is not None and int(tasks_root.attrib.get('count', 0)) < 100:
+                
+                # Check if we should continue to next page
+                if len(tasks) < 100:
                     break
                 current_page += 1
             except requests.exceptions.RequestException as e:
@@ -258,8 +268,6 @@ def main():
                     supabase_conn, TASKS_TABLE_NAME, TASKS_PK_COLUMN, all_processed_ids
                 )
                 logger.info(f"Marked tasks not in the current batch as deleted.")
-            else:
-                logger.warning("No new task IDs were processed successfully. Skipping deletion marking to avoid data loss due to potential errors.")
     except psycopg2.Error as e:
         logger.critical(f"Supabase connection error: {e}")
     except ValueError as e:

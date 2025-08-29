@@ -8,7 +8,17 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import Dict, Any, List, Tuple
 from .config import MANAGERS_KPI
-from utils import planfix_utils
+from utils.planfix_utils import (
+    PLANFIX_API_KEY,
+    PLANFIX_TOKEN,
+    PLANFIX_ACCOUNT,
+    SUPABASE_CONNECTION_STRING,
+    SUPABASE_HOST,
+    SUPABASE_DB,
+    SUPABASE_USER,
+    SUPABASE_PASSWORD,
+    SUPABASE_PORT
+)
 import psycopg2
 from .kpi_utils import math_round
 

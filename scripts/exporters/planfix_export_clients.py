@@ -13,7 +13,15 @@ load_dotenv()
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import planfix_utils
+from utils.planfix_utils import (
+    check_required_env_vars,
+    make_planfix_request,
+    get_supabase_connection,
+    mark_items_as_deleted_in_supabase,
+    upsert_data_to_supabase,
+    create_table_if_not_exists,
+    add_missing_columns
+)
 
 # --- Константы ---
 CLIENT_TEMPLATE_ID = 20
@@ -140,7 +148,7 @@ def get_planfix_companies(page):
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<request method="contact.getList">'
-        f'<account>{planfix_utils.PLANFIX_ACCOUNT}</account>'
+        f'<account>{os.environ.get("PLANFIX_ACCOUNT")}</account>'
         f'<pageCurrent>{page}</pageCurrent>'
         f'<pageSize>100</pageSize>'
         '<target>company</target>'
@@ -156,10 +164,10 @@ def get_planfix_companies(page):
         '</request>'
     )
     response = requests.post(
-        planfix_utils.PLANFIX_API_URL,
+        "https://api.planfix.com/xml/",
         data=body.encode('utf-8'),
         headers=headers,
-        auth=(planfix_utils.PLANFIX_API_KEY, planfix_utils.PLANFIX_TOKEN)
+        auth=(os.environ.get('PLANFIX_API_KEY'), os.environ.get('PLANFIX_TOKEN'))
     )
     response.raise_for_status()
     return response.text
@@ -299,10 +307,16 @@ def get_create_table_sql(table_name, pk_column, columns_map):
 def main():
     """Главная функция для экспорта клиентов из Planfix в Supabase."""
     logger.info("--- Starting Planfix clients export ---")
-    planfix_utils.check_required_env_vars({
-        'PLANFIX_API_KEY': planfix_utils.PLANFIX_API_KEY,
-        'PLANFIX_TOKEN': planfix_utils.PLANFIX_TOKEN,
-        'PLANFIX_ACCOUNT': planfix_utils.PLANFIX_ACCOUNT,
+    check_required_env_vars({
+        'PLANFIX_API_KEY': os.environ.get('PLANFIX_API_KEY'),
+        'PLANFIX_TOKEN': os.environ.get('PLANFIX_TOKEN'),
+        'PLANFIX_ACCOUNT': os.environ.get('PLANFIX_ACCOUNT'),
+        'SUPABASE_CONNECTION_STRING': os.environ.get('SUPABASE_CONNECTION_STRING'),
+        'SUPABASE_HOST': os.environ.get('SUPABASE_HOST'),
+        'SUPABASE_DB': os.environ.get('SUPABASE_DB'),
+        'SUPABASE_USER': os.environ.get('SUPABASE_USER'),
+        'SUPABASE_PASSWORD': os.environ.get('SUPABASE_PASSWORD'),
+        'SUPABASE_PORT': os.environ.get('SUPABASE_PORT')
     })
 
     conn = None
@@ -334,7 +348,7 @@ def main():
             logger.info("No companies to update. Exiting.")
             return
 
-        conn = planfix_utils.get_supabase_connection()
+        conn = get_supabase_connection()
 
         # --- Schema Management ---
         # 1. Define all columns and their types
@@ -344,10 +358,10 @@ def main():
 
         # 2. Create table if it doesn't exist
         create_sql = get_create_table_sql(CLIENTS_TABLE_NAME, CLIENTS_PK_COLUMN, all_columns)
-        planfix_utils.create_table_if_not_exists(conn, create_sql)
+        create_table_if_not_exists(conn, create_sql)
 
         # 3. Add any missing columns to the existing table
-        planfix_utils.add_missing_columns(conn, CLIENTS_TABLE_NAME, all_columns)
+        add_missing_columns(conn, CLIENTS_TABLE_NAME, all_columns)
 
         # --- Data Upsert ---
         # Get final list of columns from the DB in case some were added
@@ -355,7 +369,7 @@ def main():
             cur.execute(f"SELECT * FROM {CLIENTS_TABLE_NAME} LIMIT 0")
             db_column_names = [desc[0] for desc in cur.description]
 
-        planfix_utils.upsert_data_to_supabase(
+        upsert_data_to_supabase(
             conn,
             CLIENTS_TABLE_NAME,
             CLIENTS_PK_COLUMN,
@@ -364,7 +378,7 @@ def main():
         )
 
         # --- Mark Deleted ---
-        planfix_utils.mark_items_as_deleted_in_supabase(
+        mark_items_as_deleted_in_supabase(
             conn,
             CLIENTS_TABLE_NAME,
             CLIENTS_PK_COLUMN,
