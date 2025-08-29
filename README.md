@@ -6,37 +6,37 @@
 
 ```
 planfix_kpi/
-├── bot/                          # Telegram Bot функционал
+├── bot/                              # Telegram Bot функционал
 │   └── api/
-│       └── telegram_webhook.py   # Webhook API для команд /premia_current, /premia_previous
-├── .github/workflows/            # GitHub Actions
-│   ├── manual-bot-commands.yml   # Workflow для команд бота
-│   ├── send_all_reports.yml      # Автоматическая отправка всех отчетов
-│   ├── report-manual-send.yml    # Ручная отправка отчетов
-│   └── planfix-manual-sync.yml   # Ручная синхронизация данных
-├── scripts/                      # Основные скрипты
-│   ├── core/                     # KPI логика (КРИТИЧЕСКИ НУЖНА)
-│   │   ├── config.py             # MANAGERS_KPI
-│   │   ├── kpi_engine.py         # KPI движок
-│   │   ├── kpi_data.py           # KPI данные
-│   │   ├── kpi_report.py         # KPI отчеты
-│   │   ├── kpi_utils.py          # KPI утилиты
-│   │   └── report_formatter.py   # Форматирование отчетов
-│   ├── exporters/                # Экспорт данных из Planfix
+│       └── telegram_webhook.py       # Webhook API для команд /premia_current, /premia_previous
+├── .github/workflows/                # GitHub Actions
+│   ├── manual-bot-commands.yml       # Workflow для команд бота
+│   ├── send_all_reports.yml          # Автоматическая отправка всех отчетов
+│   ├── report-manual-send.yml        # Ручная отправка отчетов
+│   └── planfix-manual-sync.yml       # Ручная синхронизация данных
+├── scripts/                          # Основные скрипты
+│   ├── core/                         # KPI логика (КРИТИЧЕСКИ НУЖНА)
+│   │   ├── config.py                 # MANAGERS_KPI
+│   │   ├── kpi_engine.py             # KPI движок
+│   │   ├── kpi_data.py               # KPI данные
+│   │   ├── kpi_report.py             # KPI отчеты
+│   │   ├── kpi_utils.py              # KPI утилиты
+│   │   └── report_formatter.py       # Форматирование отчетов
+│   ├── exporters/                    # Экспорт данных из Planfix
 │   │   ├── planfix_export_clients.py
 │   │   ├── planfix_export_orders.py
 │   │   └── planfix_export_tasks.py
-│   ├── reports/                  # Генерация отчетов
+│   ├── reports/                      # Генерация отчетов
 │   │   ├── report_activity.py
 │   │   ├── report_bonus.py
 │   │   ├── report_income.py
 │   │   ├── report_kpi.py
 │   │   └── report_status.py
-│   └── utils/                    # Утилиты для работы с Planfix
+│   └── utils/                        # Утилиты для работы с Planfix
 │       └── planfix_utils.py
-├── requirements.txt               # Python зависимости
-├── env.example                   # Пример переменных окружения
-└── .gitignore                    # Git ignore файлы
+├── requirements.txt                  # Python зависимости
+├── env.example                       # Пример переменных окружения
+└── .gitignore                        # Git ignore файлы
 ```
 
 ## 🚀 Основные функции
