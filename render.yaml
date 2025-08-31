@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: planfix-kpi-webhook
+    env: python
+    buildCommand: pip install -r bot/requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --pythonpath . bot.wsgi:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO
+        value: krvzdrv/planfix_kpi
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: PORT
+        value: 10000
