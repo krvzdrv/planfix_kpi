@@ -1,6 +1,4 @@
-requests
-python-dotenv
-psycopg2-binary==2.9.9
-python-telegram-bot==20.7
-flask
-gunicorn 
+flask==3.1.2
+gunicorn==23.0.0
+requests==2.32.5
+python-dotenv==1.1.1

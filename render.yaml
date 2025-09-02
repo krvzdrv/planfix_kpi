@@ -13,5 +13,5 @@ services:
         value: krvzdrv/planfix_kpi
       - key: TELEGRAM_BOT_TOKEN
         sync: false
-      - key: PORT
+твуют осле       - key: PORT
         value: 10000
