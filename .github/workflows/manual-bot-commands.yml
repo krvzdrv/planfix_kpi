@@ -70,4 +70,4 @@ jobs:
         run: |
           curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"❌ Błąd podczas generowania raportu premii. Spróbuj ponownie później.\",\"parse_mode\":\"Markdown\"}"
+            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"Błąd podczas generowania raportu premii. Spróbuj ponownie później.\",\"parse_mode\":\"Markdown\"}"
