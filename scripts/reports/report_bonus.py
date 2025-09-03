@@ -69,7 +69,9 @@ def generate_premia_report(period_type: str = 'monthly', start_date: str = None,
         report = formatter.format_premia_report(
             report_data['coefficients'],
             period_type,
-            report_data['additional_premia']
+            report_data['additional_premia'],
+            report_data.get('month'),
+            report_data.get('year')
         )
         
         logger.info(f"Premia report generated successfully for {period_type}")

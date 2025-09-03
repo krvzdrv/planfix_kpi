@@ -16,7 +16,7 @@ class ReportFormatter:
         ]
         self.managers = ['Kozik Andrzej', 'Stukalo Nazarii']
     
-    def format_premia_report(self, coefficients: Dict, period_type: str, additional_premia: Dict = None) -> str:
+    def format_premia_report(self, coefficients: Dict, period_type: str, additional_premia: Dict = None, month: int = None, year: int = None) -> str:
         """Форматирует отчет по премиям"""
         # Определяем заголовок в зависимости от периода
         period_titles = {
@@ -29,13 +29,28 @@ class ReportFormatter:
         }
         
         title = period_titles.get(period_type, period_type.upper())
-        today = datetime.now()
+        
+        # Определяем месяц и год для заголовка
+        if month is None or year is None:
+            today = datetime.now()
+            if period_type == 'previous_month':
+                # Предыдущий месяц
+                if today.month == 1:
+                    month = 12
+                    year = today.year - 1
+                else:
+                    month = today.month - 1
+                    year = today.year
+            else:
+                # Текущий месяц
+                month = today.month
+                year = today.year
         
         top_line = '══════════════════════'
         mid_line = '──────────────────────'
         
         message = '```\n'
-        message += f'PREMIA_{today.strftime("%m.%Y")}\n'
+        message += f'PREMIA_{month:02d}.{year}\n'
         message += f'{top_line}\n'
         message += 'KPI | Kozik  | Stukalo\n'
         message += f'{mid_line}\n'

@@ -481,5 +481,7 @@ class KPIEngine:
             'metrics': metrics,
             'actual_values': actual_values,
             'coefficients': coefficients,
-            'additional_premia': additional_premia
+            'additional_premia': additional_premia,
+            'month': month,
+            'year': year
         } 
