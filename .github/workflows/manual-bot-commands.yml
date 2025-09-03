@@ -70,14 +70,4 @@ jobs:
         run: |
           curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"❌ Ошибка при генерации отчета по премии. Попробуйте позже.\",\"parse_mode\":\"Markdown\"}"
-
-      - name: Notify on success
-        if: success()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ github.event.client_payload.chat_id }}
-        run: |
-          curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-            -H "Content-Type: application/json" \
-            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"✅ Отчет по премии сгенерирован и отправлен!\",\"parse_mode\":\"Markdown\"}"
+            -d "{\"chat_id\":\"$TELEGRAM_CHAT_ID\",\"text\":\"❌ Błąd podczas generowania raportu premii. Spróbuj ponownie później.\",\"parse_mode\":\"Markdown\"}"

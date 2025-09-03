@@ -78,7 +78,7 @@ def generate_premia_report(period_type: str = 'monthly', start_date: str = None,
         return report
         
     except Exception as e:
-        error_msg = f"❌ Ошибка при генерации отчета за {period_type}: {str(e)}"
+        error_msg = f"❌ Błąd podczas generowania raportu za {period_type}: {str(e)}"
         logger.error(f"Error generating premia report: {e}")
         return error_msg
 
@@ -130,7 +130,7 @@ def main():
         
     except Exception as e:
         logger.error(f"Error in main function: {e}")
-        send_to_telegram(f"❌ Ошибка при генерации отчета: {str(e)}")
+        send_to_telegram(f"❌ Błąd podczas generowania raportu: {str(e)}")
         raise
 
 if __name__ == "__main__":
