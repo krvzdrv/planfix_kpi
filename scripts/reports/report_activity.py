@@ -99,47 +99,6 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
         )
         GROUP BY hour, t.owner_name, metric
     ),
-    client_statuses AS (
-        SELECT 
-            EXTRACT(HOUR FROM TO_TIMESTAMP(c.data_dodania_do_nowi, 'DD-MM-YYYY HH24:MI')) as hour,
-            c.menedzer AS manager_name,
-            'NWI' as metric,
-            COUNT(*) as count
-        FROM planfix_clients c
-        WHERE c.data_dodania_do_nowi IS NOT NULL AND c.data_dodania_do_nowi != ''
-        AND TO_DATE(c.data_dodania_do_nowi, 'DD-MM-YYYY') >= %s AND TO_DATE(c.data_dodania_do_nowi, 'DD-MM-YYYY') < %s
-        AND c.menedzer = ANY(%s)
-        AND c.is_deleted = false
-        GROUP BY hour, c.menedzer
-        
-        UNION ALL
-        
-        SELECT 
-            EXTRACT(HOUR FROM TO_TIMESTAMP(c.data_dodania_do_w_trakcie, 'DD-MM-YYYY HH24:MI')) as hour,
-            c.menedzer AS manager_name,
-            'WTR' as metric,
-            COUNT(*) as count
-        FROM planfix_clients c
-        WHERE c.data_dodania_do_w_trakcie IS NOT NULL AND c.data_dodania_do_w_trakcie != ''
-        AND TO_DATE(c.data_dodania_do_w_trakcie, 'DD-MM-YYYY') >= %s AND TO_DATE(c.data_dodania_do_w_trakcie, 'DD-MM-YYYY') < %s
-        AND c.menedzer = ANY(%s)
-        AND c.is_deleted = false
-        GROUP BY hour, c.menedzer
-        
-        UNION ALL
-        
-        SELECT 
-            EXTRACT(HOUR FROM TO_TIMESTAMP(c.data_dodania_do_perspektywiczni, 'DD-MM-YYYY HH24:MI')) as hour,
-            c.menedzer AS manager_name,
-            'PSK' as metric,
-            COUNT(*) as count
-        FROM planfix_clients c
-        WHERE c.data_dodania_do_perspektywiczni IS NOT NULL AND c.data_dodania_do_perspektywiczni != ''
-        AND TO_DATE(c.data_dodania_do_perspektywiczni, 'DD-MM-YYYY') >= %s AND TO_DATE(c.data_dodania_do_perspektywiczni, 'DD-MM-YYYY') < %s
-        AND c.menedzer = ANY(%s)
-        AND c.is_deleted = false
-        GROUP BY hour, c.menedzer
-    ),
     order_metrics AS (
         SELECT 
             EXTRACT(HOUR FROM TO_TIMESTAMP(o.data_potwierdzenia_zamowienia, 'DD-MM-YYYY HH24:MI')) as hour,
@@ -183,19 +142,14 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
     FROM (
         SELECT * FROM task_counts
         UNION ALL
-        SELECT * FROM client_statuses
-        UNION ALL
         SELECT * FROM order_metrics
     ) combined
-    WHERE metric IN ('NWI', 'WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'OFW', 'ZAM')
+    WHERE metric IN ('WDM', 'PRZ', 'ZKL', 'SPT', 'MAT', 'TPY', 'MSP', 'NOW', 'OPI', 'WRK', 'KNT', 'OFW', 'ZAM')
     ORDER BY hour, manager_name, metric
     """
     
     params = (
         start_date, end_date, list(user_names),  # task_counts
-        start_date, end_date, list(user_names),  # NWI
-        start_date, end_date, list(user_names),  # WTR
-        start_date, end_date, list(user_names),  # PSK
         start_date, end_date, list(user_names),  # OFW
         start_date, end_date, list(user_names),  # ZAM
     )
@@ -206,7 +160,6 @@ def get_daily_activity(start_date: datetime, end_date: datetime, user_names: tup
     activity = {}
     for h in range(24):
         activity[h] = {
-            'NWI': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'WDM': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'PRZ': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
             'ZKL': {'Kozik Andrzej': 0, 'Stukalo Nazarii': 0},
