@@ -197,12 +197,10 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
     total_sum = sum(data['current'] for data in changes.values())
     if total_sum == 0: total_sum = 1
 
-    # Собираем все данные для каждого столбца
-    current_values = []
-    change_values = []
-    inout_values = []
-    percent_values = []
+    # Длина разделителя - максимальная ширина строки
+    separator_length = 35  # "───────────────────────────────────"
     
+    # Собираем все данные для каждого столбца
     change_strings = {}
     inout_strings = {}
     percent_strings = {}
@@ -214,33 +212,44 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         inflow = data['inflow']
         outflow = data['outflow']
         
-        # Текущее количество
-        current_str = str(current)
-        current_values.append(current_str)
-        
         # Изменение
         change_str = f"+{change}" if change > 0 else (str(change) if change < 0 else "")
         change_strings[status] = change_str
-        change_values.append(change_str)
         
         # IN/OUT
         inout_str = f"[+{inflow}/-{outflow}]"
         inout_strings[status] = inout_str
-        inout_values.append(inout_str)
         
         # Проценты БЕЗ скобок
         percentage = math_round(float(current) / float(total_sum) * 100)
-        percent_str = f"{percentage}%"  # Убираем скобки
+        percent_str = f"{percentage}%"
         percent_strings[status] = percent_str
-        percent_values.append(percent_str)
 
-    # Используем фиксированные ширины столбцов для всех менеджеров
-    max_current_len = 6   # Фиксированная ширина для текущего количества
-    max_change_len = 4    # Фиксированная ширина для изменений
-    max_inout_len = 12    # Фиксированная ширина для [IN/OUT]
-    max_percent_len = 4   # Фиксированная ширина для процентов
+    # Фиксированные длины столбцов как в примере
+    max_current_len = 3   # Максимальная длина для текущего количества (3 цифры для больших значений)
+    max_change_len = 3    # Максимальная длина для изменений (-99)
+    max_inout_len = 9     # Максимальная длина для [IN/OUT] ([+99/-99])
+    max_percent_len = 3   # Максимальная длина для процентов (100%)
+    
+    # Проверяем фактические максимальные длины
+    for status in CLIENT_STATUSES:
+        data = changes[status]
+        current = data['current']
+        change_str = change_strings[status]
+        inout_str = inout_strings[status]
+        percent_str = percent_strings[status]
+        
+        max_current_len = max(max_current_len, len(str(current)))
+        max_change_len = max(max_change_len, len(change_str))
+        max_inout_len = max(max_inout_len, len(inout_str))
+        max_percent_len = max(max_percent_len, len(percent_str))
 
-    max_bar_len = 4  # Еще больше уменьшаем максимальную длину бара
+    # Рассчитываем длину бара (оставшееся место)
+    # Формат: "STATUS BAR CURRENT CHANGE IND INOUT PERCENT"
+    # STATUS (3) + " " (1) + BAR (переменная) + " " (7) + CURRENT + " " (1) + CHANGE + " " (1) + IND (1) + " " (3) + INOUT + " " (4) + PERCENT
+    fixed_parts_length = 3 + 1 + 7 + max_current_len + 1 + max_change_len + 1 + 1 + 3 + max_inout_len + 4 + max_percent_len
+    max_bar_len = max(1, separator_length - fixed_parts_length)
+    
     lines = []
     
     for status in CLIENT_STATUSES:
@@ -255,16 +264,13 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         bar_len = max(1, math_round(float(current) / float(global_max) * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
 
-        # Левая часть: "KPI BAR" - фиксированная ширина
-        kpi_bar_part = f"{status} {bar_str}"
-        
-        # Формируем строку с фиксированными позициями без выравнивания
+        # Формируем строку точно как в примере
         line = (
-            f"{kpi_bar_part:<10}"  # KPI + бар (позиции 1-10)
-            f"{current:>6}"        # Текущее количество (позиции 11-16, фиксированная ширина)
-            f"  {change_str:>4} {indicator}"  # Изменение + направление (позиции 17-21)
-            f"      {inout_str:>12}"     # IN/OUT (позиции 22-33)
-            f" {percent_str:>4}"    # Проценты (позиции 34-37)
+            f"{status} {bar_str:<7} "
+            f"{current:>{max_current_len}} "
+            f"{change_str:>{max_change_len}} {indicator} "
+            f"{inout_str:>{max_inout_len}} "
+            f"{percent_str:>{max_percent_len}}"
         )
         
         lines.append(line)
@@ -353,7 +359,7 @@ def main():
                 # Формируем полный текст сообщения для одного менеджера
                 # Заголовок теперь будет общий, а здесь только имя менеджера
                 manager_header = f"👤 {manager}:"
-                separator = "──────────────────────────────────"
+                separator = "───────────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
                 total_net = sum(data['net'] for data in status_changes.values())
                 
@@ -361,15 +367,23 @@ def main():
                 total_current_str = str(total_sum)
                 total_change_str = f"+{total_net}" if total_net > 0 else (str(total_net) if total_net < 0 else "")
                 
-                # Используем уже рассчитанные глобальные максимальные длины
+                # Используем те же максимальные длины что и в основном отчете
+                max_current_len = max(3, len(total_current_str))
+                max_change_len = max(3, len(total_change_str))
+                
+                # Рассчитываем длину бара для RZM (без процентов и IN/OUT)
+                # Формат: "RZM BAR CURRENT CHANGE"
+                # RZM (3) + " " (1) + BAR (переменная) + " " (7) + CURRENT + " " (1) + CHANGE
+                fixed_parts_length = 3 + 1 + 7 + max_current_len + 1 + max_change_len
+                max_bar_len = max(1, 35 - fixed_parts_length)
                 
                 footer = (
-                    f"RZM{'':<7}"     # RZM (позиции 1-10, как KPI+бар)
-                    f"{total_current_str:>6}"  # Текущее количество (позиции 11-16)
-                    f"  {total_change_str:>4}"   # Изменение (позиции 17-20, без индикатора)
+                    f"RZM {'█' * max_bar_len:<7} "
+                    f"{total_current_str:>{max_current_len}} "
+                    f"{total_change_str:>{max_change_len}}"
                 )
 
-                full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
+                full_report_for_manager = f"{manager_header}\n{separator}\n{report_kpi_lines}\n{separator}\n{footer}"
                 all_reports.append(full_report_for_manager)
                 
                 logger.info(f"Generated report for {manager}:\n{full_report_for_manager}")
