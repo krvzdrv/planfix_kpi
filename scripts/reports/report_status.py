@@ -263,9 +263,9 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         line = (
             f"{kpi_bar_part:<10}"  # KPI + бар (позиции 1-10)
             f"{current:>6}"        # Текущее количество (позиции 11-16)
-            f"{change_str:>4} {indicator}"  # Изменение + направление (позиции 17-21)
-            f"{inout_str:>12}"     # IN/OUT (позиции 22-33)
-            f"{percent_str:>4}"    # Проценты (позиции 34-37)
+            f"  {change_str:>4} {indicator}"  # Изменение + направление (позиции 17-21)
+            f"      {inout_str:>12}"     # IN/OUT (позиции 22-33)
+            f" {percent_str:>4}"    # Проценты (позиции 34-37)
         )
         
         lines.append(line)
@@ -387,7 +387,7 @@ def main():
                 footer = (
                     f"RZM{'':<7}"     # RZM (позиции 1-10, как KPI+бар)
                     f"{total_current_str:>6}"  # Текущее количество (позиции 11-16)
-                    f"{total_change_str:>4}"   # Изменение (позиции 17-20, без индикатора)
+                    f"  {total_change_str:>4}"   # Изменение (позиции 17-20, без индикатора)
                 )
 
                 full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
