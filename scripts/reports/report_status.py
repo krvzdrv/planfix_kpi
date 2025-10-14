@@ -240,7 +240,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
     max_inout_len = max(len(s) for s in inout_values)
     max_percent_len = max(len(s) for s in percent_values)
 
-    max_bar_len = 9
+    max_bar_len = 6  # Уменьшаем максимальную длину бара
     lines = []
     
     for status in CLIENT_STATUSES:
@@ -260,11 +260,11 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         
         # Формируем строку с правильным выравниванием по правому краю для каждого столбца
         line = (
-            f"{kpi_bar_part:<12} "  # KPI + бар (12 символов)
+            f"{kpi_bar_part:<10} "  # KPI + бар (10 символов, уменьшили)
             f"{current:>{max_current_len}} "  # Текущее количество (правое выравнивание)
             f"{change_str:>{max_change_len}} {indicator} "  # Изменение + направление (правое выравнивание)
-            f"{inout_str:>{max_inout_len-1}} "  # IN/OUT (правое выравнивание, отступ -1)
-            f"{percent_str:>{max_percent_len-2}}"  # Проценты БЕЗ скобок (правое выравнивание, отступ -2)
+            f"{inout_str:>{max_inout_len}} "  # IN/OUT (правое выравнивание, убрали -1)
+            f"{percent_str:>{max_percent_len}}"  # Проценты БЕЗ скобок (правое выравнивание, убрали -2)
         )
         
         lines.append(line)
@@ -362,7 +362,7 @@ def main():
                 max_change_len = max(len(f"+{data['net']}" if data['net'] > 0 else (str(data['net']) if data['net'] < 0 else "")) for data in status_changes.values())
                 
                 footer = (
-                    f"RZM:{'':<8} "  # RZM: + 8 пробелов
+                    f"RZM:{'':<6} "  # RZM: + 6 пробелов (уменьшили)
                     f"{total_current_str:>{max_current_len}} "  # Текущее количество (правое выравнивание)
                     f"{total_change_str:>{max_change_len}}"  # Изменение (правое выравнивание)
                 )
