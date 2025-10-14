@@ -244,11 +244,8 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         max_inout_len = max(max_inout_len, len(inout_str))
         max_percent_len = max(max_percent_len, len(percent_str))
 
-    # Рассчитываем длину бара (оставшееся место)
-    # Формат: "STATUS BAR CURRENT CHANGE IND INOUT PERCENT"
-    # STATUS (3) + " " (1) + BAR (переменная) + " " (7) + CURRENT + " " (1) + CHANGE + " " (1) + IND (1) + " " (3) + INOUT + " " (4) + PERCENT
-    fixed_parts_length = 3 + 1 + 7 + max_current_len + 1 + max_change_len + 1 + 1 + 3 + max_inout_len + 4 + max_percent_len
-    max_bar_len = max(1, separator_length - fixed_parts_length)
+    # Фиксированная длина бара как в старой версии
+    max_bar_len = 7  # Фиксированная длина бара для пропорционального отображения
     
     lines = []
     
