@@ -198,7 +198,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
     if total_sum == 0: total_sum = 1
 
     # Длина разделителя - максимальная ширина строки
-    separator_length = 35  # "───────────────────────────────────"
+    separator_length = 33  # "─────────────────────────────────"
     
     # Собираем все данные для каждого столбца
     change_strings = {}
@@ -245,7 +245,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         max_percent_len = max(max_percent_len, len(percent_str))
 
     # Фиксированная длина бара как в старой версии
-    max_bar_len = 7  # Фиксированная длина бара для пропорционального отображения
+    max_bar_len = 5  # Фиксированная длина бара для пропорционального отображения (уменьшено на 2)
     
     lines = []
     
@@ -263,7 +263,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
 
         # Формируем строку точно как в примере
         line = (
-            f"{status} {bar_str:<7} "
+            f"{status} {bar_str:<5} "
             f"{current:>{max_current_len}} "
             f"{change_str:>{max_change_len}} {indicator} "
             f"{inout_str:>{max_inout_len}} "
@@ -356,7 +356,7 @@ def main():
                 # Формируем полный текст сообщения для одного менеджера
                 # Заголовок теперь будет общий, а здесь только имя менеджера
                 manager_header = f"👤 {manager}:"
-                separator = "───────────────────────────────────"
+                separator = "─────────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
                 total_net = sum(data['net'] for data in status_changes.values())
                 
@@ -372,7 +372,7 @@ def main():
                 # RZM (3) + " " (1) + CURRENT + " " (1) + CHANGE
                 # Рассчитываем отступ для выравнивания по правому краю
                 current_change_length = len(total_current_str) + 1 + len(total_change_str)
-                rzm_padding = 35 - 3 - 1 - current_change_length  # 35 - "RZM" - " " - длина CURRENT и CHANGE
+                rzm_padding = 33 - 3 - 1 - current_change_length  # 33 - "RZM" - " " - длина CURRENT и CHANGE
                 
                 footer = (
                     f"RZM{' ' * rzm_padding}"
