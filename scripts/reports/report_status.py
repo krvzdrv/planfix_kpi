@@ -122,11 +122,12 @@ def get_statuses_from_history(conn, report_date: date, manager: str) -> dict:
             statuses[status] = count
     return statuses
 
-def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, dict):
+def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, dict, dict):
     """
-    Возвращает два словаря:
+    Возвращает три словаря:
     1. Абсолютное количество клиентов в каждом статусе на сегодня.
     2. Дневной приток клиентов (для статусов с датой входа).
+    3. Дневной отток клиентов (для статусов с датой выхода).
     """
     # 1. Рассчитываем АБСОЛЮТНЫЕ значения на сегодня
     query = "SELECT status_wspolpracy, data_ostatniego_zamowienia FROM planfix_clients WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''"
@@ -158,7 +159,27 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         (count,) = _execute_query(conn, query, params_inflow, f"inflow for {status}")[0]
         daily_inflow[status] = count
 
-    return current_totals, daily_inflow
+    # 3. Рассчитываем ДНЕВНОЙ ОТТОК (для статусов с датой выхода)
+    daily_outflow = {status: 0 for status in CLIENT_STATUSES}
+    # Для STL/NAK отток рассчитывается как разница со вчерашним днем
+    # Для остальных - количество клиентов, которые ушли из статуса сегодня
+    for status, col_name in STATUS_INFLOW_DATE_COLS.items():
+        # Считаем клиентов, которые были в этом статусе вчера, но не сегодня
+        yesterday = today - timedelta(days=1)
+        query = f"""
+        SELECT COUNT(*) FROM planfix_clients 
+        WHERE menedzer = %s 
+          AND {col_name} IS NOT NULL 
+          AND {col_name} != '' 
+          AND TO_DATE({col_name}, 'DD-MM-YYYY') < %s 
+          AND TO_DATE({col_name}, 'DD-MM-YYYY') >= %s
+          AND is_deleted = false
+        """
+        params_outflow = (manager, today, yesterday)
+        (count,) = _execute_query(conn, query, params_outflow, f"outflow for {status}")[0]
+        daily_outflow[status] = count
+
+    return current_totals, daily_inflow, daily_outflow
 
 def get_global_max_count(all_managers_data: dict) -> int:
     """Получить глобальный максимум из словаря {manager: {status: count}}."""
@@ -172,47 +193,81 @@ def get_global_max_count(all_managers_data: dict) -> int:
     return global_max if global_max > 0 else 1 # Избегаем деления на ноль
 
 def format_client_status_report(changes: dict, global_max: int) -> str:
-    """Форматировать отчёт по статусам клиентов в соответствии с ТЗ."""
+    """Форматировать отчёт по статусам клиентов с IN/OUT."""
     total_sum = sum(data['current'] for data in changes.values())
     if total_sum == 0: total_sum = 1
 
-    max_change_str_len = 0
+    # Собираем все данные для каждого столбца
+    current_values = []
+    change_values = []
+    inout_values = []
+    percent_values = []
+    
     change_strings = {}
+    inout_strings = {}
+    percent_strings = {}
+    
     for status in CLIENT_STATUSES:
-        change = changes[status]['change']
-        s = f"+{change}" if change > 0 else (str(change) if change < 0 else "")
-        change_strings[status] = s
-        max_change_str_len = max(max_change_str_len, len(s))
+        data = changes[status]
+        current = data['current']
+        change = data['net']
+        inflow = data['inflow']
+        outflow = data['outflow']
+        
+        # Текущее количество
+        current_str = str(current)
+        current_values.append(current_str)
+        
+        # Изменение
+        change_str = f"+{change}" if change > 0 else (str(change) if change < 0 else "")
+        change_strings[status] = change_str
+        change_values.append(change_str)
+        
+        # IN/OUT
+        inout_str = f"[+{inflow}/-{outflow}]"
+        inout_strings[status] = inout_str
+        inout_values.append(inout_str)
+        
+        # Проценты БЕЗ скобок
+        percentage = math_round(float(current) / float(total_sum) * 100)
+        percent_str = f"{percentage}%"  # Убираем скобки
+        percent_strings[status] = percent_str
+        percent_values.append(percent_str)
 
-    # Макс. длина бара = 9.
-    # Левая часть будет 18 символов, правая 12.
+    # Находим максимальные ширины для каждого столбца
+    max_current_len = max(len(s) for s in current_values)
+    max_change_len = max(len(s) for s in change_values)
+    max_inout_len = max(len(s) for s in inout_values)
+    max_percent_len = max(len(s) for s in percent_values)
+
     max_bar_len = 9
-
     lines = []
+    
     for status in CLIENT_STATUSES:
         data = changes[status]
         current = data['current']
         indicator = data['direction']
+        change_str = change_strings[status]
+        inout_str = inout_strings[status]
+        percent_str = percent_strings[status]
 
+        # Бар
         bar_len = max(1, math_round(float(current) / float(global_max) * max_bar_len)) if global_max > 0 and current > 0 else 0
         bar_str = '█' * bar_len
 
-        # Левая часть: "KPI BAR  VALUE" - 18 символов.
-        # Поле для KPI(3), пробела(1) и бара с отступом = 18 - 3(value) = 15.
+        # Левая часть: "KPI BAR" - фиксированная ширина
         kpi_bar_part = f"{status} {bar_str}"
-        left_part = f"{kpi_bar_part:<15}{current:>3}"
-
-        # Правая часть: " INDICATOR CHANGE (PERCENT)" - 12 символов.
-        change_str = change_strings[status]
-        change_part = f" {indicator} {change_str}".ljust(3 + max_change_str_len)
-
-        percentage = math_round(float(current) / float(total_sum) * 100)
-        percent_str = f"({percentage}%)"
-
-        padding_len = 12 - len(change_part) - len(percent_str)
-        right_part = f"{change_part}{' ' * max(0, padding_len)}{percent_str}"
-
-        lines.append(f"{left_part}{right_part}")
+        
+        # Формируем строку с правильным выравниванием по правому краю для каждого столбца
+        line = (
+            f"{kpi_bar_part:<12} "  # KPI + бар (12 символов)
+            f"{current:>{max_current_len}} "  # Текущее количество (правое выравнивание)
+            f"{change_str:>{max_change_len}} {indicator} "  # Изменение + направление (правое выравнивание)
+            f"{inout_str:>{max_inout_len-1}} "  # IN/OUT (правое выравнивание, отступ -1)
+            f"{percent_str:>{max_percent_len-2}}"  # Проценты БЕЗ скобок (правое выравнивание, отступ -2)
+        )
+        
+        lines.append(line)
 
     return "\n".join(lines)
 
@@ -241,11 +296,13 @@ def main():
 
         all_managers_totals = {}
         all_managers_inflow = {}
+        all_managers_outflow = {}
         
         for manager in (m['planfix_user_name'] for m in MANAGERS_KPI if m['planfix_user_name']):
-            totals, inflow = get_current_statuses_and_inflow(conn, manager, today)
+            totals, inflow, outflow = get_current_statuses_and_inflow(conn, manager, today)
             all_managers_totals[manager] = totals
             all_managers_inflow[manager] = inflow
+            all_managers_outflow[manager] = outflow
             save_statuses_to_history(conn, today, manager, totals)
 
         global_max = get_global_max_count(all_managers_totals)
@@ -264,6 +321,8 @@ def main():
                 status_changes = {}
                 for status in CLIENT_STATUSES:
                     curr_count = current_totals.get(status, 0)
+                    inflow = all_managers_inflow[manager].get(status, 0)
+                    outflow = all_managers_outflow[manager].get(status, 0)
                     
                     if status in ['STL', 'NAK']:
                         # Динамика для STL/NAK - чистая разница со вчера
@@ -271,10 +330,16 @@ def main():
                         diff = curr_count - prev_count
                     else:
                         # Динамика для остальных - дневной приток
-                        diff = all_managers_inflow[manager].get(status, 0)
+                        diff = inflow
 
                     direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
-                    status_changes[status] = {'current': curr_count, 'change': diff, 'direction': direction}
+                    status_changes[status] = {
+                        'current': curr_count, 
+                        'net': diff, 
+                        'direction': direction,
+                        'inflow': inflow,
+                        'outflow': outflow
+                    }
                 
                 logger.info(f"Got status changes for {manager}: {status_changes}")
                 
@@ -284,10 +349,23 @@ def main():
                 # Формируем полный текст сообщения для одного менеджера
                 # Заголовок теперь будет общий, а здесь только имя менеджера
                 manager_header = f"👤 {manager}:"
-                separator = "──────────────────────────────"
+                separator = "──────────────────────────────────"
                 total_sum = sum(data['current'] for data in status_changes.values())
-                # Выравниваем значение RZM так же, как значения KPI (последняя цифра на 18 позиции)
-                footer = f"RZM:{total_sum:>14}"
+                total_net = sum(data['net'] for data in status_changes.values())
+                
+                # Формируем итоговую строку с правильным выравниванием
+                total_current_str = str(total_sum)
+                total_change_str = f"+{total_net}" if total_net > 0 else (str(total_net) if total_net < 0 else "")
+                
+                # Используем те же максимальные длины, что и в данных
+                max_current_len = max(len(str(data['current'])) for data in status_changes.values())
+                max_change_len = max(len(f"+{data['net']}" if data['net'] > 0 else (str(data['net']) if data['net'] < 0 else "")) for data in status_changes.values())
+                
+                footer = (
+                    f"RZM:{'':<8} "  # RZM: + 8 пробелов
+                    f"{total_current_str:>{max_current_len}} "  # Текущее количество (правое выравнивание)
+                    f"{total_change_str:>{max_change_len}}"  # Изменение (правое выравнивание)
+                )
 
                 full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
                 all_reports.append(full_report_for_manager)
