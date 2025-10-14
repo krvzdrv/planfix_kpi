@@ -240,7 +240,7 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
     max_inout_len = max(len(s) for s in inout_values)
     max_percent_len = max(len(s) for s in percent_values)
 
-    max_bar_len = 6  # Уменьшаем максимальную длину бара
+    max_bar_len = 4  # Еще больше уменьшаем максимальную длину бара
     lines = []
     
     for status in CLIENT_STATUSES:
