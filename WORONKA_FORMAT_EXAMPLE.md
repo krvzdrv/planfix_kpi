@@ -27,7 +27,7 @@ REZ ██       9  +6 ▲    [+6/0]  15%
 BRK █        7  +4 ▲    [+4/0]  12%
 ARC          0   0 -     [0/0]   0%
 ───────────────────────────────────
-RZM         77 -19
+RZM                         77 -19
 
 👤 Kozik Andrzej:
 ───────────────────────────────────
@@ -41,7 +41,7 @@ REZ █        1   0 -   [+0/-0]   2%
 BRK █        2  +1 ▲   [+1/-0]   3%
 ARC █        1   0 -   [+0/-0]   2%
 ───────────────────────────────────
-RZM         66  +4
+RZM                         66  +4
 ```
 
 ## 🔧 **Технические детали:**
@@ -101,12 +101,14 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
 
 ### Итоговая строка (RZM):
 ```python
+# Формат итоговой строки: "RZM CURRENT CHANGE"
+current_change_length = len(total_current_str) + 1 + len(total_change_str)
+rzm_padding = 35 - 3 - 1 - current_change_length  # 35 - "RZM" - " " - длина CURRENT и CHANGE
+
 footer = (
-    f"RZM {'█' * max_bar_len} "
-    f"{total_current_str:>{max_current_len}} "
-    f"{total_change_str:>{max_change_len}}   "
-    f"{'':>{max_inout_len}} "
-    f"{'':>{max_percent_len}}"
+    f"RZM{' ' * rzm_padding}"
+    f"{total_current_str} "
+    f"{total_change_str}"
 )
 ```
 

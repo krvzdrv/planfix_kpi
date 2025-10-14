@@ -371,16 +371,16 @@ def main():
                 max_current_len = max(3, len(total_current_str))
                 max_change_len = max(3, len(total_change_str))
                 
-                # Рассчитываем длину бара для RZM (без процентов и IN/OUT)
-                # Формат: "RZM BAR CURRENT CHANGE"
-                # RZM (3) + " " (1) + BAR (переменная) + " " (7) + CURRENT + " " (1) + CHANGE
-                fixed_parts_length = 3 + 1 + 7 + max_current_len + 1 + max_change_len
-                max_bar_len = max(1, 35 - fixed_parts_length)
+                # Формат итоговой строки: "RZM CURRENT CHANGE"
+                # RZM (3) + " " (1) + CURRENT + " " (1) + CHANGE
+                # Рассчитываем отступ для выравнивания по правому краю
+                current_change_length = len(total_current_str) + 1 + len(total_change_str)
+                rzm_padding = 35 - 3 - 1 - current_change_length  # 35 - "RZM" - " " - длина CURRENT и CHANGE
                 
                 footer = (
-                    f"RZM {'█' * max_bar_len:<7} "
-                    f"{total_current_str:>{max_current_len}} "
-                    f"{total_change_str:>{max_change_len}}"
+                    f"RZM{' ' * rzm_padding}"
+                    f"{total_current_str} "
+                    f"{total_change_str}"
                 )
 
                 full_report_for_manager = f"{manager_header}\n{separator}\n{report_kpi_lines}\n{separator}\n{footer}"
