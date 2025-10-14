@@ -258,13 +258,14 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         # Левая часть: "KPI BAR" - фиксированная ширина
         kpi_bar_part = f"{status} {bar_str}"
         
-        # Формируем строку с правильным выравниванием по правому краю для каждого столбца
+        # Формируем строку с фиксированными отступами между столбцами
+        # Каждый столбец имеет фиксированную позицию от левого края
         line = (
-            f"{kpi_bar_part:<10} "  # KPI + бар (10 символов, уменьшили)
-            f"{current:>{max_current_len}} "  # Текущее количество (правое выравнивание)
-            f"{change_str:>{max_change_len}} {indicator} "  # Изменение + направление (правое выравнивание)
-            f"{inout_str:>{max_inout_len}} "  # IN/OUT (правое выравнивание, убрали -1)
-            f"{percent_str:>{max_percent_len}}"  # Проценты БЕЗ скобок (правое выравнивание, убрали -2)
+            f"{kpi_bar_part:<10}"  # KPI + бар (позиции 1-10)
+            f"{current:>6}"        # Текущее количество (позиции 11-16)
+            f"{change_str:>4} {indicator}"  # Изменение + направление (позиции 17-21)
+            f"{inout_str:>12}"     # IN/OUT (позиции 22-33)
+            f"{percent_str:>4}"    # Проценты (позиции 34-37)
         )
         
         lines.append(line)
@@ -384,9 +385,9 @@ def main():
                 # Используем уже рассчитанные глобальные максимальные длины
                 
                 footer = (
-                    f"RZM:{'':<6} "  # RZM: + 6 пробелов
-                    f"{total_current_str:>{global_max_current_len}} "  # Текущее количество (глобальное выравнивание)
-                    f"{total_change_str:>{global_max_change_len}}"  # Изменение (глобальное выравнивание)
+                    f"RZM{'':<7}"     # RZM (позиции 1-10, как KPI+бар)
+                    f"{total_current_str:>6}"  # Текущее количество (позиции 11-16)
+                    f"{total_change_str:>4}"   # Изменение (позиции 17-20, без индикатора)
                 )
 
                 full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
