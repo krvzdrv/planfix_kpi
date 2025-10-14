@@ -124,48 +124,6 @@ def get_statuses_from_history(conn, report_date: date, manager: str) -> dict:
             statuses[status] = count
     return statuses
 
-def get_current_client_status(client_data, today):
-    """Определяет текущий статус клиента по самой последней дате"""
-    
-    # Сопоставление полей дат и статусов
-    status_dates = {
-        'NWI': client_data.get('data_dodania_do_nowi'),
-        'WTR': client_data.get('data_dodania_do_w_trakcie'),
-        'PSK': client_data.get('data_dodania_do_perspektywiczni'),
-        'PIZ': client_data.get('data_pierwszego_zamowienia'),
-        'REZ': client_data.get('data_dodania_do_rezygnacja'),
-        'BRK': client_data.get('data_dodania_do_brak_kontaktu'),
-        'ARC': client_data.get('data_dodania_do_archiwum')
-    }
-    
-    # Находим самую последнюю дату
-    latest_date = None
-    current_status = None
-    
-    for status, date_str in status_dates.items():
-        if date_str and date_str.strip():
-            try:
-                date_obj = datetime.strptime(date_str.strip()[:10], '%d-%m-%Y').date()
-                if latest_date is None or date_obj > latest_date:
-                    latest_date = date_obj
-                    current_status = status
-            except:
-                continue
-    
-    # Для STL/NAK - особая логика
-    if current_status is None and client_data.get('status_wspolpracy') == 'Stali klienci':
-        last_order_date = client_data.get('data_ostatniego_zamowienia')
-        if last_order_date and last_order_date.strip():
-            try:
-                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
-                days_diff = (today - order_date).days
-                current_status = 'STL' if days_diff <= 30 else 'NAK'
-            except:
-                current_status = 'NAK'
-        else:
-            current_status = 'NAK'
-    
-    return current_status
 
 def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, dict, dict):
     """
@@ -174,39 +132,27 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     2. Дневной приток клиентов (для статусов с датой входа).
     3. Дневной отток клиентов (для статусов с датой выхода).
     """
-    # 1. Рассчитываем АБСОЛЮТНЫЕ значения на сегодня по новой логике
-    query = """
-    SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
-           data_dodania_do_nowi, data_dodania_do_w_trakcie,
-           data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
-           data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
-           data_dodania_do_archiwum
-    FROM planfix_clients 
-    WHERE menedzer = %s AND is_deleted = false
-    """
+    # 1. Рассчитываем АБСОЛЮТНЫЕ значения на сегодня (ВОЗВРАЩАЕМ СТАРУЮ ЛОГИКУ)
+    query = "SELECT status_wspolpracy, data_ostatniego_zamowienia FROM planfix_clients WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''"
     params = (manager,)
     results = _execute_query(conn, query, params, f"current statuses for {manager}")
 
     current_totals = {status: 0 for status in CLIENT_STATUSES}
-    for row in results:
-        client_data = {
-            'id': row[0],
-            'status_wspolpracy': row[1],
-            'data_ostatniego_zamowienia': row[2],
-            'data_dodania_do_nowi': row[3],
-            'data_dodania_do_w_trakcie': row[4],
-            'data_dodania_do_perspektywiczni': row[5],
-            'data_pierwszego_zamowienia': row[6],
-            'data_dodania_do_rezygnacja': row[7],
-            'data_dodania_do_brak_kontaktu': row[8],
-            'data_dodania_do_archiwum': row[9]
-        }
-        
-        # Определяем текущий статус по новой логике
-        current_status = get_current_client_status(client_data, today)
-        
-        if current_status and current_status in current_totals:
-            current_totals[current_status] += 1
+    for full_status, last_order_date in results:
+        status_clean = full_status.strip()
+        if status_clean == 'Stali klienci':
+            days_diff = float('inf')
+            if last_order_date and last_order_date.strip():
+                try:
+                    days_diff = (today - datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()).days
+                except (ValueError, TypeError):
+                    pass
+            short_status = 'STL' if days_diff <= 30 else 'NAK'
+        else:
+            short_status = STATUS_MAPPING.get(status_clean)
+
+        if short_status and short_status in current_totals:
+            current_totals[short_status] += 1
             
     # 2. Рассчитываем ДНЕВНОЙ ПРИТОК
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
@@ -236,86 +182,33 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     return current_totals, daily_inflow, daily_outflow
 
 def get_current_statuses_for_date(conn, manager: str, target_date: date) -> dict:
-    """Получает статусы клиентов на определенную дату"""
+    """Получает статусы клиентов на определенную дату (используем старую логику для CURRENT)"""
     
-    query = """
-    SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
-           data_dodania_do_nowi, data_dodania_do_w_trakcie,
-           data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
-           data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
-           data_dodania_do_archiwum
-    FROM planfix_clients 
-    WHERE menedzer = %s AND is_deleted = false
-    """
+    # Для расчета CURRENT используем старую логику - берем status_wspolpracy из Planfix
+    # Это правильно, потому что CURRENT должен показывать фактическое состояние
+    query = "SELECT status_wspolpracy, data_ostatniego_zamowienia FROM planfix_clients WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''"
     params = (manager,)
     results = _execute_query(conn, query, params, f"statuses for {manager} on {target_date}")
 
     current_totals = {status: 0 for status in CLIENT_STATUSES}
-    for row in results:
-        client_data = {
-            'id': row[0],
-            'status_wspolpracy': row[1],
-            'data_ostatniego_zamowienia': row[2],
-            'data_dodania_do_nowi': row[3],
-            'data_dodania_do_w_trakcie': row[4],
-            'data_dodania_do_perspektywiczni': row[5],
-            'data_pierwszego_zamowienia': row[6],
-            'data_dodania_do_rezygnacja': row[7],
-            'data_dodania_do_brak_kontaktu': row[8],
-            'data_dodania_do_archiwum': row[9]
-        }
-        
-        # Определяем статус на целевую дату
-        current_status = get_current_client_status_for_date(client_data, target_date)
-        
-        if current_status and current_status in current_totals:
-            current_totals[current_status] += 1
+    for full_status, last_order_date in results:
+        status_clean = full_status.strip()
+        if status_clean == 'Stali klienci':
+            days_diff = float('inf')
+            if last_order_date and last_order_date.strip():
+                try:
+                    days_diff = (target_date - datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()).days
+                except (ValueError, TypeError):
+                    pass
+            short_status = 'STL' if days_diff <= 30 else 'NAK'
+        else:
+            short_status = STATUS_MAPPING.get(status_clean)
+
+        if short_status and short_status in current_totals:
+            current_totals[short_status] += 1
     
     return current_totals
 
-def get_current_client_status_for_date(client_data, target_date):
-    """Определяет статус клиента на определенную дату"""
-    
-    # Сопоставление полей дат и статусов
-    status_dates = {
-        'NWI': client_data.get('data_dodania_do_nowi'),
-        'WTR': client_data.get('data_dodania_do_w_trakcie'),
-        'PSK': client_data.get('data_dodania_do_perspektywiczni'),
-        'PIZ': client_data.get('data_pierwszego_zamowienia'),
-        'REZ': client_data.get('data_dodania_do_rezygnacja'),
-        'BRK': client_data.get('data_dodania_do_brak_kontaktu'),
-        'ARC': client_data.get('data_dodania_do_archiwum')
-    }
-    
-    # Находим самую последнюю дату до целевой даты
-    latest_date = None
-    current_status = None
-    
-    for status, date_str in status_dates.items():
-        if date_str and date_str.strip():
-            try:
-                date_obj = datetime.strptime(date_str.strip()[:10], '%d-%m-%Y').date()
-                # Учитываем только даты до или равные целевой дате
-                if date_obj <= target_date and (latest_date is None or date_obj > latest_date):
-                    latest_date = date_obj
-                    current_status = status
-            except:
-                continue
-    
-    # Для STL/NAK - особая логика
-    if current_status is None and client_data.get('status_wspolpracy') == 'Stali klienci':
-        last_order_date = client_data.get('data_ostatniego_zamowienia')
-        if last_order_date and last_order_date.strip():
-            try:
-                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
-                days_diff = (target_date - order_date).days
-                current_status = 'STL' if days_diff <= 30 else 'NAK'
-            except:
-                current_status = 'NAK'
-        else:
-            current_status = 'NAK'
-    
-    return current_status
 
 def get_global_max_count(all_managers_data: dict) -> int:
     """Получить глобальный максимум из словаря {manager: {status: count}}."""
