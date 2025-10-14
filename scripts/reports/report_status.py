@@ -310,6 +310,30 @@ def main():
 
         yesterday = today - timedelta(days=1)
         
+        # Рассчитываем глобальные максимальные длины для всех менеджеров
+        all_current_values = []
+        all_change_values = []
+        
+        for manager, current_totals in all_managers_totals.items():
+            previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
+            
+            for status in CLIENT_STATUSES:
+                curr_count = current_totals.get(status, 0)
+                inflow = all_managers_inflow[manager].get(status, 0)
+                
+                if status in ['STL', 'NAK']:
+                    prev_count = previous_stl_nak.get(status, 0)
+                    diff = curr_count - prev_count
+                else:
+                    diff = inflow
+                
+                all_current_values.append(str(curr_count))
+                change_str = f"+{diff}" if diff > 0 else (str(diff) if diff < 0 else "")
+                all_change_values.append(change_str)
+        
+        global_max_current_len = max(len(s) for s in all_current_values)
+        global_max_change_len = max(len(s) for s in all_change_values)
+        
         all_reports = []
         for manager, current_totals in all_managers_totals.items():
             report_body = ""
@@ -357,14 +381,12 @@ def main():
                 total_current_str = str(total_sum)
                 total_change_str = f"+{total_net}" if total_net > 0 else (str(total_net) if total_net < 0 else "")
                 
-                # Используем те же максимальные длины, что и в данных
-                max_current_len = max(len(str(data['current'])) for data in status_changes.values())
-                max_change_len = max(len(f"+{data['net']}" if data['net'] > 0 else (str(data['net']) if data['net'] < 0 else "")) for data in status_changes.values())
+                # Используем уже рассчитанные глобальные максимальные длины
                 
                 footer = (
-                    f"RZM:{'':<6} "  # RZM: + 6 пробелов (уменьшили)
-                    f"{total_current_str:>{max_current_len}} "  # Текущее количество (правое выравнивание)
-                    f"{total_change_str:>{max_change_len}}"  # Изменение (правое выравнивание)
+                    f"RZM:{'':<6} "  # RZM: + 6 пробелов
+                    f"{total_current_str:>{global_max_current_len}} "  # Текущее количество (глобальное выравнивание)
+                    f"{total_change_str:>{global_max_change_len}}"  # Изменение (глобальное выравнивание)
                 )
 
                 full_report_for_manager = f"{manager_header}\n\n{report_kpi_lines}\n{separator}\n{footer}"
