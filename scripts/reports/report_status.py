@@ -234,11 +234,11 @@ def format_client_status_report(changes: dict, global_max: int) -> str:
         percent_strings[status] = percent_str
         percent_values.append(percent_str)
 
-    # Находим максимальные ширины для каждого столбца
-    max_current_len = max(len(s) for s in current_values)
-    max_change_len = max(len(s) for s in change_values)
-    max_inout_len = max(len(s) for s in inout_values)
-    max_percent_len = max(len(s) for s in percent_values)
+    # Используем фиксированные ширины столбцов для всех менеджеров
+    max_current_len = 6   # Фиксированная ширина для текущего количества
+    max_change_len = 4    # Фиксированная ширина для изменений
+    max_inout_len = 12    # Фиксированная ширина для [IN/OUT]
+    max_percent_len = 4   # Фиксированная ширина для процентов
 
     max_bar_len = 4  # Еще больше уменьшаем максимальную длину бара
     lines = []
@@ -311,29 +311,9 @@ def main():
 
         yesterday = today - timedelta(days=1)
         
-        # Рассчитываем глобальные максимальные длины для всех менеджеров
-        all_current_values = []
-        all_change_values = []
-        
-        for manager, current_totals in all_managers_totals.items():
-            previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
-            
-            for status in CLIENT_STATUSES:
-                curr_count = current_totals.get(status, 0)
-                inflow = all_managers_inflow[manager].get(status, 0)
-                
-                if status in ['STL', 'NAK']:
-                    prev_count = previous_stl_nak.get(status, 0)
-                    diff = curr_count - prev_count
-                else:
-                    diff = inflow
-                
-                all_current_values.append(str(curr_count))
-                change_str = f"+{diff}" if diff > 0 else (str(diff) if diff < 0 else "")
-                all_change_values.append(change_str)
-        
-        global_max_current_len = max(len(s) for s in all_current_values)
-        global_max_change_len = max(len(s) for s in all_change_values)
+        # Используем фиксированные ширины для всех менеджеров
+        global_max_current_len = 6   # Фиксированная ширина для текущего количества
+        global_max_change_len = 4    # Фиксированная ширина для изменений
         
         all_reports = []
         for manager, current_totals in all_managers_totals.items():
