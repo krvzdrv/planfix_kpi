@@ -180,21 +180,25 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
             
-    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК
+    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК по реальным переходам
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
-    for status, col_name in STATUS_INFLOW_DATE_COLS.items():
-        query = f"SELECT COUNT(*) FROM planfix_clients WHERE menedzer = %s AND {col_name} IS NOT NULL AND {col_name} != '' AND TO_DATE({col_name}, 'DD-MM-YYYY') = %s AND is_deleted = false"
-        params_inflow = (manager, today)
-        (count,) = _execute_query(conn, query, params_inflow, f"inflow for {status}")[0]
-        daily_inflow[status] = count
-
-    # 3. Рассчитываем ДНЕВНОЙ ОТТОК по правильной логике
-    daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
     
     # Получаем списки клиентов по статусам на вчера и сегодня
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
+    
+    # Рассчитываем приток как количество клиентов, которые пришли в статус
+    for status in CLIENT_STATUSES:
+        yesterday_set = yesterday_clients.get(status, set())
+        today_set = today_clients.get(status, set())
+        
+        # Приток = клиенты, которые НЕ были в статусе вчера, но в статусе сегодня
+        inflow_clients = today_set - yesterday_set
+        daily_inflow[status] = len(inflow_clients)
+
+    # 3. Рассчитываем ДНЕВНОЙ ОТТОК по правильной логике
+    daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     
     # Рассчитываем отток как количество клиентов, которые покинули статус
     for status in CLIENT_STATUSES:
@@ -209,17 +213,15 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if status == 'WTR' and len(outflow_clients) > 0:
             logger.info(f"WTR outflow clients: {outflow_clients}")
         if status == 'WTR' and daily_inflow[status] > 0:
-            logger.info(f"WTR inflow count: {daily_inflow[status]}")
+            logger.info(f"WTR inflow clients: {today_set - yesterday_set}")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
         logger.info(f"=== DEBUG INFO for {manager} ===")
-        logger.info(f"Yesterday WTR clients: {yesterday_clients.get('WTR', set())}")
-        logger.info(f"Today WTR clients: {today_clients.get('WTR', set())}")
-        logger.info(f"WTR new clients: {today_clients.get('WTR', set()) - yesterday_clients.get('WTR', set())}")
-        logger.info(f"NWI yesterday: {yesterday_clients.get('NWI', set())}")
-        logger.info(f"NWI today: {today_clients.get('NWI', set())}")
-        logger.info(f"NWI left clients: {yesterday_clients.get('NWI', set()) - today_clients.get('NWI', set())}")
+        logger.info(f"WTR inflow: {daily_inflow['WTR']} clients")
+        logger.info(f"WTR outflow: {daily_outflow['WTR']} clients")
+        logger.info(f"NWI inflow: {daily_inflow['NWI']} clients")
+        logger.info(f"NWI outflow: {daily_outflow['NWI']} clients")
         logger.info("=== END DEBUG ===")
 
     return current_totals, daily_inflow, daily_outflow
