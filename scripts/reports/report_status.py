@@ -181,31 +181,93 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
 
     return current_totals, daily_inflow, daily_outflow
 
-def get_current_statuses_for_date(conn, manager: str, target_date: date) -> dict:
-    """Получает статусы клиентов на определенную дату (используем старую логику для CURRENT)"""
+def get_client_status_on_date(client_data, target_date):
+    """Определяет, в каком статусе был клиент на определенную дату"""
     
-    # Для расчета CURRENT используем старую логику - берем status_wspolpracy из Planfix
-    # Это правильно, потому что CURRENT должен показывать фактическое состояние
-    query = "SELECT status_wspolpracy, data_ostatniego_zamowienia FROM planfix_clients WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''"
+    # Собираем все даты статусов (кроме STL/NAK)
+    status_dates = {
+        'NWI': client_data.get('data_dodania_do_nowi'),
+        'WTR': client_data.get('data_dodania_do_w_trakcie'),
+        'PSK': client_data.get('data_dodania_do_perspektywiczni'),
+        'PIZ': client_data.get('data_pierwszego_zamowienia'),
+        'REZ': client_data.get('data_dodania_do_rezygnacja'),
+        'BRK': client_data.get('data_dodania_do_brak_kontaktu'),
+        'ARC': client_data.get('data_dodania_do_archiwum')
+    }
+    
+    # Находим самую последнюю дату, которая <= target_date
+    latest_date = None
+    status_on_date = None
+    
+    for status, date_str in status_dates.items():
+        if date_str and date_str.strip():
+            try:
+                date_obj = datetime.strptime(date_str.strip()[:10], '%d-%m-%Y').date()
+                
+                # Берем только даты <= целевой даты
+                if date_obj <= target_date:
+                    if latest_date is None or date_obj > latest_date:
+                        latest_date = date_obj
+                        status_on_date = status
+            except:
+                continue
+    
+    # Для STL/NAK - особая логика (если нет других статусов или после PIZ)
+    if status_on_date is None and client_data.get('status_wspolpracy') == 'Stali klienci':
+        last_order_date = client_data.get('data_ostatniego_zamowienia')
+        if last_order_date and last_order_date.strip():
+            try:
+                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
+                days_diff = (target_date - order_date).days
+                status_on_date = 'STL' if days_diff <= 30 else 'NAK'
+            except:
+                status_on_date = 'NAK'
+        else:
+            status_on_date = 'NAK'
+    
+    # Если у клиента нет никаких дат, но он в статусе "Stali klienci"
+    # это значит он был добавлен давно и перешел в STL/NAK
+    if status_on_date is None and client_data.get('status_wspolpracy') == 'Stali klienci':
+        status_on_date = 'NAK'  # По умолчанию NAK если нет даты заказа
+    
+    return status_on_date
+
+def get_current_statuses_for_date(conn, manager: str, target_date: date) -> dict:
+    """Получает статусы клиентов на определенную дату"""
+    
+    query = """
+    SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
+           data_dodania_do_nowi, data_dodania_do_w_trakcie,
+           data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
+           data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
+           data_dodania_do_archiwum
+    FROM planfix_clients 
+    WHERE menedzer = %s AND is_deleted = false
+    """
     params = (manager,)
     results = _execute_query(conn, query, params, f"statuses for {manager} on {target_date}")
 
     current_totals = {status: 0 for status in CLIENT_STATUSES}
-    for full_status, last_order_date in results:
-        status_clean = full_status.strip()
-        if status_clean == 'Stali klienci':
-            days_diff = float('inf')
-            if last_order_date and last_order_date.strip():
-                try:
-                    days_diff = (target_date - datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()).days
-                except (ValueError, TypeError):
-                    pass
-            short_status = 'STL' if days_diff <= 30 else 'NAK'
-        else:
-            short_status = STATUS_MAPPING.get(status_clean)
-
-        if short_status and short_status in current_totals:
-            current_totals[short_status] += 1
+    
+    for row in results:
+        client_data = {
+            'id': row[0],
+            'status_wspolpracy': row[1],
+            'data_ostatniego_zamowienia': row[2],
+            'data_dodania_do_nowi': row[3],
+            'data_dodania_do_w_trakcie': row[4],
+            'data_dodania_do_perspektywichni': row[5],
+            'data_pierwszego_zamowienia': row[6],
+            'data_dodania_do_rezygnacja': row[7],
+            'data_dodania_do_brak_kontaktu': row[8],
+            'data_dodania_do_archiwum': row[9]
+        }
+        
+        # Определяем статус на целевую дату (по самой последней дате ≤ target_date)
+        status_on_date = get_client_status_on_date(client_data, target_date)
+        
+        if status_on_date and status_on_date in current_totals:
+            current_totals[status_on_date] += 1
     
     return current_totals
 
