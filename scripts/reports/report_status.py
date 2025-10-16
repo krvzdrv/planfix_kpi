@@ -188,22 +188,22 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         (count,) = _execute_query(conn, query, params_inflow, f"inflow for {status}")[0]
         daily_inflow[status] = count
 
-    # 3. Рассчитываем ДНЕВНОЙ ОТТОК по новой логике
+    # 3. Рассчитываем ДНЕВНОЙ ОТТОК по правильной логике
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
     
-    # Получаем снимки вчерашнего и сегодняшнего дня
-    yesterday_statuses = get_current_statuses_for_date(conn, manager, yesterday)
-    today_statuses = get_current_statuses_for_date(conn, manager, today)
+    # Получаем списки клиентов по статусам на вчера и сегодня
+    yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
+    today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # Рассчитываем отток как разность между вчерашним и сегодняшним количеством
+    # Рассчитываем отток как количество клиентов, которые покинули статус
     for status in CLIENT_STATUSES:
-        yesterday_count = yesterday_statuses.get(status, 0)
-        today_count = today_statuses.get(status, 0)
+        yesterday_set = yesterday_clients.get(status, set())
+        today_set = today_clients.get(status, set())
         
-        # Отток = было вчера больше, чем сегодня
-        if yesterday_count > today_count:
-            daily_outflow[status] = yesterday_count - today_count
+        # Отток = клиенты, которые были в статусе вчера, но НЕ в статусе сегодня
+        outflow_clients = yesterday_set - today_set
+        daily_outflow[status] = len(outflow_clients)
 
     return current_totals, daily_inflow, daily_outflow
 
@@ -296,6 +296,45 @@ def get_current_statuses_for_date(conn, manager: str, target_date: date) -> dict
             current_totals[status_on_date] += 1
     
     return current_totals
+
+def get_clients_by_status_for_date(conn, manager: str, target_date: date) -> dict:
+    """Получает списки клиентов по статусам на определенную дату"""
+    
+    query = """
+    SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
+           data_dodania_do_nowi, data_dodania_do_w_trakcie,
+           data_dodania_do_perspektywichni, data_pierwszego_zamowienia,
+           data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
+           data_dodania_do_archiwum
+    FROM planfix_clients 
+    WHERE menedzer = %s AND is_deleted = false
+    """
+    params = (manager,)
+    results = _execute_query(conn, query, params, f"clients by status for {manager} on {target_date}")
+
+    clients_by_status = {status: set() for status in CLIENT_STATUSES}
+    
+    for row in results:
+        client_data = {
+            'id': row[0],
+            'status_wspolpracy': row[1],
+            'data_ostatniego_zamowienia': row[2],
+            'data_dodania_do_nowi': row[3],
+            'data_dodania_do_w_trakcie': row[4],
+            'data_dodania_do_perspektywichni': row[5],
+            'data_pierwszego_zamowienia': row[6],
+            'data_dodania_do_rezygnacja': row[7],
+            'data_dodania_do_brak_kontaktu': row[8],
+            'data_dodania_do_archiwum': row[9]
+        }
+        
+        # Определяем статус на целевую дату
+        status_on_date = get_client_status_on_date(client_data, target_date)
+        
+        if status_on_date and status_on_date in clients_by_status:
+            clients_by_status[status_on_date].add(row[0])  # Добавляем ID клиента
+    
+    return clients_by_status
 
 
 def get_global_max_count(all_managers_data: dict) -> int:
