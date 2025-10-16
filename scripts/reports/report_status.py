@@ -204,6 +204,23 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         # Отток = клиенты, которые были в статусе вчера, но НЕ в статусе сегодня
         outflow_clients = yesterday_set - today_set
         daily_outflow[status] = len(outflow_clients)
+        
+        # Отладочная информация для WTR
+        if status == 'WTR' and len(outflow_clients) > 0:
+            logger.info(f"WTR outflow clients: {outflow_clients}")
+        if status == 'WTR' and daily_inflow[status] > 0:
+            logger.info(f"WTR inflow count: {daily_inflow[status]}")
+            
+    # Дополнительная отладочная информация для понимания переходов
+    if manager == 'Stukalo Nazarii':
+        logger.info(f"=== DEBUG INFO for {manager} ===")
+        logger.info(f"Yesterday WTR clients: {yesterday_clients.get('WTR', set())}")
+        logger.info(f"Today WTR clients: {today_clients.get('WTR', set())}")
+        logger.info(f"WTR new clients: {today_clients.get('WTR', set()) - yesterday_clients.get('WTR', set())}")
+        logger.info(f"NWI yesterday: {yesterday_clients.get('NWI', set())}")
+        logger.info(f"NWI today: {today_clients.get('NWI', set())}")
+        logger.info(f"NWI left clients: {yesterday_clients.get('NWI', set()) - today_clients.get('NWI', set())}")
+        logger.info("=== END DEBUG ===")
 
     return current_totals, daily_inflow, daily_outflow
 
