@@ -1,0 +1,14 @@
+help - Показать список команд
+start - Начать работу с ботом
+report_all - Все отчеты
+report_activity - Отчет об активности
+report_kpi - KPI отчет
+report_bonus - Премии (текущий месяц)
+report_bonus_previous - Премии (предыдущий месяц)
+report_income - Отчет о доходах
+report_status - Статус клиентов (воронка)
+sync_all - Синхронизировать все данные
+sync_clients - Синхронизировать клиентов
+sync_orders - Синхронизировать заказы
+sync_tasks - Синхронизировать задачи
+

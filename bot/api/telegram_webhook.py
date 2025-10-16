@@ -40,17 +40,84 @@ def telegram_webhook():
         logger.info(f"Received message from {user_name} (ID: {user_id}): {text}")
 
         # Обработка команд
-        if text.startswith('/premia_current'):
-            command = "premia_current"
-            logger.info(f"Processing command: {command}")
+        command = None
+        
+        # Команды помощи
+        if text.startswith('/start') or text.startswith('/help'):
+            help_text = """
+🤖 **Доступные команды бота:**
+
+📊 **Отчеты:**
+/report_all - Отправить все отчеты
+/report_activity - Отчет об активности
+/report_kpi - KPI отчет
+/report_bonus - Отчет о премиях (текущий месяц)
+/report_bonus_previous - Отчет о премиях (предыдущий месяц)
+/report_income - Отчет о доходах
+/report_status - Статус клиентов
+
+🔄 **Синхронизация данных:**
+/sync_all - Синхронизировать все данные
+/sync_clients - Синхронизировать клиентов
+/sync_orders - Синхронизировать заказы
+/sync_tasks - Синхронизировать задачи
+
+ℹ️ /help - Показать это сообщение
+"""
+            # Отправляем справку напрямую
+            TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+            if TELEGRAM_BOT_TOKEN:
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": help_text,
+                            "parse_mode": "Markdown"
+                        },
+                        timeout=10
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send help message: {e}")
+            return jsonify({"status": "OK", "message": "Help sent"}), 200
+        
+        # Отчеты
+        elif text.startswith('/report_all'):
+            command = "report_all"
+        elif text.startswith('/report_activity'):
+            command = "report_activity"
+        elif text.startswith('/report_kpi'):
+            command = "report_kpi"
+        elif text.startswith('/report_bonus_previous'):
+            command = "report_bonus_previous"
+        elif text.startswith('/report_bonus'):
+            command = "report_bonus"
+        elif text.startswith('/report_income'):
+            command = "report_income"
+        elif text.startswith('/report_status'):
+            command = "report_status"
             
+        # Синхронизация данных
+        elif text.startswith('/sync_all'):
+            command = "sync_all"
+        elif text.startswith('/sync_clients'):
+            command = "sync_clients"
+        elif text.startswith('/sync_orders'):
+            command = "sync_orders"
+        elif text.startswith('/sync_tasks'):
+            command = "sync_tasks"
+            
+        # Старые команды для обратной совместимости
+        elif text.startswith('/premia_current'):
+            command = "report_bonus"
         elif text.startswith('/premia_previous'):
-            command = "premia_previous"
-            logger.info(f"Processing command: {command}")
+            command = "report_bonus_previous"
             
         else:
             logger.info(f"Ignoring message: {text}")
-            return jsonify({"status": "Ignored", "message": "Command not recognized"}), 200
+            return jsonify({"status": "Ignored", "message": "Command not recognized. Use /help for available commands."}), 200
+        
+        logger.info(f"Processing command: {command}")
 
         # Отправляем команду в GitHub Actions
         headers = {
