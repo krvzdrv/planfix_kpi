@@ -15,6 +15,31 @@ from core.kpi_utils import math_round
 # Load environment variables from .env file
 load_dotenv()
 
+def count_workdays(start_date, end_date):
+    """
+    Подсчитывает количество рабочих дней между двумя датами (исключая выходные).
+    
+    Args:
+        start_date: дата начала (date)
+        end_date: дата окончания (date)
+    
+    Returns:
+        int: количество рабочих дней
+    """
+    if start_date > end_date:
+        return 0
+    
+    workdays = 0
+    current_date = start_date
+    
+    while current_date <= end_date:
+        # Понедельник = 0, Воскресенье = 6
+        if current_date.weekday() < 5:  # 0-4 = понедельник-пятница
+            workdays += 1
+        current_date += timedelta(days=1)
+    
+    return workdays
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -141,13 +166,14 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     for full_status, last_order_date in results:
         status_clean = full_status.strip()
         if status_clean == 'Stali klienci':
-            days_diff = float('inf')
+            workdays_diff = float('inf')
             if last_order_date and last_order_date.strip():
                 try:
-                    days_diff = (today - datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()).days
+                    order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
+                    workdays_diff = count_workdays(order_date, today)
                 except (ValueError, TypeError):
                     pass
-            short_status = 'STL' if days_diff <= 30 else 'NAK'
+            short_status = 'STL' if workdays_diff <= 30 else 'NAK'
         else:
             short_status = STATUS_MAPPING.get(status_clean)
 
@@ -218,8 +244,8 @@ def get_client_status_on_date(client_data, target_date):
         if last_order_date and last_order_date.strip():
             try:
                 order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
-                days_diff = (target_date - order_date).days
-                status_on_date = 'STL' if days_diff <= 30 else 'NAK'
+                workdays_diff = count_workdays(order_date, target_date)
+                status_on_date = 'STL' if workdays_diff <= 30 else 'NAK'
             except:
                 status_on_date = 'NAK'
         else:
