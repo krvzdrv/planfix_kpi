@@ -282,7 +282,7 @@ def get_current_statuses_for_date(conn, manager: str, target_date: date) -> dict
             'data_ostatniego_zamowienia': row[2],
             'data_dodania_do_nowi': row[3],
             'data_dodania_do_w_trakcie': row[4],
-            'data_dodania_do_perspektywichni': row[5],
+            'data_dodania_do_perspektywiczni': row[5],
             'data_pierwszego_zamowienia': row[6],
             'data_dodania_do_rezygnacja': row[7],
             'data_dodania_do_brak_kontaktu': row[8],
@@ -303,7 +303,7 @@ def get_clients_by_status_for_date(conn, manager: str, target_date: date) -> dic
     query = """
     SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
            data_dodania_do_nowi, data_dodania_do_w_trakcie,
-           data_dodania_do_perspektywichni, data_pierwszego_zamowienia,
+           data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
            data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
            data_dodania_do_archiwum
     FROM planfix_clients 
@@ -321,7 +321,7 @@ def get_clients_by_status_for_date(conn, manager: str, target_date: date) -> dic
             'data_ostatniego_zamowienia': row[2],
             'data_dodania_do_nowi': row[3],
             'data_dodania_do_w_trakcie': row[4],
-            'data_dodania_do_perspektywichni': row[5],
+            'data_dodania_do_perspektywiczni': row[5],
             'data_pierwszego_zamowienia': row[6],
             'data_dodania_do_rezygnacja': row[7],
             'data_dodania_do_brak_kontaktu': row[8],
