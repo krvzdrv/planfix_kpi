@@ -221,6 +221,13 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         logger.info(f"Outflow: {daily_outflow}")
         logger.info(f"WTR yesterday: {len(yesterday_clients.get('WTR', set()))}, today: {len(today_clients.get('WTR', set()))}")
         logger.info(f"PSK yesterday: {len(yesterday_clients.get('PSK', set()))}, today: {len(today_clients.get('PSK', set()))}")
+        
+        # Детально по каждому статусу
+        for status in CLIENT_STATUSES:
+            yesterday_count = len(yesterday_clients.get(status, set()))
+            today_count = len(today_clients.get(status, set()))
+            if yesterday_count != today_count:
+                logger.info(f"{status}: yesterday={yesterday_count}, today={today_count}, diff={today_count - yesterday_count}")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
