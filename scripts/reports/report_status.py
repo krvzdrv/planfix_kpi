@@ -204,30 +204,33 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         # Получаем все переходы клиента за сегодня
         transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
         
+        # Находим где клиент был вчера и где сегодня
+        yesterday_status = None
+        today_status = None
+        
+        for status in CLIENT_STATUSES:
+            if client_id in yesterday_clients.get(status, set()):
+                yesterday_status = status
+            if client_id in today_clients.get(status, set()):
+                today_status = status
+        
         if transitions:
-            # Если есть переходы сегодня, считаем inflow/outflow по цепочке
+            # Если есть переходы сегодня, считаем inflow по всей цепочке
             for i, status in enumerate(transitions):
                 daily_inflow[status] += 1
                 # Outflow для всех кроме последнего в цепочке
                 if i < len(transitions) - 1:
                     daily_outflow[status] += 1
         else:
-            # Если нет переходов сегодня, сравниваем статус вчера и сегодня
-            yesterday_status = None
-            today_status = None
-            
-            for status in CLIENT_STATUSES:
-                if client_id in yesterday_clients.get(status, set()):
-                    yesterday_status = status
-                if client_id in today_clients.get(status, set()):
-                    today_status = status
-            
-            # Если статус изменился
-            if yesterday_status != today_status:
-                if yesterday_status:
-                    daily_outflow[yesterday_status] += 1
-                if today_status:
-                    daily_inflow[today_status] += 1
+            # Если нет переходов сегодня, но статус изменился - считаем inflow
+            if yesterday_status != today_status and today_status:
+                daily_inflow[today_status] += 1
+        
+        # OUTFLOW считаем ВСЕГДА по сравнению вчера/сегодня
+        if yesterday_status and yesterday_status != today_status:
+            # Только если клиент НЕ в цепочке переходов (чтобы не дублировать)
+            if not transitions or yesterday_status not in transitions:
+                daily_outflow[yesterday_status] += 1
 
     # Отладочная информация
     if manager == 'Kozik Andrzej':
