@@ -189,23 +189,36 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # Находим всех клиентов, которые были активны сегодня
+    # Находим всех клиентов, которые были активны сегодня или вчера
     all_today_clients = set()
     for status_set in today_clients.values():
         all_today_clients.update(status_set)
     
+    all_yesterday_clients = set()
+    for status_set in yesterday_clients.values():
+        all_yesterday_clients.update(status_set)
+    
+    all_active_clients = all_today_clients | all_yesterday_clients
+    
     # Для каждого активного клиента находим все его переходы за день
-    for client_id in all_today_clients:
+    for client_id in all_active_clients:
         transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
         
-        # Считаем переходы как inflow в соответствующий статус
-        for status in transitions:
-            daily_inflow[status] += 1
-        
-        # Если клиент был в статусе вчера, но не сегодня - это outflow
-        for status in CLIENT_STATUSES:
-            if client_id in yesterday_clients.get(status, set()) and client_id not in today_clients.get(status, set()):
-                daily_outflow[status] += 1
+        # Если у клиента есть переходы сегодня
+        if transitions:
+            # Считаем inflow и outflow для каждого статуса в цепочке переходов
+            for i, status in enumerate(transitions):
+                # Inflow - клиент был в этом статусе
+                daily_inflow[status] += 1
+                
+                # Outflow - клиент ушел из этого статуса в другой (не последний в цепочке)
+                if i < len(transitions) - 1:
+                    daily_outflow[status] += 1
+        else:
+            # Если нет переходов сегодня, проверяем outflow для клиентов, которые ушли
+            for status in CLIENT_STATUSES:
+                if client_id in yesterday_clients.get(status, set()) and client_id not in today_clients.get(status, set()):
+                    daily_outflow[status] += 1
 
     # Отладочная информация для WTR
     if daily_outflow.get('WTR', 0) > 0:
