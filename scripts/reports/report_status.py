@@ -180,7 +180,7 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
             
-    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК по всем переходам за день
+    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК по изменениям между вчера и сегодня
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
@@ -189,36 +189,18 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # Находим всех клиентов, которые были активны сегодня или вчера
-    all_today_clients = set()
-    for status_set in today_clients.values():
-        all_today_clients.update(status_set)
-    
-    all_yesterday_clients = set()
-    for status_set in yesterday_clients.values():
-        all_yesterday_clients.update(status_set)
-    
-    all_active_clients = all_today_clients | all_yesterday_clients
-    
-    # Для каждого активного клиента находим все его переходы за день
-    for client_id in all_active_clients:
-        transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
+    # Для каждого статуса считаем inflow и outflow
+    for status in CLIENT_STATUSES:
+        yesterday_set = yesterday_clients.get(status, set())
+        today_set = today_clients.get(status, set())
         
-        # Если у клиента есть переходы сегодня
-        if transitions:
-            # Считаем inflow и outflow для каждого статуса в цепочке переходов
-            for i, status in enumerate(transitions):
-                # Inflow - клиент был в этом статусе
-                daily_inflow[status] += 1
-                
-                # Outflow - клиент ушел из этого статуса в другой (не последний в цепочке)
-                if i < len(transitions) - 1:
-                    daily_outflow[status] += 1
-        else:
-            # Если нет переходов сегодня, проверяем outflow для клиентов, которые ушли
-            for status in CLIENT_STATUSES:
-                if client_id in yesterday_clients.get(status, set()) and client_id not in today_clients.get(status, set()):
-                    daily_outflow[status] += 1
+        # Inflow = клиенты, которых НЕ было в статусе вчера, но ЕСТЬ сегодня
+        inflow_clients = today_set - yesterday_set
+        daily_inflow[status] = len(inflow_clients)
+        
+        # Outflow = клиенты, которые БЫЛИ в статусе вчера, но НЕТ сегодня
+        outflow_clients = yesterday_set - today_set
+        daily_outflow[status] = len(outflow_clients)
 
     # Отладочная информация для WTR
     if daily_outflow.get('WTR', 0) > 0:
