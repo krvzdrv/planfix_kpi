@@ -650,24 +650,20 @@ def main():
                 previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
                 
                 status_changes = {}
-                total_new_clients = 0  # Счетчик реальных новых клиентов
+                
+                # Получаем вчерашние данные для расчета net
+                yesterday_totals = get_statuses_from_history(conn, yesterday, manager)
                 
                 for status in CLIENT_STATUSES:
                     curr_count = current_totals.get(status, 0)
+                    prev_count = yesterday_totals.get(status, 0)
                     inflow = all_managers_inflow[manager].get(status, 0)
                     outflow = all_managers_outflow[manager].get(status, 0)
                     
-                    # Новая логика Вариант 3:
-                    # - Промежуточные статусы (NWI, WTR, PSK): net = 0, но показываем inflow/outflow
-                    # - Финальные статусы (PIZ, STL, NAK, REZ, BRK, ARC): net = inflow - outflow
-                    if status in ['PIZ', 'STL', 'NAK', 'REZ', 'BRK', 'ARC']:
-                        # Финальные статусы - показываем реальное изменение
-                        diff = inflow - outflow
-                        if diff > 0:
-                            total_new_clients += diff
-                    else:
-                        # Промежуточные статусы - net = 0
-                        diff = 0
+                    # Правильная логика Вариант 3:
+                    # Net = реальное изменение (сегодня - вчера)
+                    # [Inflow/-Outflow] = движение через статус
+                    diff = curr_count - prev_count
 
                     direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
                     status_changes[status] = {
@@ -688,9 +684,9 @@ def main():
                 manager_header = f"👤 {manager}:"
                 separator = "─────────────────────────────────"
                 
-                # Используем total_new_clients для RZM
+                # RZM = сумма всех текущих и сумма всех изменений
                 total_current = sum(data['current'] for data in status_changes.values())
-                total_net = total_new_clients
+                total_net = sum(data['net'] for data in status_changes.values())
                 
                 # Формируем итоговую строку с правильным выравниванием
                 total_current_str = str(total_current)
