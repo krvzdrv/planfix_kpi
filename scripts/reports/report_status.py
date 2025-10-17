@@ -651,19 +651,15 @@ def main():
                 
                 status_changes = {}
                 
-                # Получаем вчерашние данные для расчета net
-                yesterday_totals = get_statuses_from_history(conn, yesterday, manager)
-                
                 for status in CLIENT_STATUSES:
                     curr_count = current_totals.get(status, 0)
-                    prev_count = yesterday_totals.get(status, 0)
                     inflow = all_managers_inflow[manager].get(status, 0)
                     outflow = all_managers_outflow[manager].get(status, 0)
                     
                     # Правильная логика Вариант 3:
-                    # Net = реальное изменение (сегодня - вчера)
+                    # Net = inflow - outflow (результат движения)
                     # [Inflow/-Outflow] = движение через статус
-                    diff = curr_count - prev_count
+                    diff = inflow - outflow
 
                     direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
                     status_changes[status] = {
