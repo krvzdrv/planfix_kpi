@@ -181,8 +181,7 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
             current_totals[short_status] += 1
             
     # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК 
-    # INFLOW: считаем по датам перехода в статус (data_dodania_do_status = today)
-    # OUTFLOW: считаем по разнице множеств (был вчера, нет сегодня)
+    # INFLOW и OUTFLOW: считаем по разнице множеств между вчера и сегодня
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
@@ -191,25 +190,16 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # INFLOW: считаем клиентов, которые перешли в статус СЕГОДНЯ (по дате перехода)
-    for status, date_col in STATUS_INFLOW_DATE_COLS.items():
-        # Запрос: клиенты с data_dodania_do_status = today
-        query = f"""
-        SELECT id FROM planfix_clients
-        WHERE menedzer = %s 
-        AND is_deleted = false
-        AND {date_col} IS NOT NULL
-        AND LEFT({date_col}, 10) = TO_CHAR(%s, 'DD-MM-YYYY')
-        """
-        params = (manager, today)
-        results = _execute_query(conn, query, params, f"inflow for {status}")
-        daily_inflow[status] = len(results)
-    
-    # OUTFLOW: считаем клиентов, которые ПОКИНУЛИ статус (был вчера, нет сегодня)
+    # INFLOW: клиенты, которых НЕ было в статусе вчера, но ЕСТЬ сегодня
+    # OUTFLOW: клиенты, которые БЫЛИ в статусе вчера, но НЕТ сегодня
     for status in CLIENT_STATUSES:
         yesterday_set = yesterday_clients.get(status, set())
         today_set = today_clients.get(status, set())
+        
+        inflow_clients = today_set - yesterday_set
         outflow_clients = yesterday_set - today_set
+        
+        daily_inflow[status] = len(inflow_clients)
         daily_outflow[status] = len(outflow_clients)
 
     # Отладочная информация
