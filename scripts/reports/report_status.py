@@ -180,8 +180,9 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
             
-    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК по всем переходам за день
+    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК по всем переходам за день
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
+    daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
     
     # Получаем списки клиентов по статусам на вчера и сегодня
@@ -197,27 +198,20 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     for client_id in all_today_clients:
         transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
         
-        # Считаем каждый переход как inflow в соответствующий статус
+        # Считаем переходы как inflow в соответствующий статус
         for status in transitions:
             daily_inflow[status] += 1
+        
+        # Если клиент был в статусе вчера, но не сегодня - это outflow
+        for status in CLIENT_STATUSES:
+            if client_id in yesterday_clients.get(status, set()) and client_id not in today_clients.get(status, set()):
+                daily_outflow[status] += 1
 
-    # 3. Рассчитываем ДНЕВНОЙ ОТТОК по правильной логике
-    daily_outflow = {status: 0 for status in CLIENT_STATUSES}
-    
-    # Рассчитываем отток как количество клиентов, которые покинули статус
-    for status in CLIENT_STATUSES:
-        yesterday_set = yesterday_clients.get(status, set())
-        today_set = today_clients.get(status, set())
-        
-        # Отток = клиенты, которые были в статусе вчера, но НЕ в статусе сегодня
-        outflow_clients = yesterday_set - today_set
-        daily_outflow[status] = len(outflow_clients)
-        
-        # Отладочная информация для WTR
-        if status == 'WTR' and len(outflow_clients) > 0:
-            logger.info(f"WTR outflow clients: {outflow_clients}")
-        if status == 'WTR' and daily_inflow[status] > 0:
-            logger.info(f"WTR inflow clients: {today_set - yesterday_set}")
+    # Отладочная информация для WTR
+    if daily_outflow.get('WTR', 0) > 0:
+        logger.info(f"WTR outflow: {daily_outflow['WTR']} clients")
+    if daily_inflow.get('WTR', 0) > 0:
+        logger.info(f"WTR inflow: {daily_inflow['WTR']} clients")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
@@ -643,13 +637,24 @@ def main():
                 previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
                 
                 status_changes = {}
+                total_new_clients = 0  # Счетчик реальных новых клиентов
+                
                 for status in CLIENT_STATUSES:
                     curr_count = current_totals.get(status, 0)
                     inflow = all_managers_inflow[manager].get(status, 0)
                     outflow = all_managers_outflow[manager].get(status, 0)
                     
-                    # Новая логика: NET = INFLOW - OUTFLOW для всех статусов
-                    diff = inflow - outflow
+                    # Новая логика Вариант 3:
+                    # - Промежуточные статусы (NWI, WTR, PSK): net = 0, но показываем inflow/outflow
+                    # - Финальные статусы (PIZ, STL, NAK, REZ, BRK, ARC): net = inflow - outflow
+                    if status in ['PIZ', 'STL', 'NAK', 'REZ', 'BRK', 'ARC']:
+                        # Финальные статусы - показываем реальное изменение
+                        diff = inflow - outflow
+                        if diff > 0:
+                            total_new_clients += diff
+                    else:
+                        # Промежуточные статусы - net = 0
+                        diff = 0
 
                     direction = "▲" if diff > 0 else ("▼" if diff < 0 else "-")
                     status_changes[status] = {
@@ -670,8 +675,9 @@ def main():
                 manager_header = f"👤 {manager}:"
                 separator = "─────────────────────────────────"
                 
-                # Используем новую функцию для расчета итогов
-                total_current, total_net = calculate_rzm_totals(status_changes)
+                # Используем total_new_clients для RZM
+                total_current = sum(data['current'] for data in status_changes.values())
+                total_net = total_new_clients
                 
                 # Формируем итоговую строку с правильным выравниванием
                 total_current_str = str(total_current)
