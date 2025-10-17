@@ -180,7 +180,8 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
             
-    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК по изменениям между вчера и сегодня
+    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК 
+    # Комбинированная логика: учитываем и переходы за день, и изменения между вчера/сегодня
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
@@ -189,18 +190,37 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # Для каждого статуса считаем inflow и outflow
-    for status in CLIENT_STATUSES:
-        yesterday_set = yesterday_clients.get(status, set())
-        today_set = today_clients.get(status, set())
+    # Находим всех активных клиентов (вчера или сегодня)
+    all_active_clients = set()
+    for status_set in today_clients.values():
+        all_active_clients.update(status_set)
+    for status_set in yesterday_clients.values():
+        all_active_clients.update(status_set)
+    
+    # Для каждого активного клиента смотрим на его движение
+    for client_id in all_active_clients:
+        # Находим где клиент был вчера и где сегодня
+        yesterday_status = None
+        today_status = None
         
-        # Inflow = клиенты, которых НЕ было в статусе вчера, но ЕСТЬ сегодня
-        inflow_clients = today_set - yesterday_set
-        daily_inflow[status] = len(inflow_clients)
+        for status in CLIENT_STATUSES:
+            if client_id in yesterday_clients.get(status, set()):
+                yesterday_status = status
+            if client_id in today_clients.get(status, set()):
+                today_status = status
         
-        # Outflow = клиенты, которые БЫЛИ в статусе вчера, но НЕТ сегодня
-        outflow_clients = yesterday_set - today_set
-        daily_outflow[status] = len(outflow_clients)
+        # Если статус изменился - это переход
+        if yesterday_status != today_status:
+            # Если клиента не было вчера, но есть сегодня - новый клиент в системе
+            if yesterday_status is None and today_status is not None:
+                daily_inflow[today_status] += 1
+            # Если клиент был вчера, но нет сегодня - ушел из системы
+            elif yesterday_status is not None and today_status is None:
+                daily_outflow[yesterday_status] += 1
+            # Если клиент переместился между статусами
+            elif yesterday_status is not None and today_status is not None:
+                daily_outflow[yesterday_status] += 1
+                daily_inflow[today_status] += 1
 
     # Отладочная информация для WTR
     if daily_outflow.get('WTR', 0) > 0:
