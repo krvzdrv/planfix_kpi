@@ -244,6 +244,21 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
             for row in results_psk_today[:3]:  # Первые 3
                 client_id = row[0]
                 logger.info(f"  Client {client_id}: in PSK yesterday? {client_id in psk_yesterday}, in PSK today? {client_id in psk_today}")
+                
+                # Получаем все даты для этого клиента
+                query_client_details = """
+                SELECT status_wspolpracy, data_dodania_do_nowi, data_dodania_do_w_trakcie,
+                       data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
+                       data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
+                       data_dodania_do_archiwum
+                FROM planfix_clients WHERE id = %s
+                """
+                client_details = _execute_query(conn, query_client_details, (client_id,), f"details for client {client_id}")
+                if client_details:
+                    details = client_details[0]
+                    logger.info(f"    Status: {details[0]}")
+                    logger.info(f"    NWI: {details[1]}, WTR: {details[2]}, PSK: {details[3]}")
+                    logger.info(f"    PIZ: {details[4]}, REZ: {details[5]}, BRK: {details[6]}, ARC: {details[7]}")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
