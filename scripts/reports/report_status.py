@@ -180,7 +180,7 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         if short_status and short_status in current_totals:
             current_totals[short_status] += 1
             
-    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК по реальным переходам
+    # 2. Рассчитываем ДНЕВНОЙ ПРИТОК по всем переходам за день
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
     yesterday = today - timedelta(days=1)
     
@@ -188,14 +188,18 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
-    # Рассчитываем приток как количество клиентов, которые пришли в статус
-    for status in CLIENT_STATUSES:
-        yesterday_set = yesterday_clients.get(status, set())
-        today_set = today_clients.get(status, set())
+    # Находим всех клиентов, которые были активны сегодня
+    all_today_clients = set()
+    for status_set in today_clients.values():
+        all_today_clients.update(status_set)
+    
+    # Для каждого активного клиента находим все его переходы за день
+    for client_id in all_today_clients:
+        transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
         
-        # Приток = клиенты, которые НЕ были в статусе вчера, но в статусе сегодня
-        inflow_clients = today_set - yesterday_set
-        daily_inflow[status] = len(inflow_clients)
+        # Считаем каждый переход как inflow в соответствующий статус
+        for status in transitions:
+            daily_inflow[status] += 1
 
     # 3. Рассчитываем ДНЕВНОЙ ОТТОК по правильной логике
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
@@ -218,10 +222,10 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
         logger.info(f"=== DEBUG INFO for {manager} ===")
-        logger.info(f"WTR inflow: {daily_inflow['WTR']} clients")
-        logger.info(f"WTR outflow: {daily_outflow['WTR']} clients")
-        logger.info(f"NWI inflow: {daily_inflow['NWI']} clients")
-        logger.info(f"NWI outflow: {daily_outflow['NWI']} clients")
+        logger.info(f"All transitions today:")
+        for status in CLIENT_STATUSES:
+            if daily_inflow[status] > 0:
+                logger.info(f"  {status}: +{daily_inflow[status]} (inflow)")
         logger.info("=== END DEBUG ===")
 
     return current_totals, daily_inflow, daily_outflow
@@ -354,6 +358,74 @@ def get_clients_by_status_for_date(conn, manager: str, target_date: date) -> dic
             clients_by_status[status_on_date].add(row[0])  # Добавляем ID клиента
     
     return clients_by_status
+
+def get_daily_transitions_for_client(conn, manager: str, client_id: int, target_date: date) -> list:
+    """Получает все переходы клиента за день"""
+    
+    query = """
+    SELECT id, status_wspolpracy, data_ostatniego_zamowienia,
+           data_dodania_do_nowi, data_dodania_do_w_trakcie,
+           data_dodania_do_perspektywiczni, data_pierwszego_zamowienia,
+           data_dodania_do_rezygnacja, data_dodania_do_brak_kontaktu,
+           data_dodania_do_archiwum
+    FROM planfix_clients 
+    WHERE menedzer = %s AND id = %s AND is_deleted = false
+    """
+    params = (manager, client_id)
+    results = _execute_query(conn, query, params, f"client {client_id} transitions for {manager} on {target_date}")
+    
+    if not results:
+        return []
+    
+    row = results[0]
+    client_data = {
+        'id': row[0],
+        'status_wspolpracy': row[1],
+        'data_ostatniego_zamowienia': row[2],
+        'data_dodania_do_nowi': row[3],
+        'data_dodania_do_w_trakcie': row[4],
+        'data_dodania_do_perspektywiczni': row[5],
+        'data_pierwszego_zamowienia': row[6],
+        'data_dodania_do_rezygnacja': row[7],
+        'data_dodania_do_brak_kontaktu': row[8],
+        'data_dodania_do_archiwum': row[9]
+    }
+    
+    # Собираем все даты статусов за день
+    status_dates = {}
+    for status, col_name in STATUS_INFLOW_DATE_COLS.items():
+        date_str = client_data.get(col_name)
+        if date_str and date_str.strip():
+            try:
+                date_obj = datetime.strptime(date_str.strip()[:10], '%d-%m-%Y').date()
+                if date_obj == target_date:
+                    status_dates[status] = date_obj
+            except (ValueError, TypeError):
+                pass
+    
+    # Добавляем STL/NAK если клиент был в статусе "Stali klienci"
+    if client_data.get('status_wspolpracy') == 'Stali klienci':
+        last_order_date = client_data.get('data_ostatniego_zamowienia')
+        if last_order_date and last_order_date.strip():
+            try:
+                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
+                if order_date == target_date:
+                    workdays_diff = count_workdays(order_date, target_date)
+                    if workdays_diff <= 30:
+                        status_dates['STL'] = order_date
+                    else:
+                        status_dates['NAK'] = order_date
+            except (ValueError, TypeError):
+                pass
+    
+    # Сортируем по времени (если есть время) или по порядку статусов
+    status_order = ['NWI', 'WTR', 'PSK', 'PIZ', 'STL', 'NAK', 'REZ', 'BRK', 'ARC']
+    transitions = []
+    for status in status_order:
+        if status in status_dates:
+            transitions.append(status)
+    
+    return transitions
 
 
 def get_global_max_count(all_managers_data: dict) -> int:
