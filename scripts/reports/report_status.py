@@ -224,14 +224,26 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         # Специальная проверка для PSK
         psk_yesterday = yesterday_clients.get('PSK', set())
         psk_today = today_clients.get('PSK', set())
-        if len(psk_yesterday) == len(psk_today) and daily_inflow['PSK'] > 0:
-            new_in_psk = psk_today - psk_yesterday
-            left_psk = psk_yesterday - psk_today
-            logger.info(f"PSK DETAILED: same count but inflow={daily_inflow['PSK']}")
-            logger.info(f"  New clients in PSK: {len(new_in_psk)} clients")
-            logger.info(f"  Left PSK: {len(left_psk)} clients")
-            if len(left_psk) > 0:
-                logger.info(f"  Clients who left PSK: {list(left_psk)[:5]}")  # Первые 5 ID
+        
+        # Если inflow показывает +2, но множества не изменились - проблема с датами
+        logger.info(f"PSK CHECK: yesterday={len(psk_yesterday)}, today={len(psk_today)}, inflow_calculated={daily_inflow['PSK']}")
+        
+        # Ищем клиентов с data_dodania_do_perspektywiczni = сегодня
+        query_psk_today = """
+        SELECT id, data_dodania_do_perspektywiczni
+        FROM planfix_clients
+        WHERE menedzer = %s 
+        AND is_deleted = false
+        AND data_dodania_do_perspektywiczni IS NOT NULL
+        AND LEFT(data_dodania_do_perspektywiczni, 10) = TO_CHAR(%s, 'DD-MM-YYYY')
+        """
+        results_psk_today = _execute_query(conn, query_psk_today, (manager, today), "PSK clients with date = today")
+        logger.info(f"Clients with PSK date = today: {len(results_psk_today)} clients")
+        
+        if len(results_psk_today) > 0:
+            for row in results_psk_today[:3]:  # Первые 3
+                client_id = row[0]
+                logger.info(f"  Client {client_id}: in PSK yesterday? {client_id in psk_yesterday}, in PSK today? {client_id in psk_today}")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
