@@ -222,11 +222,15 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                 daily_outflow[yesterday_status] += 1
                 daily_inflow[today_status] += 1
 
-    # Отладочная информация для WTR
-    if daily_outflow.get('WTR', 0) > 0:
-        logger.info(f"WTR outflow: {daily_outflow['WTR']} clients")
-    if daily_inflow.get('WTR', 0) > 0:
-        logger.info(f"WTR inflow: {daily_inflow['WTR']} clients")
+    # Отладочная информация
+    if manager == 'Kozik Andrzej':
+        logger.info(f"=== DEBUG for {manager} ===")
+        logger.info(f"Yesterday clients count: {sum(len(s) for s in yesterday_clients.values())}")
+        logger.info(f"Today clients count: {sum(len(s) for s in today_clients.values())}")
+        logger.info(f"Inflow: {daily_inflow}")
+        logger.info(f"Outflow: {daily_outflow}")
+        logger.info(f"WTR yesterday: {len(yesterday_clients.get('WTR', set()))}, today: {len(today_clients.get('WTR', set()))}")
+        logger.info(f"PSK yesterday: {len(yesterday_clients.get('PSK', set()))}, today: {len(today_clients.get('PSK', set()))}")
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
