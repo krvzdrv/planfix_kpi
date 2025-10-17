@@ -274,6 +274,9 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
 def get_client_status_on_date(client_data, target_date):
     """Определяет, в каком статусе был клиент на определенную дату"""
     
+    # Порядок статусов в воронке (важно для случаев с одинаковыми датами)
+    status_order = ['NWI', 'WTR', 'PSK', 'PIZ', 'REZ', 'BRK', 'ARC']
+    
     # Собираем все даты статусов (кроме STL/NAK)
     status_dates = {
         'NWI': client_data.get('data_dodania_do_nowi'),
@@ -286,6 +289,7 @@ def get_client_status_on_date(client_data, target_date):
     }
     
     # Находим самую последнюю дату, которая <= target_date
+    # Если даты одинаковые, выбираем статус, который идет ПОЗЖЕ в воронке
     latest_date = None
     status_on_date = None
     
@@ -296,9 +300,15 @@ def get_client_status_on_date(client_data, target_date):
                 
                 # Берем только даты <= целевой даты
                 if date_obj <= target_date:
+                    # Если дата новее, или дата та же, но статус позже в воронке
                     if latest_date is None or date_obj > latest_date:
                         latest_date = date_obj
                         status_on_date = status
+                    elif date_obj == latest_date and status_on_date:
+                        # Если даты одинаковые, выбираем статус, который позже в воронке
+                        if status in status_order and status_on_date in status_order:
+                            if status_order.index(status) > status_order.index(status_on_date):
+                                status_on_date = status
             except:
                 continue
     
