@@ -224,10 +224,24 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
         
         # Детально по каждому статусу
         for status in CLIENT_STATUSES:
-            yesterday_count = len(yesterday_clients.get(status, set()))
-            today_count = len(today_clients.get(status, set()))
+            yesterday_set = yesterday_clients.get(status, set())
+            today_set = today_clients.get(status, set())
+            yesterday_count = len(yesterday_set)
+            today_count = len(today_set)
             if yesterday_count != today_count:
                 logger.info(f"{status}: yesterday={yesterday_count}, today={today_count}, diff={today_count - yesterday_count}")
+        
+        # Специальная проверка для PSK
+        psk_yesterday = yesterday_clients.get('PSK', set())
+        psk_today = today_clients.get('PSK', set())
+        if len(psk_yesterday) == len(psk_today) and daily_inflow['PSK'] > 0:
+            new_in_psk = psk_today - psk_yesterday
+            left_psk = psk_yesterday - psk_today
+            logger.info(f"PSK DETAILED: same count but inflow={daily_inflow['PSK']}")
+            logger.info(f"  New clients in PSK: {len(new_in_psk)} clients")
+            logger.info(f"  Left PSK: {len(left_psk)} clients")
+            if len(left_psk) > 0:
+                logger.info(f"  Clients who left PSK: {list(left_psk)[:5]}")  # Первые 5 ID
             
     # Дополнительная отладочная информация для понимания переходов
     if manager == 'Stukalo Nazarii':
