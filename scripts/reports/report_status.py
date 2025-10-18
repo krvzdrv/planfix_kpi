@@ -183,13 +183,27 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     # 2. Рассчитываем ДНЕВНОЙ ПРИТОК и ОТТОК 
     # Комбинированная логика:
     # - Для клиентов с переходами СЕГОДНЯ: считаем все переходы
-    # - Для остальных клиентов: сравниваем вчера vs сегодня
+    # - Для остальных клиентов: сравниваем с последним рабочим днем
     daily_inflow = {status: 0 for status in CLIENT_STATUSES}
     daily_outflow = {status: 0 for status in CLIENT_STATUSES}
-    yesterday = today - timedelta(days=1)
     
-    # Получаем списки клиентов по статусам на вчера и сегодня
-    yesterday_clients = get_clients_by_status_for_date(conn, manager, yesterday)
+    # Определяем последний рабочий день для сравнения
+    # Понедельник (0) → сравниваем с пятницей (-3 дня)
+    # Вторник-пятница (1-4) → сравниваем со вчера (-1 день)
+    # Суббота/воскресенье (5-6) → сравниваем с пятницей
+    if today.weekday() == 0:  # Понедельник
+        last_workday = today - timedelta(days=3)
+    elif today.weekday() == 6:  # Воскресенье
+        last_workday = today - timedelta(days=2)
+    elif today.weekday() == 5:  # Суббота
+        last_workday = today - timedelta(days=1)
+    else:  # Вторник-пятница
+        last_workday = today - timedelta(days=1)
+    
+    logger.info(f"Comparing {today} (weekday={today.weekday()}) with last workday: {last_workday}")
+    
+    # Получаем списки клиентов по статусам на последний рабочий день и сегодня
+    yesterday_clients = get_clients_by_status_for_date(conn, manager, last_workday)
     today_clients = get_clients_by_status_for_date(conn, manager, today)
     
     # Находим всех активных клиентов (вчера или сегодня)
