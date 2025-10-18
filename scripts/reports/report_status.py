@@ -190,21 +190,29 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     # Определяем последний рабочий день для сравнения
     # Понедельник (0) → сравниваем с пятницей (-3 дня)
     # Вторник-пятница (1-4) → сравниваем со вчера (-1 день)
-    # Суббота/воскресенье (5-6) → сравниваем с пятницей
+    # Суббота/воскресенье (5-6) → показываем данные за пятницу
+    is_weekend_report = False
+    report_date = today
+    
     if today.weekday() == 0:  # Понедельник
-        last_workday = today - timedelta(days=3)
-    elif today.weekday() == 6:  # Воскресенье
-        last_workday = today - timedelta(days=2)
-    elif today.weekday() == 5:  # Суббота
-        last_workday = today - timedelta(days=1)
+        last_workday = today - timedelta(days=3)  # Пятница
+    elif today.weekday() >= 5:  # Суббота или воскресенье
+        # В выходные показываем отчет за пятницу
+        is_weekend_report = True
+        days_since_friday = today.weekday() - 4
+        report_date = today - timedelta(days=days_since_friday)  # Пятница
+        last_workday = report_date - timedelta(days=1)  # Четверг
+        logger.info(f"⚠️ Weekend report: showing data for Friday {report_date} (comparing with Thursday {last_workday})")
     else:  # Вторник-пятница
         last_workday = today - timedelta(days=1)
     
-    logger.info(f"Comparing {today} (weekday={today.weekday()}) with last workday: {last_workday}")
+    if not is_weekend_report:
+        logger.info(f"Comparing {today} (weekday={today.weekday()}) with last workday: {last_workday}")
     
-    # Получаем списки клиентов по статусам на последний рабочий день и сегодня
+    # Получаем списки клиентов по статусам на последний рабочий день и report_date
+    # В выходные report_date = пятница, в остальные дни = today
     yesterday_clients = get_clients_by_status_for_date(conn, manager, last_workday)
-    today_clients = get_clients_by_status_for_date(conn, manager, today)
+    today_clients = get_clients_by_status_for_date(conn, manager, report_date)
     
     # Находим всех активных клиентов (вчера или сегодня)
     all_active_clients = set()
@@ -215,8 +223,8 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     
     # Для каждого активного клиента проверяем его переходы
     for client_id in all_active_clients:
-        # Получаем все переходы клиента за сегодня
-        transitions = get_daily_transitions_for_client(conn, manager, client_id, today)
+        # Получаем все переходы клиента за report_date (сегодня или пятница в выходные)
+        transitions = get_daily_transitions_for_client(conn, manager, client_id, report_date)
         
         # Находим где клиент был вчера и где сегодня
         yesterday_status = None
@@ -743,8 +751,20 @@ def main():
         
         # Отправляем один общий отчет
         if all_reports:
-            final_report_header = f"WORONKA_{today.strftime('%d.%m.%Y')}"
-            final_report = f"```{final_report_header}\n\n" + "\n\n".join(all_reports) + "\n```"
+            # Проверяем, выходной ли день
+            is_weekend = today.weekday() >= 5
+            
+            if is_weekend:
+                # В выходные показываем данные за пятницу
+                days_since_friday = today.weekday() - 4
+                friday = today - timedelta(days=days_since_friday)
+                final_report_header = f"WORONKA_{friday.strftime('%d.%m.%Y')}"
+                weekend_note = f"⚠️ Отчет за пятницу {friday.strftime('%d.%m.%Y')} (сегодня выходной)\n\n"
+                final_report = f"```{final_report_header}\n\n{weekend_note}" + "\n\n".join(all_reports) + "\n```"
+            else:
+                final_report_header = f"WORONKA_{today.strftime('%d.%m.%Y')}"
+                final_report = f"```{final_report_header}\n\n" + "\n\n".join(all_reports) + "\n```"
+            
             send_to_telegram(final_report)
 
     except psycopg2.Error as e:
