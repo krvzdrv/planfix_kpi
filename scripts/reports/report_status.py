@@ -314,6 +314,21 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
 def get_client_status_on_date(client_data, target_date):
     """Определяет, в каком статусе был клиент на определенную дату"""
     
+    # ПРИОРИТЕТ 1: STL/NAK (если status_wspolpracy = 'Stali klienci')
+    # Это переопределяет ВСЕ другие статусы, включая PIZ!
+    if client_data.get('status_wspolpracy') == 'Stali klienci':
+        last_order_date = client_data.get('data_ostatniego_zamowienia')
+        if last_order_date and last_order_date.strip():
+            try:
+                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
+                workdays_diff = count_workdays(order_date, target_date)
+                return 'STL' if workdays_diff <= 30 else 'NAK'
+            except:
+                return 'NAK'
+        else:
+            return 'NAK'
+    
+    # ПРИОРИТЕТ 2: Остальные статусы по датам
     # Порядок статусов в воронке (важно для случаев с одинаковыми датами)
     status_order = ['NWI', 'WTR', 'PSK', 'PIZ', 'REZ', 'BRK', 'ARC']
     
@@ -351,24 +366,6 @@ def get_client_status_on_date(client_data, target_date):
                                 status_on_date = status
             except:
                 continue
-    
-    # Для STL/NAK - особая логика (если нет других статусов или после PIZ)
-    if status_on_date is None and client_data.get('status_wspolpracy') == 'Stali klienci':
-        last_order_date = client_data.get('data_ostatniego_zamowienia')
-        if last_order_date and last_order_date.strip():
-            try:
-                order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
-                workdays_diff = count_workdays(order_date, target_date)
-                status_on_date = 'STL' if workdays_diff <= 30 else 'NAK'
-            except:
-                status_on_date = 'NAK'
-        else:
-            status_on_date = 'NAK'
-    
-    # Если у клиента нет никаких дат, но он в статусе "Stali klienci"
-    # это значит он был добавлен давно и перешел в STL/NAK
-    if status_on_date is None and client_data.get('status_wspolpracy') == 'Stali klienci':
-        status_on_date = 'NAK'  # По умолчанию NAK если нет даты заказа
     
     return status_on_date
 
