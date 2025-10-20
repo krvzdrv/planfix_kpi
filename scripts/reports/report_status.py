@@ -315,14 +315,20 @@ def get_client_status_on_date(client_data, target_date):
     """Определяет, в каком статусе был клиент на определенную дату"""
     
     # ПРИОРИТЕТ 1: STL/NAK (если status_wspolpracy = 'Stali klienci')
-    # Это переопределяет ВСЕ другие статусы, включая PIZ!
+    # НО ТОЛЬКО если второй заказ был ДО target_date!
     if client_data.get('status_wspolpracy') == 'Stali klienci':
         last_order_date = client_data.get('data_ostatniego_zamowienia')
         if last_order_date and last_order_date.strip():
             try:
                 order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
-                workdays_diff = count_workdays(order_date, target_date)
-                return 'STL' if workdays_diff <= 30 else 'NAK'
+                # Если последний заказ ПОСЛЕ target_date → клиент ЕЩЕ НЕ БЫЛ в STL/NAK
+                if order_date > target_date:
+                    # Используем обычную логику по датам (PIZ и т.д.)
+                    pass
+                else:
+                    # Последний заказ БЫЛ до target_date → клиент УЖЕ в STL/NAK
+                    workdays_diff = count_workdays(order_date, target_date)
+                    return 'STL' if workdays_diff <= 30 else 'NAK'
             except:
                 return 'NAK'
         else:
