@@ -293,12 +293,20 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                 # Если статус изменился - считаем inflow
                 if yesterday_status != today_status and today_status:
                     daily_inflow[today_status] += 1
+                    
+                    # Debug для переходов в STL/NAK
+                    if yesterday_status in ['STL', 'NAK', 'PIZ'] or today_status in ['STL', 'NAK']:
+                        logger.info(f"[DEBUG] Client {client_id} inflow: {yesterday_status} → {today_status}")
         
         # OUTFLOW считаем ВСЕГДА по сравнению вчера/сегодня
         if yesterday_status and yesterday_status != today_status:
             # Только если клиент НЕ в цепочке переходов (чтобы не дублировать)
             if not transitions or yesterday_status not in transitions:
                 daily_outflow[yesterday_status] += 1
+                
+                # Debug для переходов с STL/NAK
+                if yesterday_status in ['STL', 'NAK'] or today_status in ['STL', 'NAK']:
+                    logger.info(f"[DEBUG] Client {client_id}: {yesterday_status} → {today_status}")
 
 
     return current_totals, daily_inflow, daily_outflow
@@ -711,7 +719,14 @@ def main():
         global_max = get_global_max_count(all_managers_totals)
         logger.info(f"Global max count for today is: {global_max}")
 
-        yesterday = today - timedelta(days=1)
+        # Определяем last_workday для получения истории STL/NAK
+        if today.weekday() == 0:  # Понедельник
+            last_workday = today - timedelta(days=3)  # Пятница
+        elif today.weekday() >= 5:  # Суббота или воскресенье
+            days_since_friday = today.weekday() - 4
+            last_workday = today - timedelta(days=days_since_friday + 1)  # Четверг
+        else:  # Вторник-пятница
+            last_workday = today - timedelta(days=1)
         
         # Используем фиксированные ширины для всех менеджеров
         global_max_current_len = 6   # Фиксированная ширина для текущего количества
@@ -723,7 +738,9 @@ def main():
             try:
                 logger.info(f"Processing report for manager: {manager}")
                 
-                previous_stl_nak = get_statuses_from_history(conn, yesterday, manager)
+                # Получаем STL/NAK с последнего рабочего дня из истории
+                previous_stl_nak = get_statuses_from_history(conn, last_workday, manager)
+                logger.info(f"[DEBUG {manager}] STL/NAK history for {last_workday}: {previous_stl_nak}")
                 
                 status_changes = {}
                 
@@ -731,6 +748,10 @@ def main():
                     curr_count = current_totals.get(status, 0)
                     inflow = all_managers_inflow[manager].get(status, 0)
                     outflow = all_managers_outflow[manager].get(status, 0)
+                    
+                    # Debug для STL/NAK
+                    if status in ['STL', 'NAK'] and (inflow > 0 or outflow > 0):
+                        logger.info(f"[DEBUG {manager}] {status}: current={curr_count}, inflow={inflow}, outflow={outflow}")
                     
                     # Правильная логика Вариант 3:
                     # Net = inflow - outflow (результат движения)
