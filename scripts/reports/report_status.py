@@ -236,6 +236,10 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
             if client_id in today_clients.get(status, set()):
                 today_status = status
         
+        # Проверяем, новый ли это клиент в системе
+        was_in_system_yesterday = yesterday_status is not None
+        is_new_client = not was_in_system_yesterday and today_status is not None
+        
         if transitions:
             # Если есть переходы сегодня, считаем inflow по всей цепочке
             for i, status in enumerate(transitions):
@@ -243,9 +247,51 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                 # Outflow для всех кроме последнего в цепочке
                 if i < len(transitions) - 1:
                     daily_outflow[status] += 1
+            
+            # Если это новый клиент, проверяем его первый статус
+            if is_new_client and transitions:
+                # Получаем данные клиента из базы для поиска первого статуса
+                query_first_status = """
+                SELECT data_dodania_do_nowi, data_dodania_do_w_trakcie,
+                       data_dodania_do_perspektywiczni, data_pierwszego_zamowienia
+                FROM planfix_clients WHERE id = %s
+                """
+                result = _execute_query(conn, query_first_status, (client_id,), "first status")
+                
+                if result:
+                    dates = result[0]
+                    status_dates = {
+                        'NWI': dates[0],
+                        'WTR': dates[1],
+                        'PSK': dates[2],
+                        'PIZ': dates[3]
+                    }
+                    
+                    # Ищем самую раннюю дату (первый статус)
+                    earliest_status = None
+                    earliest_date = None
+                    
+                    for status, date_str in status_dates.items():
+                        if date_str and date_str.strip():
+                            try:
+                                date_obj = datetime.strptime(date_str.strip()[:10], '%d-%m-%Y').date()
+                                if earliest_date is None or date_obj < earliest_date:
+                                    earliest_date = date_obj
+                                    earliest_status = status
+                            except:
+                                continue
+                    
+                    # Если первый статус не в transitions, добавляем его
+                    if earliest_status and earliest_status not in transitions:
+                        daily_inflow[earliest_status] += 1
+                        daily_outflow[earliest_status] += 1
         else:
-            # Если нет переходов сегодня, но статус изменился - считаем inflow
-            if yesterday_status != today_status and today_status:
+            # Если нет переходов сегодня, но клиент появился - это новый клиент
+            if is_new_client:
+                # Новый клиент - добавляем inflow в его текущий статус
+                daily_inflow[today_status] += 1
+            # Если статус изменился (но без переходов сегодня) - считаем inflow
+            elif yesterday_status != today_status and today_status:
                 daily_inflow[today_status] += 1
         
         # OUTFLOW считаем ВСЕГДА по сравнению вчера/сегодня
