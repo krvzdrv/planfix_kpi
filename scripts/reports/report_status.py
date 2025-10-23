@@ -294,20 +294,12 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                 if yesterday_status != today_status and today_status:
                     daily_inflow[today_status] += 1
                     
-                    # Debug для переходов в STL/NAK
-                    if yesterday_status in ['STL', 'NAK', 'PIZ'] or today_status in ['STL', 'NAK']:
-                        logger.info(f"[DEBUG] Client {client_id} inflow: {yesterday_status} → {today_status}")
-        
         # OUTFLOW считаем ВСЕГДА по сравнению вчера/сегодня
         if yesterday_status and yesterday_status != today_status:
             # Только если клиент НЕ в цепочке переходов (чтобы не дублировать)
             if not transitions or yesterday_status not in transitions:
                 daily_outflow[yesterday_status] += 1
                 
-                # Debug для переходов с STL/NAK
-                if yesterday_status in ['STL', 'NAK'] or today_status in ['STL', 'NAK']:
-                    logger.info(f"[DEBUG] Client {client_id}: {yesterday_status} → {today_status}")
-
 
     return current_totals, daily_inflow, daily_outflow
 
@@ -743,7 +735,6 @@ def main():
                 
                 # Получаем STL/NAK с последнего рабочего дня из истории
                 previous_stl_nak = get_statuses_from_history(conn, last_workday, manager)
-                logger.info(f"[DEBUG {manager}] STL/NAK history for {last_workday}: {previous_stl_nak}")
                 
                 status_changes = {}
                 
@@ -751,10 +742,6 @@ def main():
                     curr_count = current_totals.get(status, 0)
                     inflow = all_managers_inflow[manager].get(status, 0)
                     outflow = all_managers_outflow[manager].get(status, 0)
-                    
-                    # Debug для STL/NAK
-                    if status in ['STL', 'NAK'] and (inflow > 0 or outflow > 0):
-                        logger.info(f"[DEBUG {manager}] {status}: current={curr_count}, inflow={inflow}, outflow={outflow}")
                     
                     # Правильная логика Вариант 3:
                     # Net = inflow - outflow (результат движения)
