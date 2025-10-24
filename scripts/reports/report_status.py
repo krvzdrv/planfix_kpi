@@ -163,6 +163,7 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     results = _execute_query(conn, query, params, f"current statuses for {manager}")
 
     current_totals = {status: 0 for status in CLIENT_STATUSES}
+    
     for full_status, last_order_date in results:
         status_clean = full_status.strip()
         if status_clean == 'Stali klienci':
@@ -172,7 +173,8 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                     order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
                     workdays_diff = count_workdays(order_date, today)
                 except (ValueError, TypeError):
-                    pass
+                    # Если дата не парсится, считаем клиента NAK
+                    workdays_diff = float('inf')
             short_status = 'STL' if workdays_diff <= 30 else 'NAK'
         else:
             short_status = STATUS_MAPPING.get(status_clean)
