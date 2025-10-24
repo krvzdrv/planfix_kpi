@@ -157,7 +157,7 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     2. Дневной приток клиентов (для статусов с датой входа).
     3. Дневной отток клиентов (для статусов с датой выхода).
     """
-    # 1. Рассчитываем АБСОЛЮТНЫЕ значения на сегодня (ВОЗВРАЩАЕМ СТАРУЮ ЛОГИКУ)
+    # 1. Рассчитываем АБСОЛЮТНЫЕ значения на сегодня
     query = "SELECT status_wspolpracy, data_ostatniego_zamowienia FROM planfix_clients WHERE menedzer = %s AND is_deleted = false AND status_wspolpracy IS NOT NULL AND status_wspolpracy != ''"
     params = (manager,)
     results = _execute_query(conn, query, params, f"current statuses for {manager}")
@@ -166,6 +166,8 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
     
     for full_status, last_order_date in results:
         status_clean = full_status.strip()
+        
+        # ПРИОРИТЕТ 1: STL/NAK (если status_wspolpracy = 'Stali klienci')
         if status_clean == 'Stali klienci':
             workdays_diff = float('inf')
             if last_order_date and last_order_date.strip():
@@ -173,9 +175,12 @@ def get_current_statuses_and_inflow(conn, manager: str, today: date) -> (dict, d
                     order_date = datetime.strptime(last_order_date.strip()[:10], '%d-%m-%Y').date()
                     workdays_diff = count_workdays(order_date, today)
                 except (ValueError, TypeError):
-                    # Если дата не парсится, считаем клиента NAK
                     workdays_diff = float('inf')
             short_status = 'STL' if workdays_diff <= 30 else 'NAK'
+        # ПРИОРИТЕТ 2: PIZ (если status_wspolpracy = 'Pierwsze zamówienie')
+        elif status_clean == 'Pierwsze zamówienie':
+            short_status = 'PIZ'
+        # ПРИОРИТЕТ 3: Остальные статусы по STATUS_MAPPING
         else:
             short_status = STATUS_MAPPING.get(status_clean)
 
